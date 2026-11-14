@@ -1,7 +1,7 @@
 # Découpage du travail en worktrees
 
 Sources :
-- `contract/knowledge-graph.yaml` (**v0.4.0**), la référence pour les routes, les schémas, les tables, les agents, les modules et les outils ;
+- `contract/knowledge-graph.yaml` (**v0.4.0, validé par l'équipe**), la référence pour les routes, les schémas, les tables, les agents, les modules et les outils ;
 - `SOLUTION.md`, qui donne les décisions de produit et de conception, et leurs raisons.
 
 Chaque chantier possède ses dossiers et n'écrit nulle part ailleurs, pour que les branches se fusionnent sans conflit.
@@ -74,7 +74,7 @@ Attention :
 1. `terraform plan` puis `apply`, par une seule personne.
 2. Exécuter l'ingestion (WS3) et téléverser le jeu de données dans le bucket (préfixe = `DATASET_VERSION`), y compris `etf_enriched.json`.
 3. **Knowledge Base :** envoyer `docs/for_KB/` vers `s3://<bucket>/kb/<version>/` (fichiers et `.metadata.json`), puis lancer l'ingestion de la KB (`job-kb-sync`). C'est l'étape la plus longue : à lancer en premier.
-4. Activer l'accès aux modèles Bedrock (Haiku et Sonnet), créer le Guardrail s'il n'est pas dans Terraform, créer les comptes Cognito des personas.
+4. Vérifier l'accès à Claude Sonnet 5.5 dans us-east-1 (déjà testé par l'équipe), créer le Guardrail s'il n'est pas dans Terraform, créer les comptes Cognito des personas.
 5. Tests de bout en bout :
    - login, conversation et portefeuille ;
    - message de cadrage, puis confirmation du mandat ;
@@ -98,6 +98,7 @@ Décisions fermes :
 - Pas de serveur MCP : nos propres outils Python.
 - Aucun calcul par un LLM. Tout chiffre affiché vient du registre de preuves d'un run (EV-nn), toute citation réglementaire de la Knowledge Base (KB-nn).
 - Aucun texte ne recommande un titre précis. Les alternatives sont formulées par catégorie d'actifs.
+- Région AWS us-east-1 pour toutes les ressources. Modèle : Claude Sonnet 5.5 pour les 3 agents (profil d'inférence global.anthropic.claude-sonnet-5-5), lu dans la config par agent.
 - Langue : tout le système interne est en anglais (prompts système, descriptions d'outils et de paramètres, docstrings, échanges entre composants, requêtes et corpus de la KB, journaux). Seuls les textes affichés à l'utilisateur sont dans sa langue (userLanguage). L'orchestrateur traduit à l'entrée et à la sortie (SOLUTION.md section 7.0, contrat conventions.language_policy).
 
 Règles de travail :

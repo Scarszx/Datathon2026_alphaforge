@@ -2,7 +2,7 @@ application:
   name: "AlphaForge"
   version: "0.4.0"
   description: "Banc d'essai agentique et auto-explicatif pour l'investisseur autonome : il cadre l'intention, simule son impact sur le portefeuille et l'audite contre les textes réglementaires canadiens (simulation seulement). Datathon 2026."
-  status: "brouillon à valider par l'équipe"
+  status: "validé par l'équipe (2026-11-14)"
   solution_ref: "SOLUTION.md (racine du dépôt) : décisions de produit et de conception détaillées"
   # Règle d'équipe : ce fichier est la référence. Toute modification passe par un accord de l'équipe.
   # Voir aussi : la page de présentation du contrat (même contenu, avec schémas).
@@ -53,7 +53,7 @@ conventions:
     ui_labels: "les libellés fixes (noms de mesures, règles) sont traduits par le front à partir de clés stables."
   jurisdictions: ["CA", "QC", "ON", "BC", "AB", "SK", "MB", "NB", "NS", "PE", "NL", "YT", "NT", "NU"]  # CA = textes nationaux
   pagination: "limit + cursor opaque; réponse { items, nextCursor }"
-  region: "A_CONFIRMER (compte d'atelier AWS; Bedrock est annoncé disponible à Montréal)"
+  region: "us-east-1 (validé : accès aux modèles testé par l'équipe; toutes les ressources y restent)"
   error_format_ref: "schema-error"
   error_codes:
     UNAUTHORIZED: 401
@@ -865,7 +865,7 @@ agents:
     status: "retenu"
     role: "Seule voix face à l'utilisateur. Détecte userLanguage et traduit chaque message de l'utilisateur en anglais avant toute action; tout ce qu'il transmet aux outils et aux autres composants est en anglais; traduit dans userLanguage tout texte affiché (réponse, quickReplies, narrative, motifs de verdict, mentions), en conservant les emplacements {EV-nn}/{KB-nn} et sans traduire les extraits réglementaires. Lit la session (portefeuille, profil, province), détecte ce qui manque, pose au plus une étape de questions (quickReplies), propose le mandat, attend sa confirmation, puis lance l'analyse. Répond aux questions de suivi à partir du registre. Ne calcule jamais de tête et ne nomme jamais un titre comme recommandation."
     runs_in: "srv-agent-runtime"
-    model: "Claude Haiku via Bedrock (identifiant exact à confirmer selon l'accès du compte)"
+    model: "Claude Sonnet 5.5 via Bedrock, région us-east-1 (profil d'inférence global.anthropic.claude-sonnet-5-5, testé par l'équipe; lu dans la config)"
     max_tokens: 1024
     allowed_tools: ["tool-get-portfolio", "tool-get-profile", "tool-search-assets", "tool-propose-mandate", "tool-read-evidence"]
     system_prompt_language: "en"
@@ -883,7 +883,7 @@ agents:
     system_prompt_language: "en"
     role: "Travaille en anglais (requêtes KB et motifs en anglais). Ne décide pas des verdicts (module-rules le fait). Pour chaque verdict, cherche dans la Knowledge Base le passage qui le fonde (filtre juridiction ∈ {CA, province}), l'inscrit au registre (KB-nn) et formule le motif en une phrase."
     runs_in: "srv-agent-runtime"
-    model: "Claude Haiku via Bedrock (à confirmer)"
+    model: "Claude Sonnet 5.5 via Bedrock, région us-east-1 (profil d'inférence global.anthropic.claude-sonnet-5-5, testé par l'équipe; lu dans la config)"
     max_tokens: 1024
     allowed_tools: ["tool-search-regulation", "tool-read-evidence"]
     limits: { max_tool_calls: 8, timeout_seconds: 20 }
@@ -897,7 +897,7 @@ agents:
     system_prompt_language: "en"
     role: "Rédige en anglais (textEn) 4 sections (données utilisées, pourquoi ce verdict, limites, ce qui changerait la réponse) à partir du registre seulement; agent-orchestrator les traduit. N'écrit aucun chiffre : seulement des emplacements {EV-nn} et {KB-nn}."
     runs_in: "srv-agent-runtime"
-    model: "Claude Sonnet via Bedrock (à confirmer)"
+    model: "Claude Sonnet 5.5 via Bedrock, région us-east-1 (profil d'inférence global.anthropic.claude-sonnet-5-5, testé par l'équipe; lu dans la config)"
     max_tokens: 2048
     allowed_tools: ["tool-read-evidence"]
     limits: { max_tool_calls: 3, timeout_seconds: 25 }
@@ -1137,12 +1137,11 @@ rules_catalog:
 # ==========================================
 open_questions:
   - "Chat synchrone (départ) ou asynchrone : à reconsidérer si les agents dépassent environ 25 s."
-  - "Modèle Bedrock de chaque agent et région : à confirmer avec l'accès réel du compte d'atelier."
   - "Univers d'actifs à télécharger au-delà des 31 du jeu fourni, et données ESG, fondamentaux, composition des FNB."
   - "Empaquetage de pandas/pyarrow dans la Lambda et temps de chargement à froid : à tester tôt."
   - "Isolation IAM par agent : choix actuel = rôle unique et limites dans le code. Évolutions possibles : rôles étroits par outil (STS) ou Lambdas d'outils."
   - "Route /v1/agents (registre public) : optionnelle. À régénérer pour v0.4.0 (agents, modules, outils)."
   - "Complétion d'un run (partial → done) : invocation asynchrone de la Lambda puis relecture par api-runs-get (compatible API Gateway HTTP), ou réponse diffusée en continu via une URL de fonction Lambda. À trancher selon le temps."
-  - "Magasin de vecteurs de la Knowledge Base (option la plus rapide à créer sur le compte d'atelier) et région : à confirmer."
+  - "Magasin de vecteurs de la Knowledge Base (option la plus rapide à créer sur le compte d'atelier, dans us-east-1) : à confirmer."
   - "Seuils d'hypothèse d'équipe (R2, R6, R7) : à valider en équipe."
   - "Relevé manuel de etf_enriched.json (fiches émetteurs datées) : à faire."

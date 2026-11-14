@@ -9,6 +9,7 @@
 > - Les décisions de la section 18 (« Ce qu'on a écarté ») sont prises. Ne les rouvre pas sans demande explicite.
 > - Tout ce qui est marqué **hypothèse d'équipe** est un choix de l'équipe, pas une règle officielle. L'interface doit le présenter comme tel.
 > - **Décision technique ferme : les agents sont construits avec le SDK Strands Agents (Python) et les modèles d'Amazon Bedrock.** Pas d'autre framework d'agents (LangChain, LlamaIndex…), pas d'appel direct à un autre fournisseur de modèles.
+> - **Décision ferme : région AWS `us-east-1` et Claude Sonnet 5.5 pour les 3 agents** (accès testé par l'équipe). Le contrat v0.4.0 est **validé par l'équipe**.
 > - **Décision ferme : tout le système interne est en anglais** (prompts, descriptions d'outils, échanges entre agents, requêtes et corpus de la KB). Seuls les textes affichés à l'utilisateur sont dans sa langue. L'orchestrateur traduit à l'entrée et à la sortie. Voir section 7.0.
 > - Les commandes AWS et Terraform suivent `AGENTS.md` : `source scripts/aws-env.sh && ...`, le compte doit contenir `WSParticipantRole`, et aucun `terraform apply` ni aucune création de ressource sans demande explicite.
 
@@ -176,7 +177,7 @@ Le prompt système de l'orchestrateur, rédigé en anglais, contient donc explic
 
 **Repli si la latence pose problème en démo :** le rédacteur peut écrire directement dans `userLanguage` (paramètre transmis en anglais dans son contexte), ce qui évite l'étape de traduction. Le reste de la politique ne change pas.
 
-### 7.1 Orchestrateur — LLM (Claude Haiku via Bedrock)
+### 7.1 Orchestrateur — LLM (Claude Sonnet 5.5 via Bedrock)
 - **Rôle :** il est la seule voix qui parle à l'utilisateur.
   - Il détecte la langue de l'utilisateur et traduit sa demande en anglais (7.0).
   - Il lit la session (portefeuille, profil de base, province) et détecte ce qui manque pour le mandat.
@@ -203,7 +204,7 @@ Le prompt système de l'orchestrateur, rédigé en anglais, contient donc explic
   - `macro_regime(date)`.
 - **Alternative (scénario 2) :** une règle déterministe. Elle garde le montant de l'idée, mais remplace l'actif risqué par une catégorie compatible avec le profil retenu, ou limite la poche à un plafond d'**hypothèse d'équipe**. Le moteur peut produire 1 ou 2 alternatives. Toutes sont décrites par catégorie.
 
-### 7.3 Auditeur de convenance — LLM (Claude Haiku) + KB + règles en code
+### 7.3 Auditeur de convenance — LLM (Claude Sonnet 5.5) + KB + règles en code
 - **Rôle :** les **verdicts viennent des règles R1 à R10, écrites en code** (section 9). L'auditeur ne décide pas du verdict. Il **cherche dans la Knowledge Base le passage qui fonde chaque verdict**, l'inscrit au registre (`KB-xx` : document, section, extrait court, juridiction, version, URL) et formule le motif en une phrase.
 - **Outils :**
   - `check_rules(mandate, scenarios)` (code) ;
@@ -211,7 +212,7 @@ Le prompt système de l'orchestrateur, rédigé en anglais, contient donc explic
 - **Langue :** il travaille en anglais. Ses motifs de verdict sont en anglais, et l'orchestrateur les traduit pour l'affichage.
 - **Fail mode :** si aucun passage pertinent n'est trouvé, le verdict reste affiché avec la mention « fondement : hypothèse d'équipe » ou « non vérifié ». L'auditeur n'invente jamais de citation.
 
-### 7.4 Rédacteur — LLM (Claude Sonnet)
+### 7.4 Rédacteur — LLM (Claude Sonnet 5.5)
 - **Rôle :** rédiger **4 rubriques** à partir du registre seulement :
   1. Quelles données ont été utilisées
   2. Pourquoi ce verdict
@@ -401,7 +402,7 @@ Les seuils marqués « hypothèse » vivent dans un fichier de configuration (pa
 |---|---|
 | **S3 + CloudFront** | Hébergement de l'interface ; Parquet ; corpus de la KB |
 | **Lambda (ou AgentCore Runtime)** | Orchestrateur et pipeline. Réponse diffusée en continu (`RESPONSE_STREAM`, NDJSON, signal régulier pour garder la connexion ouverte). Garder la Lambda chaude pendant la démo |
-| **Bedrock + Strands** | Haiku pour l'orchestrateur et l'auditeur, Sonnet pour le rédacteur. **Tester l'accès aux modèles** sur le compte de l'événement dès le début (profil d'inférence global : l'IAM a ses pièges) |
+| **Bedrock + Strands** | **Claude Sonnet 5.5 pour les 3 agents**, région **us-east-1** (décision validée : accès testé par l'équipe ; profil d'inférence `global.anthropic.claude-sonnet-5-5`, lu dans la config par agent pour pouvoir en changer). Toutes les ressources AWS restent dans us-east-1 |
 | **Bedrock Knowledge Bases** | Corpus réglementaire avec filtre de métadonnées par juridiction |
 | **Bedrock Guardrails** | Filtre d'entrée et de sortie |
 | **DynamoDB** | Sessions, portefeuilles, mandats versionnés, registres, résultats. Les sessions de démo peuvent être rejouées si Bedrock ou le réseau flanche |
@@ -491,7 +492,6 @@ Les calculs, les règles et le vérificateur ont aussi des **tests unitaires san
 ## 19. Points ouverts et risques
 
 - **Contrat v0.4.0 aligné sur ce document** (2026-11-14). Il reste à le faire valider par l'équipe et à propager les impacts listés dans `application.changelog.impacts_to_handle` : régénérer `backend/api/registry.json` et ses tests, ajouter dans Terraform la table `Analyses`, la KB, le Guardrail et les droits IAM.
-- L'accès aux modèles Bedrock et l'IAM sur le compte de l'événement.
 - Le temps de création de la KB (magasin de vecteurs).
 - Les faux positifs de Guardrails.
 - Le démarrage à froid de la Lambda pendant la démo.
