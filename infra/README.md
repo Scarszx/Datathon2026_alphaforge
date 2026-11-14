@@ -25,9 +25,9 @@ terraform apply                                 # une seule personne, après acc
 
 Remarques :
 
-- `terraform validate` passe **sans** identifiants AWS ni zips : aucune data source n'est évaluée par validate. En revanche `terraform plan` exige les zips de `build/` (lanter `build_lambdas.sh` avant).
+- `terraform validate` passe **sans** identifiants AWS ni zips : aucune data source n'est évaluée par validate. En revanche `terraform plan` exige les zips de `build/` (lancer `build_lambdas.sh` avant).
 - **`validate` ne remplace pas un `plan` réel** : il ne vérifie pas les appels de fonctions dans les `locals` ni le contenu des zips. Un `plan` (humain, avec credentials) reste obligatoire avant `apply`.
-- Tant que `backend/api/app.py` et `backend/agents/app.py` n'existent pas (WS4, WS5), `build_lambdas.sh` produit des **zips factices** (le handler n'y est pas). Le plan passe, la première invocation échouera jusqu'à l'arrivée du code réel.
+- Tant que `backend/api/app.py` et `backend/agents/app.py` n'existent pas (WS4, WS5), `build_lambdas.sh` produit des **zips factices** (le handler n'y est pas) et le contrôle `tickers.json` est reporté ; dès qu'il y a du code applicatif, le contrôle devient obligatoire. Le plan passe, la première invocation échouera jusqu'à l'arrivée du code réel.
 - Le zip embarque l'arborescence `backend/` sans `__init__.py` dans `backend/` et `backend/common/` (namespace packages, conforme au socle WS0) ; le handler est donc bien `backend/api/app.handler`.
 
 ## Variables à adapter (`terraform.tfvars`)
@@ -51,6 +51,8 @@ Remarques :
 3. Exécuter l'ingestion (WS3) et téléverser le jeu de données : `data/output/<version>/` → `s3://<bucket>/dataset/<version>/` (bucket en output `dataset_bucket`).
 4. Déposer le build du front dans `s3://<front bucket>/` (output `front_bucket`).
 
-## Écart documenté au doc WS1
+## Validation des tickers (Lambda API)
 
-Le doc WS1 prévoit « Lambda API = tables seulement », mais le contrat exige que `PUT holdings` valide chaque ticker contre `universe.parquet` (lecture S3 de ce seul fichier). Décision de l'équipe : respecter le contrat → la Lambda API a `s3:GetObject` restreint à `dataset/*/universe.parquet`. À re-discuter si le front valide lui-même les tickers.
+La Lambda API valide les tickers de `PUT holdings` avec une copie **embarquée** dans son zip : `backend/api/tickers.json` (contrat : srv-api-light.rules — « lecture S3 de ce seul fichier, ou copie embarquée »). Elle n'a donc **aucun droit S3**, et ses variables d'environnement ne contiennent ni `DATASET_BUCKET` ni `DATASET_VERSION`.
+
+Cette liste est **figée au moment du build** : si l'univers d'actifs change (WS3), il faut régénérer `tickers.json` depuis `universe.parquet` et reconstruire le zip — `build_lambdas.sh` échoue si le fichier manque dès qu'il y a du code applicatif. La Lambda agents, elle, lit le bucket (`s3:GetObject` sur le préfixe du jeu de données).

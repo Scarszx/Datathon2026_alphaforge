@@ -8,18 +8,25 @@ locals {
   api_zip    = "${path.module}/build/api.zip"
   agents_zip = "${path.module}/build/agents.zip"
 
-  lambda_env_vars = {
+  # Variables communes aux deux Lambdas (noms exacts de backend/common/config.py).
+  # La Lambda API valide les tickers avec une copie embarquée dans son zip
+  # (backend/api/tickers.json) : elle ne lit pas S3 et n'a ni DATASET_BUCKET
+  # ni DATASET_VERSION ; la Lambda agents les conserve.
+  common_env_vars = {
     USERS_TABLE         = local.table_names.users
     CONVERSATIONS_TABLE = local.table_names.conversations
     MESSAGES_TABLE      = local.table_names.messages
     PORTFOLIOS_TABLE    = local.table_names.portfolios
-    DATASET_BUCKET      = local.dataset_bucket
-    DATASET_VERSION     = var.dataset_version
     MODEL_ORCHESTRATOR  = var.model_orchestrator
     MODEL_ANALYST       = var.model_analyst
     MODEL_GOVERNANCE    = var.model_governance
     LOG_LEVEL           = var.log_level
   }
+  api_env_vars = local.common_env_vars
+  agents_env_vars = merge(local.common_env_vars, {
+    DATASET_BUCKET  = local.dataset_bucket
+    DATASET_VERSION = var.dataset_version
+  })
 }
 
 resource "aws_lambda_function" "api" {
@@ -39,7 +46,7 @@ resource "aws_lambda_function" "api" {
   source_code_hash = can(filebase64sha256(local.api_zip)) ? filebase64sha256(local.api_zip) : null
 
   environment {
-    variables = local.lambda_env_vars
+    variables = local.api_env_vars
   }
 
   depends_on = [
@@ -65,7 +72,7 @@ resource "aws_lambda_function" "agents" {
   layers = var.pandas_layer_arn != null ? [var.pandas_layer_arn] : null
 
   environment {
-    variables = local.lambda_env_vars
+    variables = local.agents_env_vars
   }
 
   depends_on = [

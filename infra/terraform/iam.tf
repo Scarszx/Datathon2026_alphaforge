@@ -68,14 +68,6 @@ data "aws_iam_policy_document" "api" {
     resources = [local.table_arn.portfolios]
   }
 
-  # Lecture du seul fichier de validation des tickers (toutes versions).
-  statement {
-    sid       = "DatasetUniverseRead"
-    effect    = "Allow"
-    actions   = ["s3:GetObject"]
-    resources = ["${local.dataset_prefix_arn}/universe.parquet"]
-  }
-
   # Journaux (groupes créés par Terraform, rétention 14 jours).
   statement {
     sid       = "Logs"

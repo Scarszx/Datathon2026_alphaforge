@@ -26,11 +26,31 @@ pip_install_arm() {
         --target "$1" -r "$2"
 }
 
+# Contrôle de fin de build api : la validation des tickers embarquée exige
+# backend/api/tickers.json dans le zip (contrat : srv-api-light.rules, lecture
+# S3 du seul fichier OU copie embarquée). Actif dès qu'il y a du code
+# applicatif ; tant que les handlers n'existent pas (WS4), les zips factices
+# passent avec un avertissement.
+check_tickers_json() {
+    local name="$1"
+    local zip="$build_dir/$name.zip"
+    if [ ! -f "$repo_root/backend/$name/app.py" ] && [ ! -f "$repo_root/backend/$name/requirements.txt" ]; then
+        echo "  (handlers pas encore livrés : contrôle tickers.json reporté)"
+        return 0
+    fi
+    if unzip -l "$zip" | grep -qE "backend/api/tickers[.]json$"; then
+        echo "  contrôle tickers.json : présent dans le zip"
+    else
+        echo "ERREUR : backend/api/tickers.json absent du zip de $name." >&2
+        echo "        Régénère-le depuis universe.parquet si l'univers de WS3 a changé." >&2
+        exit 1
+    fi
+}
+
 build_lambda() {
     local name="$1"
     local stage="$staging/$name"
     echo "=== Construction de $name.zip ==="
-
     mkdir -p "$stage/backend"
     cp -r "$repo_root/backend/$name" "$stage/backend/$name"
     cp -r "$repo_root/backend/common" "$stage/backend/common"
@@ -58,6 +78,9 @@ build_lambda() {
     # Tout le contenu du stage : backend/ (code) et les dépendances à la racine.
     (cd "$stage" && python3 -m zipfile -c "$build_dir/$name.zip" .)
     ls -lh "$build_dir/$name.zip"
+    if [ "$name" = "api" ]; then
+        check_tickers_json "$name"
+    fi
 }
 
 build_lambda api
