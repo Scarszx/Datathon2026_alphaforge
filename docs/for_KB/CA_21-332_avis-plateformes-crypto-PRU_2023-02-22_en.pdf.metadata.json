@@ -1,0 +1,14 @@
+{
+  "metadataAttributes": {
+    "juridiction": "CA",
+    "regulateur": "ACVM",
+    "sujets": [
+      "crypto"
+    ],
+    "date_version": "2023-02-22",
+    "langue": "en",
+    "type_document": "avis_personnel",
+    "source_url": "https://www.asc.ca/en/securities-law-and-policy/-/media/81AC364F57D44E2CABF1A5B6F4519E33.ashx",
+    "date_recuperation": "2026-11-14"
+  }
+}

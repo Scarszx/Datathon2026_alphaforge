@@ -1,0 +1,16 @@
+{
+  "metadataAttributes": {
+    "juridiction": "CA",
+    "regulateur": "ACVM-OCRI",
+    "sujets": [
+      "kyc",
+      "profil_risque",
+      "convenance"
+    ],
+    "date_version": "2025-12-10",
+    "langue": "fr",
+    "type_document": "avis_personnel",
+    "source_url": "https://fcnb.ca/sites/default/files/2025-12/2025-12-10-Avis%20conjoint%20des%20ACVM-OCRI-31-368.pdf",
+    "date_recuperation": "2026-11-14"
+  }
+}

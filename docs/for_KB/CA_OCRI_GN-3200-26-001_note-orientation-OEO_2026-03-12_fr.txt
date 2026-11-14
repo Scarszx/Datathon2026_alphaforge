@@ -1,0 +1,374 @@
+Source: https://www.ocri.ca/salle-de-presse/publications/note-dorientation-sur-les-services-et-les-activites-dexecution-dordres-sans-conseils-2
+Récupéré le 2026-11-14
+
+Fil d'Ariane
+ACCUEIL
+ / SALLE DE PRESSE / PUBLICATIONS / 
+
+NOTE D’ORIENTATION SUR LES SERVICES ET LES ACTIVITÉS D’EXÉCUTION D’ORDRES SANS CONSEILS
+
+Note d’orientation sur les services et les activités d’exécution d’ordres sans conseils
+le 12 mars 2026
+GN-3200-26-001
+Type :
+Note d’orientation
+Destinataires à l’interne 
+Affaires juridiques et conformité
+Opérations
+Détail
+Haute direction
+Renvoi au Manuel de réglementation 
+Règles CPPC
+Division 
+Courtiers en placement
+Personne(s)-ressource(s)
+Politique de réglementation des membres
+memberpolicymailbox@ciro.ca
+Sommaire
+
+L’Organisme canadien de réglementation des investissements (OCRI) publie une note d’orientation sur la capacité des courtiers en placement membres de l’OCRI qui offrent des services pour comptes sans conseils (les courtiers offrant des services pour comptes sans conseils) à offrir des informations fiables, utiles et en temps opportun ainsi que d’autres ressources d’aide à la décision dans le respect des exigences réglementaires auxquelles les courtiers offrant des services pour comptes sans conseils sont assujettis, et qui permettra aux investisseurs autonomes d’investir avec plus de confiance.
+
+La présente note d’orientation énonce les principales exigences réglementaires applicables aux courtiers offrant des services pour comptes sans conseils, y compris l’interdiction de formuler des recommandations, de même que nos attentes relativement à leur mise en application dans la pratique1. Elle présente les principaux éléments à prendre en compte pour déterminer si les ressources d’aide à la décision (telles que les ressources éducatives, les notifications, les alertes et les outils d’autoassistance) que les courtiers offrant des services pour comptes sans conseils peuvent proposer à leurs clients sont autorisées au motif qu’elles ne constituent pas une recommandation vis-à-vis d’une quelconque décision de placement.
+
+Les courtiers offrant des services pour comptes sans conseils doivent évaluer les ressources d’aide à la décision actuelles et futures à la lumière de cette note d’orientation afin de garantir leur cohérence avec le cadre réglementaire auquel ils sont assujettis. Ce faisant, il convient de prendre en considération les faits et circonstances propres à chaque cas. Ainsi, la présente note d’orientation n’a pas pour but d’être exhaustive. Nous invitons les courtiers offrant des services pour comptes sans conseils à nous consulter au sujet des ressources d’aide à la décision qu’ils offrent actuellement ou qu’ils envisagent d’offrir.
+
+Il convient de noter que la présente note d’orientation ne vise pas un courtier offrant des services pour comptes sans conseils qui se limitent, en totalité ou en grande partie, à des produits exclusifs ou affiliés2, ou à une gamme très limitée de produits. Dans ces cas, la capacité du courtier membre à régler les conflits d’intérêts qui en découleraient dans l’intérêt du client dépend de divers facteurs. Un courtier offrant des services pour comptes sans conseils qui envisage d’exercer ses activités de cette manière doit soumettre un avis de changement important dans ses activités conformément au paragraphe 2246(2) des Règles CPPC.
+
+1
+Dans la présente note d’orientation, tous les renvois à des règles concernent les Règles visant les courtiers en placement et règles partiellement consolidées (les Règles CPPC), sauf indication contraire.
+2
+Il est à noter que l’utilisation de l’expression « produits exclusifs ou affiliés » dans le présent document fait référence aux titres ou aux produits de placement dans lesquels le courtier offrant des services pour comptes sans conseils a une participation exclusive ou liée à une société du même groupe, y compris les titres ou les produits dans lesquels le courtier offrant des services pour comptes sans conseils ou un membre du même groupe n’a pas de participation, mais qu’il a un incitatif à promouvoir.
+Table des matières
+1. Introduction
+2. Cadre réglementaire
+2.1 Interdiction de formuler des recommandations
+2.1.1 Ressources d’aide à la décision
+2.2 Pertinence du compte
+2.3 Conflits d’intérêts
+2.4 Contrôle diligent
+3. Ressources d’aide à la décision
+3.1 Exemples de ressources d’aide à la décision
+3.1.1 Alertes et notifications
+3.1.2 Renseignements instructifs
+3.1.3 Outils d’autoassistance
+3.1.4 Contenu de tiers
+3.2 Combinaison de ressources d’aide à la décision
+3.3 Mesures de protection applicables aux ressources d’aide à la décision
+4. Conclusion
+5. Dispositions applicables
+6. Notes d’orientation antérieures
+7. Documents connexes
+1. Introduction
+
+Les comptes sans conseils sont destinés aux investisseurs qui choisissent de prendre leurs propres décisions de placement, ou les investisseurs autonomes. Les courtiers offrant des services pour comptes sans conseils fournissent des plateformes où les investisseurs peuvent négocier des produits de placement de manière indépendante et où ils sont les seuls responsables de toutes les décisions de placement, sans bénéficier de recommandations personnalisées ni d’évaluations de convenance de la part des courtiers offrant des services pour comptes sans conseils.
+
+Bien qu’ils ne soient pas tenus de le faire, les courtiers offrant des services pour comptes sans conseils peuvent proposer à leurs clients des ressources d’aide à la décision afin de les aider à prendre eux-mêmes des décisions de placement plus éclairées. Cette approche peut non seulement permettre d’obtenir de meilleurs résultats financiers, mais aussi d’accroître la confiance et l’engagement des investisseurs. Des informations pertinentes, fiables et ciblées et des outils d’autoassistance qui se fondent sur ces informations peuvent aider les clients à prendre des décisions de placement plus éclairées en leur permettant de mieux comprendre les principes de placement, d’évaluer eux-mêmes leur tolérance au risque et d’aligner avec précision leurs propres décisions de placement sur les objectifs financiers qu’ils ont eux-mêmes fixés.
+
+Par exemple, les ressources d’aide à la décision que propose un courtier offrant des services pour comptes sans conseils peuvent prendre la forme (cette liste ne se veut pas exhaustive) :
+
+d’informations mises à la disposition des clients sur la plateforme du courtier;
+de notifications et d’alertes envoyées aux clients;
+d’outils d’autoassistance conçus pour permettre aux clients de mieux comprendre leurs objectifs de placement, leur disposition ou leur capacité à assumer un risque de placement, ainsi que d’autres questions connexes telles que la manière de constituer leur portefeuille de placement.
+
+Ce type de ressources est particulièrement utile pour les clients qui pourraient autrement avoir accès à des informations et des conseils provenant de sources non réglementées et potentiellement trompeuses. Nous présentons ci-dessous les moyens par lesquels les courtiers offrant des services pour comptes sans conseils peuvent proposer ces ressources d’aide à la décision aux clients tout en restant conformes aux exigences du cadre réglementaire auquel ils sont assujettis.
+
+Nous reconnaissons également que les investisseurs autonomes ont des niveaux de culture financière différents et que certains ne comprennent peut-être pas entièrement les risques associés aux placements. Par conséquent, lorsqu’ils proposent des ressources d’aide à la décision (en particulier pour les produits ou services à risque élevé), les courtiers offrant des services pour comptes sans conseils doivent tenir compte des besoins des clients investisseurs autonomes selon leur niveau de culture financière, au lieu de supposer qu’ils ont tous les mêmes connaissances.
+
+2. Cadre réglementaire
+
+Les Règles CPPC établissent le cadre réglementaire pour les comptes sans conseils. Les courtiers offrant des services pour comptes sans conseils doivent satisfaire à toutes les exigences de l’OCRI3, sauf celles faisant l’objet de dispenses particulières4.
+
+La principale disposition qui différencie les courtiers offrant des services pour comptes sans conseils des autres courtiers membres et qui constitue la base de leur modèle opérationnel est la définition de la notion de « compte sans conseils »5, qui est définie comme suit :
+
+Compte auquel ne s’applique aucune obligation liée à l’évaluation de la convenance (autre que celles prévues aux alinéas 3402(3)(i) et 3403(4)(i)) et qui réunit les conditions suivantes :
+
+le client est seul responsable de la prise des décisions de placement;
+le courtier membre ne fait aucune recommandation d’achat, de vente, d’échange ou de détention de titres, peu importe la catégorie de titres ou d’émetteurs, ni aucune recommandation d’opération sur dérivé. [c’est nous qui soulignons]
+2.1 Interdiction de formuler des recommandations
+
+Au sens courant, une « recommandation » est une déclaration selon laquelle une ligne de conduite particulière est recommandée par la partie qui la formule, sans qu’elle soit nécessairement adressée à une personne en particulier.
+
+Selon les Règles CPPC, il est interdit de formuler des recommandations à l’intention des titulaires de comptes sans conseils. Une communication est considérée comme une recommandation si elle soutient une décision de placement précise pour un client précis.
+
+Cette interdiction s’applique même lorsqu’une communication ne visait pas à transmettre une recommandation vis-à-vis d’une quelconque décision de placement, si un client raisonnable est susceptible de l’interpréter ainsi. Une telle interprétation peut survenir non seulement lorsqu’une communication est adressée à un seul client, mais aussi lorsqu’elle est envoyée à des clients de façon générale ou à un certain nombre d’entre eux, ou encore lorsqu’un outil est mis à la disposition de clients dans un contexte de large accessibilité. De plus, les courtiers offrant des services pour comptes sans conseils ne peuvent pas contourner l’interdiction de formuler des recommandations en affirmant simplement qu’une communication ou un outil n’est pas adressé à un client en particulier.
+
+Par exemple, si un courtier offrant des services pour comptes sans conseils fait parvenir à tous ses clients (ou à un groupe de clients) une communication qui précise que « le moment est propice pour acheter le titre X », un client raisonnable pourrait en déduire que le courtier lui recommande précisément une telle décision de placement, sans savoir si d’autres personnes ont reçu la même communication. Cette pratique se distingue des ressources d’aide à la décision proposées en bonne et due forme, telles que les notifications et les alertes informatives, les rapports de recherche ou les outils d’autoassistance mis à la disposition des clients (voir ci-après les détails de ces éléments).
+
+La présente note d’orientation précise les types de mesures de protection que nous considérons comme efficaces pour prévenir de tels malentendus et permettre aux clients de prendre des décisions de placement de façon autonome.
+
+2.1.1 Ressources d’aide à la décision
+
+L’interdiction de formuler des recommandations ne s’applique pas aux informations factuelles relatives aux placements qui pourraient être pertinentes pour le compte d’un client donné ou qui pourraient éventuellement influencer la prise de décision de celui-ci, pourvu que ces informations ne comportent aucune mention qu’un client raisonnable pourrait interpréter comme une recommandation par le courtier offrant des services pour comptes sans conseils d’une décision de placement précise.
+
+Les ressources d’aide à la décision peuvent s’appuyer en partie sur des informations fournies par les clients les concernant (p. ex., un questionnaire d’autoévaluation sur le risque). Ces outils ne seront généralement pas considérés comme des recommandations interdites dans les cas suivants :
+
+l’outil aide le client à prendre lui-même une décision, sans pour autant recommander une décision de placement précise;
+les données sont fournies uniquement par le client;
+le client est clairement informé que les résultats obtenus sont des données de référence qui s’adressent aux investisseurs ayant saisi des données similaires, et que les courtiers offrant des services pour comptes sans conseils ne fournissent aucune indication quant à la pertinence de ces résultats pour le client (p. ex., une mention telle que « la présente communication illustre un modèle de répartition des actifs qu’un investisseur bientôt à la retraite pourrait envisager pour son portefeuille »6 pourrait être utilisée).
+
+Pour plus de détails, reportez-vous à la section ci-dessous consacrée aux ressources d’aide à la décision.
+
+2.2 Pertinence du compte
+
+Avant l’ouverture d’un compte et de façon continue par la suite, un courtier offrant des services pour comptes sans conseils doit déterminer s’il est approprié qu’un investisseur devienne ou demeure l’un de ses clients7. Les courtiers offrant des services pour comptes sans conseils doivent prêter attention aux « signaux d’alarme » qui indiquent qu’un client potentiel pourrait ne pas être un bon candidat pour les placements autonomes, notamment lorsque :
+
+le client éprouve des difficultés évidentes et constantes avec les activités en ligne (p. ex., pour remplir la demande d’ouverture de compte en ligne du courtier offrant des services pour comptes sans conseils);
+les renseignements fournis par le client sont incompatibles avec le type de compte demandé (p. ex., un client qui demande d’ouvrir un compte sur marge alors que son expérience ou ses actifs sont insuffisants);
+le client cherche à obtenir des recommandations de placement individualisées.
+
+Comme le précisent les Règles CPPC, avant l’ouverture d’un compte, le courtier offrant des services pour comptes sans conseils doit informer le client par écrit qu’il :
+
+ne fournira pas de recommandations et que le client sera l’unique responsable de toutes les décisions de placement;
+ne sera pas tenu de procéder à des évaluations de la convenance des placements;
+ne tiendra pas compte de la situation financière personnelle du client, de ses besoins, objectifs et connaissances en matière de placement, de son profil de risque, de son horizon de placement ni d’autres facteurs similaires;
+ne sera pas tenu d’évaluer si les produits, les services et les relations associées aux comptes conviennent au client8.
+2.3 Conflits d’intérêts
+
+Comme d’autres sociétés membres de l’OCRI, les courtiers offrant des services pour comptes sans conseils doivent prendre des mesures raisonnables pour détecter les conflits d’intérêts importants réels ainsi que ceux qui sont raisonnablement prévisibles9. Les conflits d’intérêts importants doivent être réglés au mieux des intérêts du client ou être évités10.
+
+La liste ci-dessous présente des exemples de circonstances susceptibles de donner lieu à des conflits d’intérêts importants dans le contexte des comptes sans conseils (à noter que cette liste ne se veut pas exhaustive) :
+
+le courtier offrant des services pour comptes sans conseils retire un avantage financier lorsque des clients ont recours à certaines fonctionnalités ou plateformes (p. ex., celui-ci pourrait être tenté de concevoir ou de prioriser des ressources d’aide à la décision de manière à augmenter ses revenus plutôt qu’à optimiser les résultats pour les clients);
+le courtier offrant des services pour comptes sans conseils incite ses clients à utiliser des fonctionnalités numériques qui influencent les opérations d’une manière avantageuse pour ses propres intérêts ou ceux d’une société de son groupe, plutôt que pour ceux du client (p. ex., les pratiques de mobilisation numérique telles que les fils d’interactions sociales qui attribuent des points ou qui encouragent des comportements incompatibles avec les principes de placement généraux); les ressources d’aide à la décision mises à la disposition des clients par le courtier offrant des services pour comptes sans conseils avantagent certains produits ou services qui sont offerts par le courtier et pour lesquels celui-ci reçoit une rémunération plus élevée (p. ex., des outils de filtrage qui priorisent certains titres ou dérivés sont proposés, ou une série précise d’un fonds est offerte sur sa plateforme, dans le but d’en tirer un avantage financier);
+le courtier offrant des services pour comptes sans conseils pourrait être tenté de faire la promotion de produits exclusifs ou affiliés auprès des clients, ou d’orienter ou d’« inciter » ces derniers à privilégier de tels produits par l’intermédiaire des ressources d’aide à la décision plutôt que d’autres produits comparables, dans le but de maximiser ses revenus internes ou ceux de sociétés de son groupe (voir les précisions ci-dessous en ce qui concerne les produits exclusifs ou affiliés).
+le courtier offrant des services pour comptes sans conseils reçoit des primes ou des honoraires d’indication de clients pour orienter les opérations vers des fournisseurs de services externes, des gestionnaires de fonds ou des plateformes de liquidité qui peuvent influencer les services ou les produits mis en valeur, potentiellement au détriment de l’impartialité quant à l’intérêt supérieur des clients.
+
+Les courtiers offrant des services pour comptes sans conseils sont tenus de fournir des mises en garde et des avis de non-responsabilité suffisamment clairs et complets pour éviter toute confusion pour les clients par rapport aux ressources d’aide à la décision (notamment en omettant de préciser qu’un courtier offrant des services pour comptes sans conseils perçoit un avantage pour un produit ou un service précis qu’il propose dans des ressources d’aide à la décision). Pour déterminer si une mise en garde est suffisante, les courtiers offrant des services pour comptes sans conseils doivent prendre en considération les caractéristiques particulières des comptes sans conseils, comme le fait que les investisseurs autonomes n’ont pas accès à un conseiller réglementé pouvant leur expliquer les conflits potentiels, et ne doivent pas présumer que ces investisseurs ont tous la même compréhension des conflits que ces comptes peuvent créer. Conformément aux notes d’orientation de l’OCRI à l’intention des courtiers membres (notamment les notes d’orientation qui établissent que la communication d’informations à elle seule n’est pas suffisante pour régler un conflit d’intérêts important dans l’intérêt supérieur des clients)11, la capacité d’un courtier offrant des services pour comptes sans conseils à régler des conflits d’intérêts importants dans l’intérêt des clients, soit en gérant ces conflits, soit en les évitant, variera selon les circonstances. Par exemple, les ressources d’aide à la décision qui sont conçues pour augmenter le nombre d’opérations et qui ne présentent aucun avantage clair pour le client peuvent créer un conflit d’intérêts important et doivent généralement être évitées.
+
+Les courtiers offrant des services pour comptes sans conseils doivent adopter des pratiques transparentes et disposer de politiques strictes en matière de conflits d’intérêts. D’autres notes d’orientation concernant les principales mesures de protection que ces courtiers doivent mettre en place à l’égard des conflits d’intérêts sont détaillées ci-dessous.
+
+2.4 Contrôle diligent
+
+Les courtiers offrant des services pour comptes sans conseils doivent prendre des mesures raisonnables pour :
+
+évaluer les aspects pertinents des produits de placement qu’ils offrent, notamment leur structure, leurs caractéristiques et leurs risques, ainsi que les frais initiaux et continus qui y sont associés et leur incidence;
+surveiller ces produits de placement pour y déceler des changements importants12.
+
+Lorsqu’un courtier offrant des services pour comptes sans conseils propose des ressources d’aide à la décision à ses clients, celui-ci est tenu d’adopter des mesures similaires à celles qu’il prend dans le cadre du contrôle diligent de ses produits. Ces mesures devraient inclure des étapes suffisantes pour l’évaluation des principaux aspects de ces ressources, tels que leur conception, leur fonctionnalité, leur clarté ainsi que tout risque inhérent ou coût pour les clients lié à leur utilisation. Toute information mise à la disposition des clients par les courtiers offrant des services pour comptes sans conseils doit être exacte et cohérente sur l’ensemble de leurs plateformes et dans leurs communications.
+
+Les courtiers offrant des services pour comptes sans conseils doivent également effectuer un contrôle continu des ressources d’aide à la décision qu’ils proposent afin de détecter tout changement important qui pourrait avoir une incidence sur la compréhension des clients ou sur leur expérience globale en tant qu’utilisateurs. Ainsi, toutes les ressources d’aide à la décision mises à la disposition des clients par un courtier offrant des services pour comptes sans conseils auront plus de chances d’être alignées à la fois sur les exigences réglementaires et sur les meilleures pratiques de communication avec les clients.
+
+3. Ressources d’aide à la décision
+
+Pour déterminer si une communication d’un courtier offrant des services pour comptes sans conseils constitue une recommandation interdite, il faut tenir compte de la manière dont les différents aspects d’une situation donnée s’appliquent aux paramètres exposés ci-dessus.
+
+Les exemples qui suivent visent à illustrer les éléments dont les courtiers offrant des services pour comptes sans conseils doivent tenir compte pour éviter de se livrer à des recommandations interdites s’ils choisissent d’offrir des ressources d’aide à la décision. Ces exemples ne constituent pas une liste exhaustive des types de ressources d’aide à la décision que ce type de courtiers peut décider de fournir, ni des facteurs susceptibles de devoir être pris en considération, ni des mesures de protection à mettre en place.
+
+Les courtiers offrant des services pour comptes sans conseils doivent préciser clairement aux clients que les ressources d’aide à la décision qu’ils proposent ont pour objectif de leur donner les moyens de prendre leurs propres décisions de placement, et qu’ils ne sont pas autorisés à leur recommander des placements précis, même si un client utilise les ressources d’aide à la décision d’un tel courtier afin d’éclairer ses propres décisions de placement.
+
+La méthode de transmission d’une communication ne détermine pas à elle seule si la communication constitue une recommandation interdite. Toutefois, si un courtier offrant des services pour comptes sans conseils envoie de manière proactive à un client une communication qui renferme du contenu qu’un client raisonnable interpréterait comme appuyant une décision précise, la communication est plus susceptible d’être perçue comme une recommandation. Cette perception peut être renforcée lorsque la communication est adressée à un seul client. Afin de veiller à ce que ces communications ne soient pas interprétées comme des recommandations interdites, les courtiers offrant des services pour comptes sans conseils devraient prendre les mesures de protection indiquées ci-dessous, notamment communiquer des mises en garde claires et bien visibles. Par exemple, lorsqu’un courtier offrant des services pour comptes sans conseils met à la disposition d’un client un rapport de recherche, il doit clairement indiquer que les recommandations contenues dans le rapport sont générales et qu’il ne les approuve pas nécessairement.
+
+3.1 Exemples de ressources d’aide à la décision
+3.1.1 Alertes et notifications
+
+Les courtiers offrant des services pour comptes sans conseils peuvent fournir aux clients, de manière proactive, des informations factuelles et objectives par le biais d’alertes ou de notifications. Ces alertes peuvent couvrir des sujets tels que les nouvelles du marché, les mesures réglementaires, les réorganisations d’actions, les annonces de dividendes, les tendances du marché et le rendement des portefeuilles. Elles peuvent également attirer l’attention sur des produits complexes et à haut risque (p. ex., des titres à fort effet de levier), des mouvements de marché, des activités spéculatives ou des comportements à risque.
+
+Les alertes et notifications peuvent être présentées sous la forme de fenêtres contextuelles lorsque les clients saisissent des ordres, lorsque les résultats des outils d’autoassistance sont livrés ou lorsque les clients ouvrent un compte à risque élevé. L’intégration d’alertes et de notifications sous la forme de fenêtres contextuelles constitue une bonne pratique qui permet de tenir les clients pleinement informés des conséquences de leurs décisions, en particulier à des étapes clés du processus décisionnel.
+
+À notre avis, les alertes et notifications ne peuvent pas être considérées comme des recommandations interdites (qu’elles découlent de la seule sélection et/ou personnalisation du client utilisateur ou qu’elles fassent l’objet d’une préconfiguration ou d’un envoi proactif par le courtier offrant des conseils pour comptes sans conseils) lorsqu’elles ne contiennent que des informations factuelles dépourvues de tout élément qu’un client raisonnable pourrait interpréter comme une recommandation à l’égard d’une quelconque décision de placement.
+
+Les courtiers offrant des services pour comptes sans conseils doivent limiter le risque qu’une alerte ou une notification de portée générale soit comprise par un client comme une recommandation personnalisée plutôt que comme une information purement factuelle, en utilisant un langage général et en fournissant des informations claires, comme il est indiqué ci-dessous.
+
+Voici des exemples d’alertes qui ne seraient pas considérées comme des recommandations interdites :
+
+Alertes et notifications aux investisseurs faisant un usage important de l’effet de levier : « L’utilisation de l’effet de levier augmente le risque lié au placement, car vous devez rembourser le montant emprunté plus les frais d’emprunt, quel que soit le rendement de vos placements. La charge de l’emprunt s’accroît au fil du temps et peut être supérieure au rendement du placement. »
+Alertes et notifications aux investisseurs ayant déjà investi dans des cryptoactifs ou qui envisagent de le faire pour la première fois :« Les cryptoactifs sont des placements très volatils et hautement spéculatifs. Leur valeur peut fluctuer considérablement et rapidement. Par conséquent, les investisseurs en cryptoactifs sont susceptibles de subir de lourdes pertes ou de réaliser d’importants gains à court terme. »
+
+Selon le contexte, des alertes ou des notifications récurrentes sur un produit de placement pourraient donner l’impression qu’un courtier offrant des services pour comptes sans conseils préconise une décision de placement précise, ce qui contrevient à l’interdiction de formuler des recommandations. Nous notons également que toute communication promotionnelle est plus susceptible d’être perçue ou comprise comme une recommandation d’un produit plutôt qu’un autre par un client raisonnable, et est donc plus susceptible de constituer une contravention à l’interdiction de formuler des recommandations si elle fait référence à un produit de placement en particulier. En outre, toute communication promotionnelle dans le réseau des comptes sans conseils concernant des produits exclusifs ou affiliés constituerait a priori un conflit d’intérêts important qu’il faut éviter.
+
+L’utilisation des alertes et des notifications par un courtier offrant des services pour comptes sans conseils doit être conforme aux exigences du cadre réglementaire applicable à ce type de courtier et être abordée de manière appropriée dans les politiques et procédures dudit courtier13. De plus, pour assurer une certaine cohérence et éviter toute apparence de partialité, les courtiers offrant des services pour comptes sans conseils sont tenus de mettre en place des politiques et des procédures claires relativement à ces alertes et à ces notifications, et de veiller à ce que les clients soient informés des raisons pour lesquelles une alerte ou une notification a été déclenchée14.
+
+Utilisation de renseignements propres à un client dans les alertes et les notifications
+
+Dans la mesure où les courtiers offrant des services pour comptes sans conseils ne formulent pas de recommandation interdite, ils peuvent utiliser des renseignements propres aux clients afin de favoriser la compréhension des clients à l’égard des ressources d’aide à la décision et leur engagement envers celles-ci, tout en encourageant des pratiques de placement objectivement positives.
+
+Par exemple, un courtier offrant des services pour comptes sans conseils peut utiliser des renseignements propres au client pour :
+
+élaborer des outils permettant de surveiller les tendances en matière de négociation et de déclencher des alertes pour les clients concernant leur participation à des activités à haut risque (comme les opérations en nombre excessif) ou à des types de produits à haut risque, afin de garantir la sensibilisation des clients aux risques possibles qui pourraient être jugés pertinents dans l’atteinte de leurs objectifs de placement;
+envoyer des alertes mettant en évidence les occasions pour adopter des comportements globalement positifs en matière de placement (tels que la réduction des conséquences de liquidités non investies, la sensibilisation aux avantages du placement de liquidités non actives, ou la minimisation des frais inutiles ou en double).
+
+En mettant en place les principales mesures de protection décrites ci-dessous, les courtiers offrant des services pour comptes sans conseils peuvent faire profiter les investisseurs des avantages des outils d’autoassistance sans pour autant tomber dans le piège des recommandations interdites. De plus, lorsque les ressources d’aide à la décision comprennent ou utilisent des renseignements propres à un client, ces courtiers doivent :
+
+fournir des mises en garde explicites sur le fait que les résultats des ressources d’aide à la décision ou les perspectives ne doivent pas être considérés comme des recommandations personnalisées;
+veiller à ce que les informations communiquées soient impartiales et visent uniquement à renseigner le client.
+3.1.2 Renseignements instructifs
+
+Les communications qui contiennent uniquement des informations générales et factuelles (telles que des rapports de marché, des dictionnaires de terminologie sur le secteur des placements ou des articles informatifs sur les caractéristiques générales d’un type de produit (p. ex., « Qu’est-ce qu’un FNB? ») et qui ne préconisent pas une décision de placement en particulier ne sont pas considérées comme des recommandations.
+
+Rapports de recherche
+
+Les rapports de recherche diffèrent du contenu purement éducatif ou informatif parce qu’ils incluent généralement une décision de placement spécifique (p. ex., un rapport de recherche peut décrire un produit de placement donné comme étant « à acheter » ou « à vendre »).
+
+Étant donné que ces recommandations sont de nature générale, qu’elles ne sont pas adressées à un client en particulier et qu’elles ne représentent pas en principe le point de vue du courtier offrant des services pour comptes sans conseils, nous ne considérons généralement pas comme incompatible avec l’interdiction de formuler des recommandations le fait qu’un tel courtier mette des rapports de recherche à la disposition de ses clients.
+
+Cependant, le risque qu’un investisseur raisonnable interprète les conclusions d’un rapport de recherche comme des recommandations de son courtier offrant des services pour comptes sans conseils est réel. Les courtiers offrant des services pour comptes sans conseils ne doivent pas supposer que les investisseurs autonomes connaissent aussi bien des documents, tels que les rapports de recherche, qu’un conseiller ni qu’ils comprennent automatiquement que le courtier n’approuve pas les décisions de placement indiquées dans les ressources d’aide à la décision.
+
+Par conséquent, les courtiers offrant des services pour comptes sans conseils qui rendent des rapports de recherche accessibles à leurs clients doivent indiquer explicitement que les recommandations qu’ils contiennent sont formulées par des tiers qui sont responsables de leur rédaction et que le courtier offrant des services pour comptes sans conseils ne souscrit à aucune des recommandations qui y sont énoncées. Pour se conformer aux pratiques exemplaires, les courtiers offrant des services pour comptes sans conseils doivent inclure au début du document une note explicative ayant la même visibilité que le contenu du rapport de recherche. Les courtiers offrant des services pour comptes sans conseils doivent également envisager d’appliquer les mesures de protection indiquées ci-dessous.
+
+3.1.3 Outils d’autoassistance
+
+Les courtiers offrant des services pour comptes sans conseils peuvent proposer un large éventail d’outils d’autoassistance conçus pour donner aux investisseurs les moyens de prendre eux-mêmes des décisions de placement éclairées. Le simple fait qu’un outil d’autoassistance recueille des informations propres à un client (comme des renseignements sur ses connaissances en matière de placement, ses objectifs de placement ou sa tolérance au risque) ne signifie pas que les résultats de cet outil constituent une recommandation.
+
+Pour protéger les investisseurs, tout outil d’autoassistance exclusif devrait être offert sur les plateformes de négociation des courtiers offrant des services pour comptes sans conseils pour garantir la cohérence et la sécurité de son utilisation. En ce qui concerne les ressources d’aide à la décision qu’un courtier offrant des services pour comptes sans conseils fournit à ses clients, mais qui ne sont pas hébergées sur sa plateforme, veuillez vous reporter à la section 3.1.4 ci-dessous.
+
+Pour garantir l’efficacité et la fiabilité des outils d’autoassistance, nous insistons sur l’importance de mettre en place les principales mesures de protection de manière à ce que les investisseurs comprennent la méthode, les limites et l’utilisation de ces outils, afin de favoriser la confiance et la transparence. Les courtiers offrant des services pour comptes sans conseils doivent envisager les mesures de protection indiquées à la section 3.3 lorsqu’ils fournissent des ressources d’aide à la décision qui sont conçues pour être utilisées comme des outils d’autoassistance par les clients.
+
+Nous traitons ci-dessous de certains types d’outils d’autoassistance et de leurs particularités. La présente section ne présente pas de manière exhaustive tous les types d’outils d’autoassistance qui peuvent être offerts ni toutes les mesures de protection et pratiques exemplaires que les courtiers offrant des services pour comptes sans conseils devraient envisager d’appliquer lorsqu’ils proposent des ressources d’aide à la décision.
+
+a) Outils de filtrage
+
+Les outils de filtrage personnalisables fondés sur les données peuvent jouer un rôle essentiel dans l’autonomie des investisseurs et soutenir leur prise de décision. Les filtres que l’investisseur peut sélectionner lui-même permettent d’accéder à des renseignements détaillés et impartiaux pour repérer des placements, simplifier le processus de sélection et obtenir des résultats en adéquation avec ses préférences. Par leur flexibilité et leur personnalisation, ces outils répondent à une grande diversité de besoins tout en favorisant la confiance grâce à la transparence et à la communication objective d’information.
+
+Les courtiers offrant des services pour comptes sans conseils peuvent cependant choisir de fournir des outils de filtrage qui permettent aux clients d’examiner les titres ou les dérivés classés sur la base de critères objectifs conformes aux normes du secteur en matière de sélection de produits de placement, tels que le coût (p. ex., le ratio des frais de gestion des fonds d’investissement), l’évaluation du risque, la capitalisation boursière ou les actifs gérés, la liquidité, etc.
+
+Pour garantir que les résultats générés par les outils de filtrage ne constituent pas une recommandation, les clients doivent pouvoir choisir les paramètres de sélection qu’ils souhaitent utiliser, personnaliser les filtres selon leurs préférences et choisir le nombre de titres et de dérivés qu’ils souhaitent voir classés selon ces critères. Le courtier offrant des services pour comptes sans conseils doit fournir des indications claires et transparentes sur la manière dont les résultats sont filtrés (p. ex., par ordre alphabétique, par valeur ou par segment). Les résultats générés par l’outil de filtrage doivent être établis sur la base de l’ensemble des produits proposés par le courtier offrant des services pour comptes sans conseils et non sur la base d’une quelconque sélection qui pourrait être perçue comme favorisant certains titres.
+
+b) Exemples de portefeuilles
+
+Les courtiers offrant des services pour comptes sans conseils peuvent fournir des exemples de portefeuilles présentant des répartitions de l’actif fondées sur les besoins en matière de placement de certains types d’investisseurs (p. ex., prudents ou axés sur la croissance) ou sur des thèmes de placement ciblés (p. ex., technologie ou biens de consommation de base). Ces répartitions de l’actif doivent être conformes aux critères standard du secteur qui s’appliquent à la conception des portefeuilles, tels que le profil de risque, l’horizon de placement et les frais.
+
+Les courtiers offrant des services pour comptes sans conseils peuvent fournir des outils de filtrage qui aident les clients à faire leur propre sélection de titres ou de dérivés qui cadrent avec la répartition de l’actif d’un exemple de portefeuille. Les courtiers offrant des services pour comptes sans conseils ne devraient pas indiquer des titres ou des dérivés précis pour ces exemples de portefeuilles, car cela laisserait entendre qu’ils préconisent une décision de placement plutôt qu’une autre et, par conséquent, serait considéré comme une recommandation interdite. Voir la section 3.1.3 a) « Outils de filtrage » pour la liste des principales caractéristiques et mesures de protection qui s’appliquent aux outils de filtrage et qui s’appliqueraient également aux exemples de portefeuilles offerts en combinaison avec des outils de filtrage. De plus, les courtiers offrant des services pour comptes sans conseils qui proposent ce type de ressources d’aide à la décision doivent prendre les mesures de protection indiquées à la section 3.3 ci-dessous.
+
+Le courtier offrant des services pour comptes sans conseils doit préciser en quoi l’exemple de portefeuille vise à répondre aux critères ou objectifs de placement généralement associés à un certain type d’investisseur et souligner les risques associés à la répartition de l’actif utilisée dans l’exemple de portefeuille. Les exemples de portefeuilles doivent être accompagnés de ressources qui aident les investisseurs à comprendre la manière de les utiliser et de les interpréter efficacement, y compris des informations sur la constitution d’un portefeuille, la diversification et la gestion des risques.
+
+Les courtiers doivent régulièrement réviser, tester et mettre à jour chacun des exemples de portefeuilles afin d’en maintenir la pertinence et l’exactitude. Les courtiers offrant des services pour comptes sans conseils peuvent informer leurs clients des changements, comme les mises à jour des exemples de portefeuilles, les nouvelles inscriptions de FNB ou les modifications de frais, qui pourraient avoir une incidence sur les hypothèses qui sous-tendent les exemples de portefeuille proposés sur leur plateforme. Si un courtier offrant des services pour comptes sans conseils n’a pas l’intention d’informer ses clients de ce type de changements, il doit l’indiquer clairement aux clients dès le départ.
+
+Pour éviter de donner l’impression qu’il recommande une décision de placement précise, le courtier offrant des services pour comptes sans conseils doit :
+
+offrir une sélection d’exemples de portefeuilles;
+fournir aux clients des fonctions de modification qui sont facilement accessibles et qui leur permettent de modifier facilement la composition d’un exemple de portefeuille (comme la pondération des actifs) pour générer leurs propres résultats.
+
+Ce faisant, les clients disposeront d’un éventail suffisamment large de choix pour qu’il soit raisonnablement probable qu’ils en trouvent un qui correspond à leurs objectifs personnels et à leur tolérance au risque.
+
+c) Outils d’autoévaluation
+
+Les outils d’autoévaluation sont conçus pour aider les investisseurs à mieux comprendre leurs besoins en matière de placement, leur permettant ainsi de prendre des décisions de placement avisées. Parmi les exemples d’outils d’autoévaluation, on retrouve les questionnaires sur la tolérance au risque et les connaissances en matière de finances, les outils de définition d’objectifs, etc. Comme il est indiqué ci-dessus, ces outils ne seront généralement pas considérés comme des recommandations interdites si toutes les données sont fournies par le client et si le courtier offrant des services pour comptes sans conseils ne soutient aucune décision de placement précise.
+
+Pour s’assurer de la compréhension d’un client par rapport au fait que les résultats contenus dans les outils ne constituent pas des recommandations formulées par le courtier offrant des services pour comptes sans conseils, il convient d’utiliser des formulations claires, par exemple « les données que vous avez saisies tendent à suggérer que vous présentez les caractéristiques d’un investisseur prudent ».
+
+Les courtiers offrant des services pour comptes sans conseils doivent recueillir auprès de leurs clients des données suffisantes pour étayer les résultats des outils d’autoévaluation. Si l’outil classe les investisseurs en types généraux, le courtier offrant des services pour comptes sans conseils doit expliquer les critères qui ont été utilisés à cette fin et permettre aux clients d’examiner et de valider les résultats de leur classement avant de consulter les outils relatifs à la répartition des actifs ou au choix des produits, comme les outils de filtrage ou les exemples de portefeuilles. Par exemple, un courtier offrant des services pour comptes sans conseils peut expliquer qu’un investisseur prudent possède généralement certaines caractéristiques particulières, et que les portefeuilles destinés à ces investisseurs comportent généralement une part plus importante de titres générateurs de revenus et une exposition moindre aux actions de croissance. Cette étape supplémentaire permet aux clients d’aligner eux-mêmes les résultats de ces outils sur leurs objectifs personnels, leur tolérance au risque et d’autres considérations de placement.
+
+Les outils d’autoassistance doivent aussi être accompagnés de ressources qui aident les investisseurs à comprendre la manière de les utiliser efficacement, notamment des informations concernant l’importance d’établir soi-même les objectifs financiers, l’horizon de placement, la diversification, la segmentation et la répartition des actifs.
+
+d) Alertes et outils de rééquilibrage
+
+Les alertes de rééquilibrage et les résultats des outils d’autoassistance pour le rééquilibrage automatique ne sont généralement pas considérés comme une recommandation interdite, à condition que :
+
+le courtier offrant des services pour comptes sans conseils n’appuie pas une décision de placement précise; le rééquilibrage se limite à la sélection par le client de la répartition des actifs prédéterminée souhaitée ou des instructions de rééquilibrage;
+le courtier offrant des services pour comptes sans conseils ne détient aucune forme de pouvoir discrétionnaire pour agir de sa propre initiative.
+3.1.4 Contenu de tiers
+
+Les courtiers offrant des services pour comptes sans conseils doivent évaluer s’ils sont susceptibles de faire des recommandations interdites ou de faciliter la réalisation d’activités assujetties à l’obligation d’inscription par des parties non inscrites (telles que certains « finfluenceurs ») lorsqu’ils créent des liens vers du contenu de tiers, hébergent ou proposent un tel contenu, concluent des ententes de recommandation ou de marketing ou simplifient le recours à des fonctionnalités de négociation par imitation.
+
+Les courtiers offrant des services pour comptes sans conseils doivent également être au fait de toute exigence ou directive en vigueur que l’OCRI ou les ACVM pourraient publier relativement à de telles pratiques, y compris en ce qui concerne les ententes d’indication de clients, les conflits d’intérêts, les activités de marketing et la publicité. Les courtiers offrant des services pour comptes sans conseils doivent garder à l’esprit que, selon les circonstances, ils peuvent être tenus responsables des déclarations faites en leur nom15.
+
+3.2 Combinaison de ressources d’aide à la décision
+
+Les courtiers offrant des services pour comptes sans conseils peuvent proposer différentes ressources d’aide à la décision, notamment des notifications informatives ainsi que des outils d’autoévaluation, de filtrage et de rééquilibrage, qui peuvent être combinés pour mieux aider les investisseurs dans leur processus de décision indépendant.
+
+Lorsque les courtiers offrant des services pour comptes sans conseils déterminent si l’effet combiné de plusieurs ressources d’aide à la décision équivaut à une recommandation interdite, les mêmes principes énoncés à la section 2.1 s’appliquent. Toutes les mesures de protection qui s’appliquent à chacune des ressources d’aide à la décision doivent également être prises en compte.
+
+Comme il est indiqué ci-dessus, l’interdiction de formuler des recommandations s’applique à chaque ressource ainsi qu’aux résultats combinés de toutes les ressources. Si aucune des ressources ne soutient une décision de placement précise et que les résultats combinés ne constituent pas non plus une recommandation, le processus global n’enfreint pas l’interdiction de formuler des recommandations. Par exemple, il peut arriver que certains courtiers offrant des services pour comptes sans conseils guident leurs clients à l’aide d’une séquence de ressources d’aide à la décision. Les clients devraient pouvoir refuser d’utiliser une ressource d’aide à la décision et ne devraient pas être contraints de suivre une séquence automatique et prédéfinie qui les oriente vers une décision de placement en particulier.
+
+Les courtiers offrant des services pour comptes sans conseils doivent également veiller à ce que les informations et les données produites par les outils combinés soient alignées et cohérentes. Par exemple, ce qui est classé comme « prudent » dans un outil d’autoassistance doit être classé de la même manière dans tous les outils de ce type proposés par le courtier offrant des services pour comptes sans conseils.
+
+L’effet net de l’ensemble des ressources d’aide à la décision, et la manière dont elles sont présentées, ne doivent pas, en pratique, reproduire un service complet fondé sur des recommandations semblable à celui fourni pour les exemples de portefeuilles que proposent les courtiers traditionnels et les gestionnaires de portefeuille. Par exemple, un courtier offrant des services pour comptes sans conseils qui met à jour les répartitions d’actifs, les sélections de titres ou d’autres éléments d’un exemple de portefeuille et qui en informe proactivement les clients afin que ces derniers puissent envisager d’apporter leurs propres changements utilise une pratique acceptable.
+
+Ces mesures contribuent à une combinaison efficace et responsable des outils, dans le but d’accroître l’autonomie des investisseurs sans introduire de risques involontaires ou de confusion.
+
+3.3 Mesures de protection applicables aux ressources d’aide à la décision
+
+Nous présentons ci-dessous certaines des principales mesures de protection qui devraient généralement être envisagées pour toutes les ressources d’aide à la décision. La présente section ne dresse pas une liste exhaustive des mesures de protection et pratiques exemplaires que les courtiers offrant des services pour comptes sans conseils devraient envisager d’appliquer lorsqu’ils proposent ces types de ressources d’aide à la décision.
+
+Mises en garde et avis de non-responsabilité explicites
+Les mises en garde et avis de non-responsabilité doivent tous être rédigés en langage simple, clair et accessible aux investisseurs autonomes.
+Les ressources d’aide à la décision doivent inclure des mises en garde et des avis de non-responsabilité qui expliquent clairement ce qui suit :
+Un rappel indiquant que le client est le seul responsable des décisions de placement prises dans son compte.
+Une mise en garde bien visible indiquant:
+que les résultats ne constituent pas un conseil de placement personnalisé;
+qu’aucune garantie n’est donnée par le courtier offrant des services pour comptes sans conseils quant à l’alignement des résultats sur les objectifs financiers propres à un client ni à sa capacité de les atteindre;
+que le courtier offrant des services pour comptes sans conseils n’est pas tenu d’informer les clients lorsque des changements dans les critères, les fonctions ou la méthodologie d’un outil entraînent des résultats différents de ceux obtenus précédemment avec cet outil;
+les indicateurs de risque et les avertissements, plus particulièrement les risques associés aux résultats générés par les ressources d’aide à la décision en question;
+de manière bien visible, que les résultats se limitent aux produits et aux services proposés par le courtier offrant des services pour comptes sans conseils.
+Si les résultats d’une ressource d’aide à la décision renvoient à des produits ou services exclusifs ou affiliés du courtier offrant des services pour comptes sans conseils ou à tout autre produit à l’égard desquels le courtier a un conflit d’intérêts important, ce dernier doit l’indiquer explicitement.
+Les courtiers offrant des services pour comptes sans conseils devraient déterminer s’il y a lieu de fournir aux clients certains avis de non-responsabilité de façon répétée, régulière ou continue, plutôt qu’à une seule reprise, afin d’assurer une communication efficace de l’information.
+Par exemple, si les avis de non-responsabilité indiqués ci-dessus sont fournis avec les ressources d’aide à la décision auxquelles ils se rapportent, les clients seront mieux à même de comprendre la portée de ces avis que si ceux-ci sont fournis une seule fois à l’ouverture du compte ou s’ils sont publiés sur une page Web indépendante.
+Descriptions claires et transparentes et critères objectifs
+Les courtiers offrant des services pour comptes sans conseils doivent fournir des indications claires et transparentes, rédigées en langage simple, concernant l’objectif d’une ressource d’aide à la décision et ses limites inhérentes.
+Ils doivent veiller à ce que tous les critères et résultats soient explicitement définis en langage simple et qu’ils soient objectifs et reproductibles, afin d’assurer une bonne compréhension par les clients de la manière dont les résultats sont générés et de leur permettre de les reproduire si nécessaire.
+Les clients doivent être en mesure d’adapter ou de modifier facilement les données saisies afin de pouvoir adapter les résultats d’un outil en fonction de leurs besoins.
+Toutes les informations ci-dessus doivent être facilement accessibles et être fournies avec la ressource d’aide à la décision pour aider les clients à comprendre la manière dont les critères influencent la méthodologie utilisée.
+Les descriptions doivent indiquer clairement que les résultats d’une ressource d’aide à la décision reposent sur des critères objectifs et ne soutiennent pas la décision de placement précise d’un client particulier.
+Autres ressources instructives
+Les ressources d’aide à la décision doivent être accompagnées de ressources qui aident les investisseurs à comprendre la manière de les utiliser et d’en interpréter les résultats.
+Conflits d’intérêts
+Les courtiers offrant des services pour comptes sans conseils doivent établir des politiques pour éviter les conflits d’intérêts importants ou les gérer dans l’intérêt supérieur des clients.
+Les courtiers offrant des services pour comptes sans conseils doivent également veiller à ce que les résultats de l’outil ne soient pas influencés par la promotion de produits ou services exclusifs ou affiliés ni par des primes versées par des tiers, conformément à l’article 3112 des Règles CPPC.
+Les ressources d’aide à la décision doivent être conçues pour fournir des informations impartiales et conformes à la présente note d’orientation, et ne favoriser aucun titre ou dérivé en particulier.
+Il s’agit notamment d’éviter les conflits d’intérêts importants, tels que la promotion de produits exclusifs ou affiliés par rapport à des produits non exclusifs similaires, ce qui constituerait presque toujours un non-respect des exigences en matière de conflits d’intérêts prévues au paragraphe 3111(2) des Règles CPPC.
+Lorsque les ressources d’aide à la décision mentionnent un produit à l’égard duquel il existe un conflit d’intérêts important, le courtier offrant des services pour comptes sans conseils doit proposer un ensemble raisonnablement représentatif de produits de remplacement qui ne présentent aucun conflit d’intérêts.
+Suivi et mise à jour des outils sur une base régulière
+Chacune des ressources d’aide à la décision doit être révisée, testée et mise à jour afin qu’elles demeurent pertinentes et exactes et qu’elles cadrent avec les normes réglementaires, les progrès technologiques, les pratiques financières et l’évolution des conditions du marché16.
+Les courtiers offrant des services pour comptes sans conseils doivent surveiller et faire escalader les résultats obtenus par les clients, notamment en exigeant des rapports périodiques sur ces résultats selon différents critères, et suivre un processus de signalement et de correction si les résultats sont défavorables17.
+4. Conclusion
+
+La présente note d’orientation ne se veut pas exhaustive. Pour déterminer si un contenu transmis à un client constitue une recommandation interdite ou si celui-ci est autorisé au motif qu’il s’agit d’informations purement factuelles qui n’encouragent pas une décision de placement en particulier, il convient d’analyser tous les faits et circonstances pertinents du cas particulier. Les courtiers offrant des services pour comptes sans conseils doivent évaluer leurs ressources d’aide à la décision actuelles et futures à la lumière de la présente note d’orientation et des principes qui y sont énoncés afin de s’assurer qu’elles respectent le cadre réglementaire auquel elles sont assujetties.
+
+Nous encourageons les courtiers offrant des services pour comptes sans conseils à nous consulter par rapport à leurs ressources d’aide à la décision actuelles et en cours d’élaboration s’ils ont des questions.
+
+5. Dispositions applicables
+
+Les dispositions des Règles CPPC auxquelles se rapporte la présente note d’orientation sont les suivantes :
+
+paragraphe 1201(2);
+article 1404;
+article 2207;
+paragraphe 2246(2);
+article 3110;
+article 3111;
+article 3112;
+article 3208;
+article 3211;
+article 3241;
+article 3303;
+article 3402;
+article 3403;
+article 3404.
+6. Notes d’orientation antérieures
+
+La présente note d’orientation remplace la note d’orientation suivante : Règles de l’OCRCVM – Avis sur les règles de l’OCRCVM – Note d’orientation – GN-3400-21-003 – Note d’orientation sur les services et les activités d’exécution d’ordres sans conseils (12 mars 2021).
+
+7. Documents connexes
+
+La présente note d’orientation est liée au bulletin suivant : Nouvelle note d’orientation sur les services et les activités d’exécution d’ordres sans conseils.
+
+3
+Voir le paragraphe 2207(1) des Règles CPPC.
+4
+Par exemple, voir les alinéas 3208(1)i) (Connaissance du client), 3211(2)i) (Pertinence du compte), 3303(2)i) (Connaissance du produit) et 3404(1)i) (Convenance) des Règles CPPC.
+5
+Paragraphe 1201(2) des Règles CPPC.
+6
+Voir le paragraphe 3110(1) des Règles CPPC.
+7
+Voir les alinéas 3211(1)i), 3402(3)i) et 3403(4)i) des Règles CPPC.
+8
+Alinéa 3241(3)i) des Règles CPPC.
+9
+Paragraphe 3110(1) des Règles CPPC.
+10
+Paragraphes 3112(1) et 3112(2) des Règles CPPC.
+11
+Voir les règles de l’OCRCVM – Avis sur les règles de l’OCRCVM – Note d’orientation – GN-16-0068 – Gérer les conflits au mieux des intérêts du client (6 avril 20216). Se reporter aussi à la Note d’orientation – GN-17-0093 – Gérer les conflits au mieux des intérêts du client – Examen des conflits liés à la rémunération (27 avril 2017).
+12
+Voir l’alinéa 3241(1)(i) des Règles CPPC.
+13
+Voir le paragraphe 2207(3) des Règles CPPC.
+14
+Voir l’alinéa 3241(1)(i) des Règles CPPC.
+15
+Pour plus d’information, voir la Note d’orientation 25-0340 – Avis conjoint 31 – 369 du personnel des Autorités canadiennes en valeurs mobilières et de l’Organisme canadien de réglementation des investissements, Indications sur l’application de la législation en valeurs mobilières aux activités des finfluenceurs.
+16
+Voir l’article 1404 des Règles CPPC.
+17
+Article 1404 des Règles CPPC.
