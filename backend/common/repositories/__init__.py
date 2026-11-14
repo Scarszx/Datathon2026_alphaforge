@@ -13,6 +13,6 @@ Conventions partagées :
   quand la docstring le précise (les Lambdas décident alors de la réponse).
 """
 
-from backend.common.repositories import conversations, messages, portfolios, users
+from backend.common.repositories import analyses, conversations, messages, portfolios, users
 
-__all__ = ["conversations", "messages", "portfolios", "users"]
+__all__ = ["analyses", "conversations", "messages", "portfolios", "users"]
