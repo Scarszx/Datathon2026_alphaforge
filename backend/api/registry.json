@@ -1,0 +1,80 @@
+{
+  "agents": [
+    {
+      "id": "agent-orchestrator",
+      "name": "Orchestrateur",
+      "role": "Comprend la demande, choisit quels agents appeler, assemble la réponse en langage clair.",
+      "allowedTools": [],
+      "delegatesTo": ["agent-analyst", "agent-governance"],
+      "limits": { "max_agent_cycles": 6, "timeout_seconds": 25 }
+    },
+    {
+      "id": "agent-analyst",
+      "name": "Analyste",
+      "role": "Cherche et calcule : rendements, volatilité, baisse maximale, corrélations, répartitions, à partir du portefeuille et des données.",
+      "allowedTools": [
+        "tool-search-assets",
+        "tool-get-prices",
+        "tool-get-macro",
+        "tool-compute-metrics",
+        "tool-get-portfolio"
+      ],
+      "delegatesTo": [],
+      "limits": {
+        "max_tool_calls": 12,
+        "max_rows_returned_per_call": 260,
+        "timeout_seconds": 25
+      }
+    },
+    {
+      "id": "agent-governance",
+      "name": "Gouvernance",
+      "role": "Vérifie que la proposition respecte le profil de l'investisseur et les limites de la simulation, signale les conflits et les informations manquantes.",
+      "allowedTools": [
+        "tool-get-profile",
+        "tool-get-portfolio",
+        "tool-compute-metrics"
+      ],
+      "delegatesTo": [],
+      "limits": { "max_tool_calls": 6, "timeout_seconds": 15 }
+    }
+  ],
+  "tools": [
+    {
+      "id": "tool-search-assets",
+      "description": "Cherche des actifs de l'univers par nom ou symbole.",
+      "reads": ["storage-dataset: universe.parquet"]
+    },
+    {
+      "id": "tool-get-prices",
+      "description": "Prix ajustés (adj_close) d'un actif, dans sa devise de cotation.",
+      "reads": ["storage-dataset: prices/{ticker}.parquet"]
+    },
+    {
+      "id": "tool-get-macro",
+      "description": "Série macroéconomique ou taux de change USD/CAD.",
+      "reads": [
+        "storage-dataset: macro/macro.parquet",
+        "storage-dataset: fx/usdcad.parquet"
+      ]
+    },
+    {
+      "id": "tool-compute-metrics",
+      "description": "Calcule des indicateurs sur un ou plusieurs actifs et renvoie des chiffres (jamais les lignes brutes).",
+      "reads": [
+        "storage-dataset: prices/{ticker}.parquet",
+        "storage-dataset: fx/usdcad.parquet"
+      ]
+    },
+    {
+      "id": "tool-get-portfolio",
+      "description": "Positions du portefeuille de l'utilisateur courant.",
+      "reads": ["db-portfolios"]
+    },
+    {
+      "id": "tool-get-profile",
+      "description": "Profil investisseur de l'utilisateur courant.",
+      "reads": ["db-users"]
+    }
+  ]
+}

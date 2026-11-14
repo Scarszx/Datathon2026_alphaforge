@@ -1,0 +1,4 @@
+python-ulid>=4
+pyarrow>=15
+# boto3 est fourni par le runtime Lambda ; pyarrow reste léger (un seul
+# fichier Parquet, sans pandas, exigence du contrat pour srv-api-light).
