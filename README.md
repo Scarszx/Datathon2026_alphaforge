@@ -1,48 +1,32 @@
-# Portefeuille — prototype local
+# AlphaForge — front (SPA)
 
-Prototype front-end du tableau de bord d'investissement (même style blanc/rouge que `bnc-portefeuille.zip`),
-avec assistant IA simulé, questionnaire de profil de risque et ordres d'achat/vente **simulés**.
-Tout tourne dans le navigateur : **aucune base de données, aucun serveur, aucune clé d'API**.
+Front du contrat d'API AlphaForge v0.3.0 (simulation seulement). Le front ne calcule rien : il affiche ce que renvoie `/v1/*`.
 
-## Lancer
+## Configuration
+Copier `.env.example` en `.env` et renseigner :
+- `VITE_API_BASE_URL` : URL d'API Gateway, sans `/v1`
+- `VITE_COGNITO_REGION`, `VITE_COGNITO_CLIENT_ID` : user pool Cognito (client sans secret, flux `USER_PASSWORD_AUTH` activé)
 
 ```bash
 npm install
-npm run dev        # http://localhost:5173
+npm run dev   # http://localhost:5173
 ```
 
-Compte démo : `demo@example.com` / `demo1234` (ou créez un compte; il reçoit 10 000 $ simulés).
-Bouton « Réinitialiser la démo » en bas du tableau de bord pour tout remettre à zéro.
+## Pages
+| Route | Contenu | API |
+|---|---|---|
+| `/login` | Connexion directe à Cognito | Cognito |
+| `/portefeuille` | Résumé calculé par le back, édition des positions, autocomplétion de ticker | `/portfolios*`, `/market/search` |
+| `/profil` | Profil investisseur | `/me`, `/me/profile` |
 
-## Ce qui est inclus
-
-| Zone | Route |
-|---|---|
-| Page d'accueil + questionnaire public (sans compte) | `/` |
-| Connexion / mot de passe oublié (simulé) | `/connexion`, `/mot-de-passe-oublie` |
-| Inscription + questionnaire de profil | `/inscription` |
-| Tableau de bord (style du ZIP) + assistant flottant + ordre | `/tableau-de-bord` |
-| Profil de risque (consulter / modifier) | `/profil` |
+## Assistant (chat)
+Bouton flottant présent sur toutes les pages connectées. Un clic ouvre le chat en plein écran, un second clic (ou `Échap`) le réduit. Historique, conversations épinglées (stockées dans le navigateur, l'API n'a pas ce champ), renommage et suppression. API : `/conversations*`.
 
 ## Organisation
-
 ```
-src/
-  styles.css          # globals.css du ZIP (inchangé) + section « AJOUTS »
-  lib/format.ts       # copie du ZIP          components/Chart.tsx  # copie du ZIP
-  lib/market.ts       # actifs et prix FICTIFS, historique simulé
-  lib/profile.ts      # questions + score de risque
-  lib/portfolio.ts    # valeur, répartition, rendement, risque
-  lib/trading.ts      # aperçu / exécution / annulation d'ordres (logique pure)
-  lib/store.tsx       # « fausse API » : localStorage (utilisateurs, portefeuille, chats)
-  agent/agent.ts      # agent simulé : registre d'outils → plan → exécution → réponse
-  components/, pages/
+src/api/types.ts      types des schémas du contrat
+src/api/auth.ts       Cognito (jetons en sessionStorage, renouvellement)
+src/api/client.ts     fetch + Bearer + erreurs au format schema-error
+src/api/endpoints.ts  une fonction par route
+src/lib/store.tsx     session (utilisateur courant)
 ```
-
-`lib/store.tsx` est la seule couche à remplacer par des appels REST quand l'API Node + PostgreSQL existera;
-`lib/trading.ts`, `lib/portfolio.ts`, `lib/profile.ts` et `agent/agent.ts` sont portables tels quels (ou en Python pour l'agent).
-
-## Non implémenté
-
-API Node/Express, PostgreSQL/Prisma, service Python FastAPI, Docker, vraie authentification, vrais cours de marché,
-LLM réel, page détaillée d'un titre, tests automatisés, déploiement AWS.

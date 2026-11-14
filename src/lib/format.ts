@@ -49,3 +49,26 @@ export function compact(n: number) {
 export function time(d: Date) {
   return `${d.getHours()} h ${String(d.getMinutes()).padStart(2, "0")}`;
 }
+
+/** Montant avec code de devise : 1 234,50 CAD */
+export function amount(n: number, currency: string, decimals = 2) {
+  return money(n, decimals) + NBSP + currency;
+}
+
+export function signedAmount(n: number, currency: string) {
+  return (n >= 0 ? "+" : "−") + amount(Math.abs(n), currency);
+}
+
+/** Pourcentage sans signe (le contrat donne des pourcentages : 9.07 = 9,07 %) */
+export function plainPct(n: number, decimals = 1) {
+  return money(n, decimals) + NBSP + "%";
+}
+
+/** Date ISO (YYYY-MM-DD ou ISO 8601) → secondes Unix, pour Chart */
+export function toSeconds(iso: string) {
+  return Math.floor(new Date(iso.length === 10 ? `${iso}T12:00:00Z` : iso).getTime() / 1000);
+}
+
+export function dateTimeFr(iso: string) {
+  return new Date(iso).toLocaleDateString("fr-CA", { day: "numeric", month: "short" });
+}
