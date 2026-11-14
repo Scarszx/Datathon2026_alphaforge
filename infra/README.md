@@ -26,6 +26,7 @@ terraform apply                                 # une seule personne, après acc
 Remarques :
 
 - `terraform validate` passe **sans** identifiants AWS ni zips : aucune data source n'est évaluée par validate. En revanche `terraform plan` exige les zips de `build/` (lanter `build_lambdas.sh` avant).
+- **`validate` ne remplace pas un `plan` réel** : il ne vérifie pas les appels de fonctions dans les `locals` ni le contenu des zips. Un `plan` (humain, avec credentials) reste obligatoire avant `apply`.
 - Tant que `backend/api/app.py` et `backend/agents/app.py` n'existent pas (WS4, WS5), `build_lambdas.sh` produit des **zips factices** (le handler n'y est pas). Le plan passe, la première invocation échouera jusqu'à l'arrivée du code réel.
 - Le zip embarque l'arborescence `backend/` sans `__init__.py` dans `backend/` et `backend/common/` (namespace packages, conforme au socle WS0) ; le handler est donc bien `backend/api/app.handler`.
 

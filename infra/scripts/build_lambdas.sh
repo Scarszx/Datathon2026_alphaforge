@@ -41,17 +41,22 @@ build_lambda() {
 
     local req="$repo_root/backend/$name/requirements.txt"
     if [ -f "$req" ]; then
-        pip_install_arm "$stage/backend" "$req"
+        # À la racine du stage (donc du zip) : la Lambda cherche les modules
+        # dans /var/task, pas dans /var/task/backend.
+        pip_install_arm "$stage" "$req"
         # Paquets fournis par la couche AWS SDK for pandas : retirés du zip.
-        rm -rf "$stage/backend/pandas" "$stage/backend/pyarrow" "$stage/backend/numpy"
-        find "$stage/backend" -maxdepth 1 \( -name "pandas*" -o -name "pyarrow*" -o -name "numpy*" \) -exec rm -rf {} +
+        rm -rf "$stage/pandas" "$stage/pyarrow" "$stage/numpy"
+        find "$stage" -maxdepth 1 \( -name "pandas*" -o -name "pyarrow*" -o -name "numpy*" \) -exec rm -rf {} +
     else
         echo "  (pas de requirements.txt dans backend/$name : zip factice)"
     fi
+    # Le requirements.txt reste un artefact de build, il ne part pas en production.
+    rm -f "$stage/backend/$name/requirements.txt"
 
     mkdir -p "$build_dir"
     rm -f "$build_dir/$name.zip"
-    (cd "$stage" && python3 -m zipfile -c "$build_dir/$name.zip" backend)
+    # Tout le contenu du stage : backend/ (code) et les dépendances à la racine.
+    (cd "$stage" && python3 -m zipfile -c "$build_dir/$name.zip" .)
     ls -lh "$build_dir/$name.zip"
 }
 
