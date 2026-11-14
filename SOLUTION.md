@@ -226,9 +226,9 @@ L'équilibre est fixé : **3 agents LLM + 2 briques de code + Guardrails + KB**.
 
 // Élément du registre — citation réglementaire
 { "id": "KB-03", "kind": "regulation", "rule": "R1",
-  "document": "Avis conjoint ACVM-OCRI 31-368", "section": "A.1 Détermination du profil de risque",
-  "excerpt": "…le profil de risque global devrait refléter le plus bas des deux…",
-  "jurisdiction": "CA", "version": "2025-12-10", "url": "https://…", "kb_file": "CA_31-368_avis-ACVM-OCRI_2025-12-10_fr.pdf" }
+  "document": "Joint CSA/CIRO Staff Notice 31-368", "section": "A.1 Determination of risk profile",
+  "excerpt": "…a client's overall risk profile should reflect the lower of the two…",
+  "jurisdiction": "CA", "version": "2025-12-10", "url": "https://…", "kb_file": "CA_31-368_staff-notice-CSA-CIRO_2025-12-10_en.pdf" }
 
 // Verdict de règle
 { "rule": "R2", "scenario": 1, "status": "FAIL",
@@ -307,20 +307,20 @@ Les seuils marqués « hypothèse » vivent dans un fichier de configuration (pa
 
 ## 11. Knowledge Base réglementaire
 
-- **Corpus :** `docs/for_KB/`, 15 documents récupérés le 2026-11-14. Le README du dossier les liste.
+- **Corpus :** `docs/for_KB/`, 13 documents récupérés le 2026-11-14, **tous en anglais** (décision d'équipe : une seule langue pour le corpus). Le README du dossier les liste. Le rédacteur et l'orchestrateur répondent quand même dans la langue de l'utilisateur ; les extraits cités restent en anglais.
 - **Métadonnées :** chaque fichier a un `<fichier>.metadata.json` au format Bedrock KB : `juridiction`, `regulateur`, `sujets` (liste), `date_version`, `langue`, `type_document`, `source_url`, `date_recuperation`.
 - **La documentation du Datathon n'est pas dans la KB** : elle sert à construire l'outil, pas à répondre à l'utilisateur.
 
 | Juridiction | Fichiers | Apport | Utilisé pour |
 |---|---|---|---|
-| CA | `CA_31-368_avis-ACVM-OCRI_2025-12-10_fr.pdf`, `..._notice-CSA-CIRO_..._en.pdf` | Tolérance ≠ capacité ; le profil global reflète la plus basse. Partie C : impact sur le portefeuille, gamme d'alternatives, opérations demandées par le client | R1, R3, R4, questions de cadrage |
-| CA | `CA_31-103_reglement-officiel-consolide_2026-07-04_fr.pdf` (AMF, valeur officielle), `CA_31-103CP_instruction-consolidee_2026-01-01_en.pdf` (non officielle, FCNB) | Art. 13.2 connaissance du client, art. 13.3 convenance | définitions du mandat, R2 |
-| CA | `CA_OCRI_GN-3200-26-001_note-orientation-OEO_2026-03-12_fr.txt`, `CA_CIRO_GN-3200-26-001_guidance-OEO_2026-03-12_en.txt`, `CA_CIRO_bulletin-26-0059_OEO_2026-03-12_en.txt` | Aide à la décision permise, interdiction de recommander un titre | R5, pitch |
-| CA | `CA_81-334_avis-ESG-fonds_2024-03-07_en.pdf` | Ce qu'un fonds doit montrer pour se dire ESG | R8 (Mateo) |
-| CA | `CA_21-329_..._2021-03-29_en.pdf`, `CA_21-332_..._2023-02-22_en.pdf` | Plateformes crypto : inscription, garde des actifs | R7 (Amira) |
-| QC | `QC_AMF_planification-financiere-titre_fr.txt`, `QC_BNCD_questions-avant-investir_fr.txt`, `QC_BNCD_info-relation-clients_fr.pdf` | Titre réservé ; questions de BNCD (objectifs, horizon, risque, diversification) ; BNCD = exécution sans conseil | R9, cadrage |
-| ON | `ON_FSRA_regle-2020-001-protection-titres_en.pdf` | « Financial planner » et « financial advisor » réservés | R9 |
-| SK | `SK_FCAA_reglement-FPFA-avis_en.pdf` | Projet de règlement sur les titres (statut final à vérifier) | R9 |
+| CA | `CA_31-368_staff-notice-CSA-CIRO_2025-12-10_en.pdf` | Tolérance ≠ capacité ; le profil global reflète la plus basse. Partie C : impact sur le portefeuille, gamme d'alternatives, opérations demandées par le client | R1, R3, R4, questions de cadrage |
+| CA | `CA_31-103_regulation-official-consolidated_2026-07-04_en.pdf` (AMF, version anglaise officielle), `CA_31-103CP_companion-policy-consolidated_2026-01-01_en.pdf` (non officielle, FCNB) | Art. 13.2 connaissance du client, art. 13.3 convenance | définitions du mandat, R2 |
+| CA | `CA_CIRO_GN-3200-26-001_OEO-guidance_2026-03-12_en.txt`, `CA_CIRO_bulletin-26-0059_OEO_2026-03-12_en.txt` | Aide à la décision permise, interdiction de recommander un titre | R5, pitch |
+| CA | `CA_81-334_staff-notice-ESG-funds_2024-03-07_en.pdf` | Ce qu'un fonds doit montrer pour se dire ESG | R8 (Mateo) |
+| CA | `CA_21-329_staff-notice-crypto-platforms_2021-03-29_en.pdf`, `CA_21-332_staff-notice-crypto-platforms-PRU_2023-02-22_en.pdf` | Plateformes crypto : inscription, garde des actifs | R7 (Amira) |
+| QC | `QC_AMF_financial-planner-title_en.txt`, `QC_NBDB_tips-better-investment-decisions_en.txt`, `QC_NBDB_relationship-disclosure-information_2025-09_en.pdf` | Titre réservé ; questions de BNCD/NBDB (objectifs, horizon, confort avec le risque, diversification, fréquence des transactions) ; BNCD = exécution sans conseil | R9, cadrage |
+| ON | `ON_FSRA_rule-2020-001-title-protection_en.pdf` | « Financial planner » et « financial advisor » réservés | R9 |
+| SK | `SK_FCAA_FPFA-proposed-regulations-notice_en.pdf` | Projet de règlement sur les titres (statut final à vérifier) | R9 |
 
 **Comment l'interroger :**
 - Bedrock Knowledge Base sur un bucket S3, avec filtre de métadonnées `juridiction` dans `["CA", province]`, et éventuellement `sujets` qui contient le sujet de la règle.
@@ -395,7 +395,7 @@ Les calculs, les règles et le vérificateur ont aussi des **tests unitaires san
   - les sessions DynamoDB ;
   - l'affichage progressif.
 - **Prévu :** modes B et C, Guardrails, R7 à R10, « et si » par curseurs (mandat v2), banc de tests, fiche enrichie des FNB.
-- **Bonus :** traces CloudWatch dans l'interface, corpus entièrement en français (81-334, 21-329, 21-332 et IG 31-103 version AMF), plus de FNB décomposés.
+- **Bonus :** traces CloudWatch dans l'interface, plus de FNB décomposés.
 
 ## 16. Calendrier
 

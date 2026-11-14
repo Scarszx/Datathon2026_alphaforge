@@ -1,7 +1,7 @@
 {
   "metadataAttributes": {
     "juridiction": "CA",
-    "regulateur": "OCRI",
+    "regulateur": "CIRO",
     "sujets": [
       "oeo",
       "aide_decision",
@@ -9,7 +9,7 @@
     ],
     "date_version": "2026-03-12",
     "langue": "en",
-    "type_document": "note_orientation",
+    "type_document": "guidance_note",
     "source_url": "https://www.ciro.ca/newsroom/publications/guidance-order-execution-only-account-services-and-activities",
     "date_recuperation": "2026-11-14"
   }
