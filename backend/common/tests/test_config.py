@@ -20,6 +20,7 @@ def test_lecture_a_l_appel_et_non_a_l_import(monkeypatch):
         (config.conversations_table, "CONVERSATIONS_TABLE"),
         (config.messages_table, "MESSAGES_TABLE"),
         (config.portfolios_table, "PORTFOLIOS_TABLE"),
+        (config.analyses_table, "ANALYSES_TABLE"),
         (config.dataset_bucket, "DATASET_BUCKET"),
         (config.dataset_version, "DATASET_VERSION"),
     ],
@@ -34,24 +35,45 @@ def test_variables_requises_presentes(monkeypatch):
     monkeypatch.setenv("CONVERSATIONS_TABLE", "Conversations-dev")
     monkeypatch.setenv("MESSAGES_TABLE", "Messages-dev")
     monkeypatch.setenv("PORTFOLIOS_TABLE", "Portfolios-dev")
+    monkeypatch.setenv("ANALYSES_TABLE", "Analyses-dev")
     monkeypatch.setenv("DATASET_BUCKET", "bucket-dev")
     monkeypatch.setenv("DATASET_VERSION", "2026-11-12")
     assert config.conversations_table() == "Conversations-dev"
     assert config.messages_table() == "Messages-dev"
     assert config.portfolios_table() == "Portfolios-dev"
+    assert config.analyses_table() == "Analyses-dev"
     assert config.dataset_bucket() == "bucket-dev"
     assert config.dataset_version() == "2026-11-12"
 
 
-def test_modeles_optionnels(monkeypatch):
-    """Modèles Bedrock : A_CHOISIR dans le contrat, None tant que non configuré."""
-    for nom in ("MODEL_ORCHESTRATOR", "MODEL_ANALYST", "MODEL_GOVERNANCE"):
-        monkeypatch.delenv(nom, raising=False)
-    assert config.model_orchestrator() is None
-    assert config.model_analyst() is None
-    assert config.model_governance() is None
-    monkeypatch.setenv("MODEL_ANALYST", "anthropic.claude-3-5-sonnet-20241022")
-    assert config.model_analyst() == "anthropic.claude-3-5-sonnet-20241022"
+@pytest.mark.parametrize(
+    "fonction,nom",
+    [
+        (config.model_orchestrator, "MODEL_ORCHESTRATOR"),
+        (config.model_auditor, "MODEL_AUDITOR"),
+        (config.model_writer, "MODEL_WRITER"),
+        (config.model_analyst, "MODEL_ANALYST"),  # déprécié, conservé pour l'infra v0.3
+        (config.model_governance, "MODEL_GOVERNANCE"),  # déprécié, conservé pour l'infra v0.3
+        (config.kb_id, "KB_ID"),
+        (config.guardrail_id, "GUARDRAIL_ID"),
+        (config.guardrail_version, "GUARDRAIL_VERSION"),
+        (config.rules_config_path, "RULES_CONFIG_PATH"),
+    ],
+)
+def test_variables_optionnelles(monkeypatch, fonction, nom):
+    """Modèles, KB, Guardrail, seuils : None tant que non configurés, lus à l'appel."""
+    monkeypatch.delenv(nom, raising=False)
+    assert fonction() is None
+    monkeypatch.setenv(nom, "valeur-test")
+    assert fonction() == "valeur-test"
+
+
+def test_modele_par_agent(monkeypatch):
+    """Contrat v0.4.0 : un modèle par agent, ex. Claude Sonnet 5.5 en us-east-1."""
+    monkeypatch.setenv("MODEL_ORCHESTRATOR", "global.anthropic.claude-sonnet-5-5")
+    monkeypatch.setenv("MODEL_AUDITOR", "global.anthropic.claude-sonnet-5-5")
+    monkeypatch.setenv("MODEL_WRITER", "global.anthropic.claude-sonnet-5-5")
+    assert config.model_orchestrator() == config.model_auditor() == config.model_writer()
 
 
 def test_log_level_par_defaut(monkeypatch):

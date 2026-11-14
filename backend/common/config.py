@@ -23,7 +23,7 @@ def _required(name: str) -> str:
     return value
 
 
-# --- Tables DynamoDB (contrat : db-users, db-conversations, db-messages, db-portfolios) ---
+# --- Tables DynamoDB (contrat : db-users, db-conversations, db-messages, db-portfolios, db-analyses) ---
 
 
 def users_table() -> str:
@@ -46,6 +46,14 @@ def portfolios_table() -> str:
     return _required("PORTFOLIOS_TABLE")
 
 
+def analyses_table() -> str:
+    """Nom de la table Analyses (partition : sessionId, tri : itemKey).
+
+    itemKey = MANDATE#<version sur 3 chiffres> ou RUN#<runId> (contrat v0.4.0).
+    """
+    return _required("ANALYSES_TABLE")
+
+
 # --- Jeu de données (contrat : storage-dataset) ---
 
 
@@ -59,22 +67,66 @@ def dataset_version() -> str:
     return _required("DATASET_VERSION")
 
 
-# --- Modèles Bedrock (contrat : agents, model = A_CHOISIR) ---
+# --- Modèles Bedrock (contrat v0.4.0 : Claude Sonnet 5.5, région us-east-1) ---
+# Un modèle par agent, lu dans la config pour pouvoir en changer sans toucher au code.
+# Valeur attendue en déploiement : un profil d'inférence, ex. global.anthropic.claude-sonnet-5-5.
 
 
 def model_orchestrator() -> str | None:
-    """Identifiant du modèle Bedrock de l'orchestrateur, None tant que non configuré."""
+    """Profil d'inférence Bedrock de agent-orchestrator, None tant que non configuré."""
     return os.environ.get("MODEL_ORCHESTRATOR")
 
 
+def model_auditor() -> str | None:
+    """Profil d'inférence Bedrock de agent-auditor, None tant que non configuré."""
+    return os.environ.get("MODEL_AUDITOR")
+
+
+def model_writer() -> str | None:
+    """Profil d'inférence Bedrock de agent-writer, None tant que non configuré."""
+    return os.environ.get("MODEL_WRITER")
+
+
 def model_analyst() -> str | None:
-    """Identifiant du modèle Bedrock de l'analyste, None tant que non configuré."""
+    """DÉPRÉCIÉ (contrat v0.4.0 : agent-analyst retiré, remplacé par module-engine).
+
+    Conservé tant que l'infra (WS1) définit encore MODEL_ANALYST. Ne pas l'utiliser.
+    """
     return os.environ.get("MODEL_ANALYST")
 
 
 def model_governance() -> str | None:
-    """Identifiant du modèle Bedrock de la gouvernance, None tant que non configuré."""
+    """DÉPRÉCIÉ (contrat v0.4.0 : agent-governance remplacé par agent-auditor).
+
+    Conservé tant que l'infra (WS1) définit encore MODEL_GOVERNANCE. Ne pas l'utiliser.
+    """
     return os.environ.get("MODEL_GOVERNANCE")
+
+
+# --- Knowledge Base et Guardrails Bedrock (contrat : srv-bedrock-kb, srv-bedrock-guardrails) ---
+
+
+def kb_id() -> str | None:
+    """Identifiant de la Knowledge Base réglementaire, None tant que non configuré."""
+    return os.environ.get("KB_ID")
+
+
+def guardrail_id() -> str | None:
+    """Identifiant du Guardrail Bedrock, None tant que non configuré."""
+    return os.environ.get("GUARDRAIL_ID")
+
+
+def guardrail_version() -> str | None:
+    """Version publiée du Guardrail Bedrock, None tant que non configurée."""
+    return os.environ.get("GUARDRAIL_VERSION")
+
+
+def rules_config_path() -> str | None:
+    """Chemin optionnel du fichier de seuils des règles R1-R10 (hypothèses d'équipe).
+
+    None = le module de règles utilise son fichier de configuration embarqué.
+    """
+    return os.environ.get("RULES_CONFIG_PATH")
 
 
 # --- Divers ---
