@@ -16,6 +16,7 @@ application:
         - "Nouvelles routes : mandats et exécutions d'analyse (runs). Nouvelle table Analyses."
         - "Nouveaux services : Bedrock Knowledge Bases (corpus réglementaire filtré par juridiction) et Bedrock Guardrails."
         - "Profil investisseur : tolérance et capacité de perte séparées, province."
+        - "Politique de langue : système interne en anglais, affichage dans userLanguage (conventions.language_policy)."
       impacts_to_handle:
         - "backend/api/registry.json et backend/api/tests/test_routes_agents.py copient l'ancien registre (agent-analyst, agent-governance) : à régénérer (Agent-Backend-API)."
         - "infra/terraform : table Analyses, Knowledge Base, Guardrail, droits IAM Bedrock KB et Guardrails à ajouter (Agent-Infra), sans apply sans accord."
@@ -44,6 +45,12 @@ conventions:
     mandateVersion: "entier croissant par session, à partir de 1"
     runId: "ULID d'une exécution d'analyse"
     evidenceId: "EV-<nn> pour un calcul, KB-<nn> pour une citation réglementaire; unique dans un run"
+  language_policy:
+    internal_language: "en"
+    rule: "Tout le système interne est en anglais : prompts système, descriptions d'outils et de paramètres lues par le modèle, arguments d'outils, champs du mandat, éléments du registre (label, method, caveats), raisons de verdict, requêtes et corpus de la Knowledge Base, journaux. Seuls les textes affichés à l'utilisateur sont dans userLanguage."
+    input: "agent-orchestrator détecte userLanguage (ISO 639-1) et traduit le message de l'utilisateur en anglais avant toute autre action. Le message original est stocké tel quel (content)."
+    output: "agent-orchestrator traduit dans userLanguage tout texte affiché (sa réponse, quickReplies, narrative, motifs de verdict, jurisdictionNotices). Les emplacements {EV-nn}/{KB-nn} restent identiques; les extraits réglementaires (evidence.excerpt) ne sont jamais traduits."
+    ui_labels: "les libellés fixes (noms de mesures, règles) sont traduits par le front à partir de clés stables."
   jurisdictions: ["CA", "QC", "ON", "BC", "AB", "SK", "MB", "NB", "NS", "PE", "NL", "YT", "NT", "NU"]  # CA = textes nationaux
   pagination: "limit + cursor opaque; réponse { items, nextCursor }"
   region: "A_CONFIRMER (compte d'atelier AWS; Bedrock est annoncé disponible à Montréal)"
@@ -221,7 +228,7 @@ services:
   - id: "srv-bedrock-guardrails"
     name: "Amazon Bedrock Guardrails"
     type: "managed_service"
-    description: "Filtre d'entrée (message utilisateur) et de sortie (texte de l'orchestrateur et du rédacteur) : ordres de transaction, promesses de rendement, conseil personnalisé, données personnelles. Un blocage renvoie GUARDRAIL_BLOCKED ou un refus expliqué; le message refusé n'entre pas dans l'historique."
+    description: "Filtre d'entrée (traduction anglaise du message utilisateur, et texte original) et de sortie (texte final affiché) : ordres de transaction, promesses de rendement, conseil personnalisé, données personnelles. Un blocage renvoie GUARDRAIL_BLOCKED ou un refus expliqué; le message refusé n'entre pas dans l'historique."
 
   - id: "srv-cloudwatch"
     name: "Amazon CloudWatch Logs"
@@ -466,6 +473,7 @@ data_schemas:
     fields:
       - { name: "sessionId", type: "string", required: true }
       - { name: "title", type: "string" }
+      - { name: "userLanguage", type: "string", description: "ISO 639-1 détecté par agent-orchestrator (ex. fr, en); défaut en" }
       - { name: "createdAt", type: "string", required: true }
       - { name: "updatedAt", type: "string", required: true }
 
@@ -620,6 +628,7 @@ data_schemas:
       - { name: "constraints", type: "array", items_type: "string" }
       - { name: "preferences", type: "object", description: "{ esg: bool, excludedSectors: [], excludedAssetClasses: [] }" }
       - { name: "province", type: "string", required: true, enum_ref: "conventions.jurisdictions" }
+      - { name: "userLanguage", type: "string", required: true, description: "ISO 639-1; langue d'affichage. Tous les champs texte du mandat sont en anglais (language_policy)." }
       - { name: "operations", type: "array", items_ref: "schema-operation", description: "vide pour diagnose" }
       - { name: "subjectTicker", type: "string", description: "titre étudié en mode diagnose" }
       - { name: "fieldSources", type: "object", description: "par champ : persona | user_answer | team_assumption | slider" }
@@ -683,12 +692,14 @@ data_schemas:
       - { name: "evidence", type: "array", items_type: "string", description: "EV-nn" }
       - { name: "citations", type: "array", items_type: "string", description: "KB-nn, rempli par agent-auditor" }
       - { name: "threshold", type: "object", description: "{ value, nature: text | team_assumption }" }
-      - { name: "message", type: "string", description: "une phrase, formulée par agent-auditor" }
+      - { name: "messageEn", type: "string", description: "une phrase, formulée par agent-auditor (anglais)" }
+      - { name: "message", type: "string", description: "messageEn traduit dans userLanguage par agent-orchestrator" }
 
   - id: "schema-narrative"
     description: "Texte du rédacteur. Il ne contient aucun chiffre écrit à la main : seulement des emplacements {EV-nn} et {KB-nn}."
     fields:
-      - { name: "sections", type: "array", required: true, description: "4 sections : { key: data_used | why | limits | what_would_change, text }" }
+      - { name: "sections", type: "array", required: true, description: "4 sections : { key: data_used | why | limits | what_would_change, textEn (version de référence, agent-writer), text (traduction dans userLanguage par agent-orchestrator; = textEn si en) }" }
+      - { name: "language", type: "string", required: true, description: "userLanguage de text" }
       - { name: "hiddenSentences", type: "array", description: "{ section, reason } : phrases masquées par module-verifier" }
 
   - id: "schema-verifier-report"
@@ -696,7 +707,8 @@ data_schemas:
       - { name: "placeholdersResolved", type: "integer", required: true }
       - { name: "placeholdersTotal", type: "integer", required: true }
       - { name: "handwrittenNumbers", type: "integer", required: true, description: "chiffres hors registre détectés (phrases masquées)" }
-      - { name: "forbiddenPhrases", type: "integer", required: true, description: "recommandation ou promesse détectée" }
+      - { name: "forbiddenPhrases", type: "integer", required: true, description: "recommandation ou promesse détectée (motifs en anglais et en français)" }
+      - { name: "placeholdersMatch", type: "boolean", required: true, description: "mêmes emplacements dans textEn et text" }
 
   - id: "schema-run"
     fields:
@@ -705,6 +717,7 @@ data_schemas:
       - { name: "mandateVersion", type: "integer", required: true }
       - { name: "status", type: "string", enum: ["partial", "done", "error"], required: true }
       - { name: "datasetVersion", type: "string", required: true }
+      - { name: "userLanguage", type: "string", required: true }
       - { name: "scenarios", type: "array", items_ref: "schema-scenario", required: true }
       - { name: "verdicts", type: "array", items_ref: "schema-rule-verdict", required: true }
       - { name: "evidence", type: "array", items_ref: "schema-evidence", required: true }
@@ -850,11 +863,13 @@ agents:
   - id: "agent-orchestrator"
     name: "Orchestrateur"
     status: "retenu"
-    role: "Lit la session (portefeuille, profil, province), détecte ce qui manque, pose au plus une étape de questions (quickReplies), propose le mandat, attend sa confirmation, puis lance l'analyse. Répond aux questions de suivi à partir du registre. Ne calcule jamais de tête et ne nomme jamais un titre comme recommandation."
+    role: "Seule voix face à l'utilisateur. Détecte userLanguage et traduit chaque message de l'utilisateur en anglais avant toute action; tout ce qu'il transmet aux outils et aux autres composants est en anglais; traduit dans userLanguage tout texte affiché (réponse, quickReplies, narrative, motifs de verdict, mentions), en conservant les emplacements {EV-nn}/{KB-nn} et sans traduire les extraits réglementaires. Lit la session (portefeuille, profil, province), détecte ce qui manque, pose au plus une étape de questions (quickReplies), propose le mandat, attend sa confirmation, puis lance l'analyse. Répond aux questions de suivi à partir du registre. Ne calcule jamais de tête et ne nomme jamais un titre comme recommandation."
     runs_in: "srv-agent-runtime"
     model: "Claude Haiku via Bedrock (identifiant exact à confirmer selon l'accès du compte)"
     max_tokens: 1024
     allowed_tools: ["tool-get-portfolio", "tool-get-profile", "tool-search-assets", "tool-propose-mandate", "tool-read-evidence"]
+    system_prompt_language: "en"
+    system_prompt_must_include: "If the user's message is not in English, translate it into English before doing anything else; all tool calls and all communication with other components are in English. When replying to the user, answer in the user's language (userLanguage), keep every {EV-nn}/{KB-nn} placeholder unchanged, and never translate quoted regulatory excerpts." 
     delegates_to: []
     limits: { max_agent_cycles: 6, timeout_seconds: 25 }
     fail_mode: "closed"
@@ -865,7 +880,8 @@ agents:
     name: "Auditeur de convenance"
     status: "retenu"
     replaces: "agent-governance"
-    role: "Ne décide pas des verdicts (module-rules le fait). Pour chaque verdict, cherche dans la Knowledge Base le passage qui le fonde (filtre juridiction ∈ {CA, province}), l'inscrit au registre (KB-nn) et formule le motif en une phrase."
+    system_prompt_language: "en"
+    role: "Travaille en anglais (requêtes KB et motifs en anglais). Ne décide pas des verdicts (module-rules le fait). Pour chaque verdict, cherche dans la Knowledge Base le passage qui le fonde (filtre juridiction ∈ {CA, province}), l'inscrit au registre (KB-nn) et formule le motif en une phrase."
     runs_in: "srv-agent-runtime"
     model: "Claude Haiku via Bedrock (à confirmer)"
     max_tokens: 1024
@@ -878,7 +894,8 @@ agents:
   - id: "agent-writer"
     name: "Rédacteur"
     status: "retenu"
-    role: "Rédige 4 sections (données utilisées, pourquoi ce verdict, limites, ce qui changerait la réponse) à partir du registre seulement. N'écrit aucun chiffre : seulement des emplacements {EV-nn} et {KB-nn}."
+    system_prompt_language: "en"
+    role: "Rédige en anglais (textEn) 4 sections (données utilisées, pourquoi ce verdict, limites, ce qui changerait la réponse) à partir du registre seulement; agent-orchestrator les traduit. N'écrit aucun chiffre : seulement des emplacements {EV-nn} et {KB-nn}."
     runs_in: "srv-agent-runtime"
     model: "Claude Sonnet via Bedrock (à confirmer)"
     max_tokens: 2048
@@ -923,7 +940,7 @@ modules:
   - id: "module-verifier"
     name: "Vérificateur"
     runs_in: "srv-agent-runtime"
-    role: "Contrôle chaque phrase du rédacteur : emplacements EV/KB existants, aucun chiffre écrit à la main hors constantes du mandat, aucune formule de recommandation ou de promesse. Une phrase fautive est masquée et signalée; pas de nouvelle tentative bloquante."
+    role: "Contrôle chaque phrase du texte final affiché (text, dans userLanguage) : mêmes emplacements que textEn, emplacements EV/KB existants, aucun chiffre écrit à la main hors constantes du mandat, aucune formule de recommandation ou de promesse. Une phrase fautive est masquée et signalée; pas de nouvelle tentative bloquante."
     owner_agent: "Agent-Backend-Agents"
 
 # ==========================================
@@ -1054,7 +1071,7 @@ tools:
     description: "Recherche dans la Knowledge Base réglementaire (Retrieve) avec filtre de métadonnées."
     used_by: ["agent-auditor"]
     params:
-      - { name: "query", type: "string", required: true }
+      - { name: "query", type: "string", required: true, description: "toujours en anglais (le corpus est en anglais)" }
       - { name: "subjects", type: "array", items_type: "string", required: false, description: "ex. profil_risque, convenance, oeo, esg, crypto, titres_proteges" }
     context_params: ["jurisdictions = [CA, province du mandat] (jamais fourni par le modèle)"]
     returns: "passages { document, section, excerpt, jurisdiction, version, url, score }, 5 maximum"
@@ -1098,6 +1115,7 @@ rules:
   - { id: "rule-mandate-before-compute", statement: "Aucun calcul de scénario avant un mandat confirmé par l'utilisateur." }
   - { id: "rule-numbers-from-registry", statement: "Tout chiffre ou citation affiché vient du registre du run (EV-nn, KB-nn). Le rédacteur n'écrit que des emplacements; le vérificateur masque toute phrase fautive." }
   - { id: "rule-team-assumptions-labeled", statement: "Les seuils choisis par l'équipe (pertes par horizon, concentration, plafond crypto) sont affichés comme hypothèses, jamais comme règles officielles." }
+  - { id: "rule-internal-english", statement: "Prompts, descriptions d'outils, échanges entre composants, requêtes et corpus de la KB sont en anglais. Les textes affichés sont dans userLanguage (conventions.language_policy)." }
   - { id: "rule-no-protected-titles", statement: "L'outil ne se présente jamais comme conseiller ou planificateur financier (titres protégés QC, ON, SK)." }
 
 rules_catalog:

@@ -9,6 +9,7 @@
 > - Les décisions de la section 18 (« Ce qu'on a écarté ») sont prises. Ne les rouvre pas sans demande explicite.
 > - Tout ce qui est marqué **hypothèse d'équipe** est un choix de l'équipe, pas une règle officielle. L'interface doit le présenter comme tel.
 > - **Décision technique ferme : les agents sont construits avec le SDK Strands Agents (Python) et les modèles d'Amazon Bedrock.** Pas d'autre framework d'agents (LangChain, LlamaIndex…), pas d'appel direct à un autre fournisseur de modèles.
+> - **Décision ferme : tout le système interne est en anglais** (prompts, descriptions d'outils, échanges entre agents, requêtes et corpus de la KB). Seuls les textes affichés à l'utilisateur sont dans sa langue. L'orchestrateur traduit à l'entrée et à la sortie. Voir section 7.0.
 > - Les commandes AWS et Terraform suivent `AGENTS.md` : `source scripts/aws-env.sh && ...`, le compte doit contenir `WSParticipantRole`, et aucun `terraform apply` ni aucune création de ressource sans demande explicite.
 
 ---
@@ -97,8 +98,9 @@
 ## 5. Flux d'une session
 
 ```
-1 INTENTION      utilisateur : portefeuille (persona ou fictif) + province + idée en texte libre
-      │          (Guardrails filtre l'entrée)
+1 INTENTION      utilisateur : portefeuille (persona ou fictif) + province + idée en texte libre (dans SA langue)
+      │          Orchestrateur : détecte userLanguage, TRADUIT la demande en anglais (Guardrails filtre l'entrée)
+      │          ── à partir d'ici, tout est en anglais en interne ──
 2 CADRAGE        Orchestrateur (LLM) : pré-remplit depuis le profil, pose UNE seule étape de questions
       │          (boutons de réponse rapide), propose le mandat → l'utilisateur confirme (mandat v1)
 3 CALCUL         Moteur Python : scénarios 0/1/2, volatilité, pire baisse, tests de résistance,
@@ -106,9 +108,10 @@
       │          + règles déterministes R1..R10 → pastilles PASS/WARN/FAIL
       │          ⇒ AFFICHÉ IMMÉDIATEMENT dans le panneau de simulation
 4 AUDIT          Auditeur (LLM + KB) : pour chaque verdict, cherche le passage qui le fonde,
-      │          avec un filtre juridiction ∈ {CA, province} → citations KB-xx (affichées au fil de l'eau)
-5 RESTITUTION    Rédacteur (LLM) : 4 rubriques, avec des emplacements {EV-xx}/{KB-xx} au lieu de chiffres,
-                 diffusées en continu ; le Vérificateur (code) contrôle chaque phrase, sans bloquer
+      │          requêtes en anglais, filtre juridiction ∈ {CA, province} → citations KB-xx (affichées au fil de l'eau)
+5 RESTITUTION    Rédacteur (LLM) : 4 rubriques EN ANGLAIS, avec des emplacements {EV-xx}/{KB-xx} au lieu de chiffres
+                 → Orchestrateur : traduit dans userLanguage (emplacements conservés, extraits KB non traduits)
+                 → Vérificateur (code) : contrôle chaque phrase du texte final, sans bloquer ; affichage en continu
 ```
 
 **Boucles :**
@@ -138,8 +141,49 @@ Tous les modes passent par le même flux. Seuls changent les calculs lancés et 
 
 L'équilibre est fixé : **3 agents LLM + 2 briques de code + Guardrails + KB**. On n'ajoute pas d'agent. Les agents utilisent le **SDK Strands (Python)** avec Bedrock.
 
+### 7.0 Politique de langue (décision ferme)
+
+**Tout le système interne fonctionne en anglais. Seule la frontière avec l'utilisateur est dans sa langue.**
+
+Pourquoi :
+- le corpus de la KB est entièrement en anglais ;
+- la langue du prompt influence le comportement du modèle ;
+- le retour d'expérience Strands l'a montré : un sous-agent répond dans la langue de ce qu'on lui envoie.
+
+Une seule langue interne rend le comportement des agents prévisible et la recherche dans la KB plus fiable.
+
+| Élément | Langue |
+|---|---|
+| Prompts système des 3 agents (`prompts.py`) | **anglais** |
+| Descriptions des outils et de leurs paramètres (docstrings lues par le modèle) | **anglais** |
+| Échanges entre composants : arguments d'outils, champs du mandat, éléments du registre (`label`, `method`, `caveats`), raisons des verdicts | **anglais** |
+| Requêtes vers la Knowledge Base (`search_regulation`) | **anglais** |
+| Corpus de la KB et extraits cités (`excerpt`) | **anglais** (citation fidèle, jamais traduite dans le registre) |
+| Journaux et traces | **anglais** |
+| Message tapé par l'utilisateur | sa langue (stocké tel quel pour l'historique affiché) |
+| Tout texte montré à l'utilisateur : messages de l'orchestrateur, réponses rapides, mandat affiché, motifs des verdicts, 4 rubriques, mentions de la province | **la langue de l'utilisateur** (`userLanguage`) |
+
+Mécanisme :
+1. **Entrée.** L'orchestrateur détecte la langue du message (`userLanguage`, code ISO 639-1 : `fr`, `en`…), l'enregistre sur la conversation, puis **traduit la demande en anglais** avant toute autre action. Tout ce qu'il transmet ensuite (arguments d'outils, brouillon du mandat, `run_analysis`) est en anglais. Les réponses rapides sont affichées dans la langue de l'utilisateur, mais chacune correspond à une valeur interne en anglais ou à une énumération.
+2. **Traitement.** Moteur, règles, auditeur, rédacteur et vérificateur travaillent en anglais. L'auditeur cherche dans la KB avec des requêtes en anglais. Le rédacteur produit les 4 rubriques **en anglais** (version de référence, stockée).
+3. **Sortie.** Avant l'affichage, l'orchestrateur **traduit dans `userLanguage`** tout ce qui va à l'utilisateur : son propre message, les 4 rubriques, les motifs des verdicts et les mentions de la province. Il ne fait rien si `userLanguage = en`.
+   - Les emplacements `{EV-nn}` et `{KB-nn}` sont **conservés à l'identique**.
+   - Les extraits réglementaires restent en anglais : l'interface les affiche comme « extrait original (anglais) ».
+   - Les libellés fixes des mesures (« Volatilité annualisée ») sont traduits par l'interface à partir de clés stables.
+4. Le **vérificateur** contrôle le texte final traduit : emplacements et chiffres, avec des motifs interdits en français et en anglais.
+
+Le prompt système de l'orchestrateur, rédigé en anglais, contient donc explicitement la consigne suivante : *« If the user's message is not in English, translate it into English before doing anything else; all tool calls and all communication with other components are in English. When replying to the user, answer in the user's language (`userLanguage`), keep every {EV-nn}/{KB-nn} placeholder unchanged, and never translate quoted regulatory excerpts. »*
+
+**Repli si la latence pose problème en démo :** le rédacteur peut écrire directement dans `userLanguage` (paramètre transmis en anglais dans son contexte), ce qui évite l'étape de traduction. Le reste de la politique ne change pas.
+
 ### 7.1 Orchestrateur — LLM (Claude Haiku via Bedrock)
-- **Rôle :** lire la session (portefeuille, profil de base, province), détecter ce qui manque pour le mandat, poser **une seule** étape de questions (2 au maximum, avec options de réponse rapide), rédiger le mandat, attendre la confirmation, lancer `run_analysis`, répondre aux questions de suivi à partir du registre.
+- **Rôle :** il est la seule voix qui parle à l'utilisateur.
+  - Il détecte la langue de l'utilisateur et traduit sa demande en anglais (7.0).
+  - Il lit la session (portefeuille, profil de base, province) et détecte ce qui manque pour le mandat.
+  - Il pose **une seule** étape de questions (2 au maximum, avec options de réponse rapide), dans la langue de l'utilisateur.
+  - Il rédige le mandat (en anglais en interne, affiché traduit), attend la confirmation et lance `run_analysis`.
+  - Il traduit la restitution dans la langue de l'utilisateur.
+  - Il répond aux questions de suivi à partir du registre.
 - **Outils :**
   - `load_session(session_id)` ;
   - `propose_mandate(mandate_draft)`, qui valide le schéma et enregistre en `MANDAT_PROPOSE` ;
@@ -163,7 +207,8 @@ L'équilibre est fixé : **3 agents LLM + 2 briques de code + Guardrails + KB**.
 - **Rôle :** les **verdicts viennent des règles R1 à R10, écrites en code** (section 9). L'auditeur ne décide pas du verdict. Il **cherche dans la Knowledge Base le passage qui fonde chaque verdict**, l'inscrit au registre (`KB-xx` : document, section, extrait court, juridiction, version, URL) et formule le motif en une phrase.
 - **Outils :**
   - `check_rules(mandate, scenarios)` (code) ;
-  - `search_regulation(query, subjects, jurisdictions)`, qui appelle Bedrock KB `Retrieve` avec un filtre de métadonnées `juridiction ∈ {CA, <province>}` et éventuellement sur `sujets`.
+  - `search_regulation(query, subjects, jurisdictions)`, qui appelle Bedrock KB `Retrieve` avec un filtre de métadonnées `juridiction ∈ {CA, <province>}` et éventuellement sur `sujets`. **La requête est toujours en anglais**, comme le corpus.
+- **Langue :** il travaille en anglais. Ses motifs de verdict sont en anglais, et l'orchestrateur les traduit pour l'affichage.
 - **Fail mode :** si aucun passage pertinent n'est trouvé, le verdict reste affiché avec la mention « fondement : hypothèse d'équipe » ou « non vérifié ». L'auditeur n'invente jamais de citation.
 
 ### 7.4 Rédacteur — LLM (Claude Sonnet)
@@ -174,19 +219,23 @@ L'équilibre est fixé : **3 agents LLM + 2 briques de code + Guardrails + KB**.
   4. Ce qui changerait la réponse
 - **Règle clé : le rédacteur n'écrit jamais de chiffre.** Il écrit des **emplacements** `{EV-07}`, `{KB-03}`. L'interface y insère la valeur exacte du registre sous forme de badge cliquable. Ça rend un chiffre faux impossible, supprime les problèmes d'arrondi et permet de diffuser le texte en continu sans risque.
 - **Outil :** `read_evidence` (lecture seule du registre complet de la session).
+- **Langue :** il rédige en anglais (version de référence). L'orchestrateur traduit ensuite dans la langue de l'utilisateur en conservant les emplacements (7.0).
 - **Exceptions autorisées sans emplacement :** les constantes saisies par l'utilisateur et répétées (« 3 ans », « 15 000 $ ») et les noms de documents.
 
 ### 7.5 Vérificateur — code Python, non bloquant
-- Il lit chaque phrase du rédacteur au fil de la diffusion.
+- Il lit chaque phrase du texte **final, tel qu'il sera affiché** : la version traduite dans la langue de l'utilisateur, ou la version anglaise si `userLanguage = en`.
 - **Contrôles :**
   1. Chaque `{EV-xx}` et `{KB-xx}` existe dans le registre de la session.
   2. Aucun nombre écrit à la main (%, $, points de base, ratio, nombre décimal) en dehors des constantes du mandat.
-  3. Pas de formule de promesse ou de recommandation (liste de motifs : « vous devriez acheter », « garanti »…).
+  3. Pas de formule de promesse ou de recommandation. La liste de motifs existe **en anglais et en français** : « you should buy », « guaranteed », « vous devriez acheter », « garanti »…
+  4. Les emplacements de la version anglaise et ceux de la version traduite sont identiques : la traduction n'en a perdu ni ajouté aucun.
 - **En cas d'échec :** la phrase est **masquée et signalée** (« phrase retirée : chiffre non vérifié »). La réponse continue. Il n'y a **pas de nouvelle tentative bloquante**.
 - **Affichage :** un score dans l'interface (« 21/21 chiffres et 3/3 citations vérifiés »).
 
 ### 7.6 Guardrails — Amazon Bedrock Guardrails
-- Placé en entrée (message utilisateur) et en sortie (texte du rédacteur et de l'orchestrateur).
+- Placé en entrée et en sortie.
+  - **En entrée**, il s'applique à la traduction anglaise de la demande, et aussi au texte original : les filtres de Guardrails sont les plus fiables en anglais, et la couverture des autres langues est à vérifier.
+  - **En sortie**, il s'applique au texte final affiché.
 - **Il bloque :**
   - les ordres de transaction (« achète pour moi ») ;
   - les promesses de rendement ;
@@ -344,6 +393,7 @@ Les seuils marqués « hypothèse » vivent dans un fichier de configuration (pa
    - le score du vérificateur.
 - **Ordre d'apparition :** scénarios et pastilles d'abord, puis citations, puis texte diffusé en continu.
 - **Mention permanente :** « Simulation pédagogique, pas un conseil financier ». Les mentions de la province (R9) sont ajoutées.
+- **Langue :** l'interface est dans la langue de l'utilisateur (`userLanguage`) : libellés fixes traduits à partir de clés stables, textes générés déjà traduits par l'orchestrateur. Les extraits réglementaires sont affichés en version originale anglaise, avec la mention « extrait original (anglais) ».
 
 ## 13. Architecture AWS
 
@@ -367,6 +417,7 @@ Les seuils marqués « hypothèse » vivent dans un fichier de configuration (pa
 - Un modèle par agent dans une table (`MODELS`) ; une toolbox qui déclare quels outils sont accordés à quel agent, vérifiée au démarrage.
 - Tout texte venu d'un outil ou de la KB est une donnée non fiable : l'encadrer, et placer la vraie consigne **après** lui.
 - Un message refusé ne doit pas entrer dans l'historique de session.
+- **La langue d'un sous-agent suit la langue de ce qu'on lui envoie** (leçon 8 du retour d'expérience). D'où la politique de la section 7.0 : prompts, descriptions d'outils et messages entre composants toujours en anglais, et langue de sortie fixée explicitement.
 - Séparer la logique pure (calculs, règles, vérificateur) des entrées-sorties, et la tester sans Bedrock.
 
 ## 14. Banc d'évaluation (à citer dans la documentation technique)
@@ -382,6 +433,7 @@ Un script lance une douzaine de scénarios sur le pipeline complet, avec **un co
 | Tous | aucun titre nommé comme recommandation (R5) |
 | Hors cadre (« achète pour moi », « garantis 20 % ») | refus de Guardrails ou de l'orchestrateur, message absent de l'historique |
 | Province ON contre QC | les mentions R9 changent ; les règles de convenance restent identiques |
+| Même demande en français et en anglais | mêmes verdicts et mêmes preuves EV ; réponse affichée dans la langue de la demande ; requêtes KB en anglais dans les traces ; emplacements identiques avant et après traduction |
 
 Les calculs, les règles et le vérificateur ont aussi des **tests unitaires sans Bedrock**.
 
@@ -434,6 +486,7 @@ Les calculs, les règles et le vérificateur ont aussi des **tests unitaires san
 | Vérificateur bloquant avec nouvelle tentative | Trop lent et risqué en direct : emplacements `{EV}` et masquage non bloquant |
 | Optimisation « portefeuille optimal » sur rendements passés | Contraire à l'esprit de l'énoncé (pas de prédiction à partir du passé) |
 | Univers de 5 000 titres | Inutile pour des personas ; 31 actifs, plus la composition des FNB, suffisent |
+| Corpus ou prompts bilingues, ou en français | Une seule langue interne (l'anglais) rend le comportement des agents et la recherche dans la KB plus prévisibles ; la langue de l'utilisateur ne sert qu'à l'affichage |
 
 ## 19. Points ouverts et risques
 

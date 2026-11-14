@@ -98,6 +98,7 @@ Décisions fermes :
 - Pas de serveur MCP : nos propres outils Python.
 - Aucun calcul par un LLM. Tout chiffre affiché vient du registre de preuves d'un run (EV-nn), toute citation réglementaire de la Knowledge Base (KB-nn).
 - Aucun texte ne recommande un titre précis. Les alternatives sont formulées par catégorie d'actifs.
+- Langue : tout le système interne est en anglais (prompts système, descriptions d'outils et de paramètres, docstrings, échanges entre composants, requêtes et corpus de la KB, journaux). Seuls les textes affichés à l'utilisateur sont dans sa langue (userLanguage). L'orchestrateur traduit à l'entrée et à la sortie (SOLUTION.md section 7.0, contrat conventions.language_policy).
 
 Règles de travail :
 - N'écris que dans les dossiers qui te sont attribués ci-dessous. Ne modifie jamais contract/, AGENTS.md ni SOLUTION.md. Si le contrat est incomplet ou contradictoire pour ta tâche, note-le dans NOTES-<chantier>.md à la racine de ton dossier attribué et continue avec l'hypothèse la plus prudente.
@@ -248,7 +249,7 @@ Chantier : compléments de la Lambda API pour le contrat v0.4.0. Dossier attribu
 
 À produire :
 1. Routes api-mandates-create (POST /v1/conversations/{sessionId}/mandates) et api-mandates-list (GET), via le repository analyses (WS0b ; simule-le en test) :
-   - validation du corps selon schema-mandate-create-request (types, enums, horizonYears > 0, riskTolerance et riskCapacity entre 1 et 5, province dans conventions.jurisdictions sauf CA, tickers des operations dans l'univers) ;
+   - validation du corps selon schema-mandate-create-request (types, enums, horizonYears > 0, riskTolerance et riskCapacity entre 1 et 5, province dans conventions.jurisdictions sauf CA, userLanguage présent au format ISO 639-1, tickers des operations dans l'univers) ;
    - riskProfile = min(riskTolerance, riskCapacity) (règle R1) ;
    - effectiveMaxLossPct = valeur saisie, sinon défaut par horizon (hypothèse d'équipe, SOLUTION.md section 9 : < 3 ans 10 %, 3–8 ans 20 %, > 8 ans 35 %), lu d'un petit fichier de configuration ;
    - contrôle de cohérence → warnings (ex. objective = project avec un horizon plus long que l'échéance du projet) ;
@@ -299,9 +300,13 @@ Architecture :
   - aucune formule de recommandation ou de promesse.
   Une phrase fautive est masquée et listée dans hiddenSentences. Pas de nouvelle tentative bloquante. Produit schema-verifier-report.
 - agents/ : trois agents Strands, chacun avec name = son id, modèle lu dans la config (MODEL_ORCHESTRATOR, MODEL_AUDITOR, MODEL_WRITER), max_tokens fixé, limites et outils accordés du contrat.
-  - orchestrateur : cadrage en une étape (quickReplies), puis mandateDraft via propose_mandate. Aucun calcul avant confirmation. Questions de suivi via read_evidence.
-  - auditeur : pour chaque verdict, search_regulation (Bedrock KB Retrieve, filtre juridiction ∈ {CA, province du mandat}), puis citations KB-nn (document, section, extrait, juridiction, version, url) et une phrase de motif. Jamais de citation inventée.
-  - rédacteur : 4 sections (data_used, why, limits, what_would_change) avec emplacements seulement, aucun chiffre.
+  - orchestrateur, seule voix face à l'utilisateur :
+    - à l'entrée : détecte userLanguage (enregistré sur la conversation) et traduit le message en anglais avant toute action ;
+    - cadrage en une étape (quickReplies affichées dans userLanguage, chacune liée à une valeur interne en anglais), puis mandateDraft (champs en anglais) via propose_mandate ;
+    - aucun calcul avant confirmation ; questions de suivi via read_evidence ;
+    - à la sortie : traduit dans userLanguage sa réponse, les sections narrative (text à partir de textEn), les motifs de verdict (message à partir de messageEn) et les jurisdictionNotices, en conservant les emplacements {EV-nn}/{KB-nn} à l'identique et sans traduire les extraits KB. Rien à faire si userLanguage = en.
+  - auditeur, en anglais : pour chaque verdict, search_regulation avec une requête en anglais (Bedrock KB Retrieve, filtre juridiction ∈ {CA, province du mandat}), puis citations KB-nn (document, section, extrait, juridiction, version, url) et un motif en anglais (messageEn). Jamais de citation inventée.
+  - rédacteur, en anglais : 4 sections (data_used, why, limits, what_would_change) dans textEn, avec emplacements seulement, aucun chiffre.
 - Toolbox : table des droits agent/module → outils conforme au contrat, vérifiée au démarrage (outil inconnu ou agent sans droits déclarés = erreur).
 - Guardrails : ApplyGuardrail sur le message utilisateur (entrée) et sur le texte de l'orchestrateur et du rédacteur (sortie). Un message bloqué donne un refus expliqué ou GUARDRAIL_BLOCKED, et n'est pas écrit dans l'historique.
 
@@ -314,8 +319,9 @@ Routes :
 - market/search : recherche dans universe.parquet.
 
 Traçabilité : une ligne JSON agent.usage par invocation d'agent et tool.call par appel d'outil (champs du contrat), jamais le texte des messages. explanation est construit à partir des tool.call de l'exécution.
-Prompts système dans un fichier prompts.py par agent :
-- répondre dans la langue de l'utilisateur ;
+Prompts système dans un fichier prompts.py par agent, ENTIÈREMENT EN ANGLAIS (la langue du prompt influence l'agent ; un sous-agent répond dans la langue de ce qu'on lui envoie). Descriptions d'outils et de paramètres en anglais aussi. Contenu :
+- orchestrateur seulement : « If the user's message is not in English, translate it into English before doing anything else; all tool calls and all communication with other components are in English. When replying to the user, answer in the user's language (userLanguage), keep every {EV-nn}/{KB-nn} placeholder unchanged, and never translate quoted regulatory excerpts. » ;
+- auditeur et rédacteur : travailler et répondre en anglais uniquement ;
 - distinguer faits, hypothèses et scénarios ;
 - ne jamais présenter le passé comme une prédiction ;
 - pas de conseil personnalisé, aucun titre recommandé, ne jamais se présenter comme conseiller ou planificateur financier ;
@@ -330,6 +336,7 @@ Tests, sans AWS ni modèle (modèle et KB simulés) :
 - la toolbox, et que chaque outil et chaque paramètre a une description non vide ;
 - le cycle d'un run : partial puis done ;
 - le scénario vedette de SOLUTION.md section 6 (Robert/NVDA) : scénario 1 FAIL, scénario 2 PASS.
+- langue : les prompts et les descriptions d'outils ne contiennent pas de français ; une demande en français produit les mêmes arguments d'outils (en anglais) qu'en anglais ; la traduction de sortie conserve exactement les emplacements {EV-nn}/{KB-nn} (placeholdersMatch) ; le vérificateur détecte les motifs interdits en français et en anglais.
 Définition de fini : tous les tests passent ; aucune réponse d'outil ne dépasse les plafonds du contrat.
 ```
 
@@ -356,6 +363,7 @@ Règles :
 - Il remplace chaque emplacement {EV-nn}/{KB-nn} par la valeur formatée de run.evidence, sous forme de badge cliquable qui ouvre la carte de preuve (méthode, période, devise, source, limites ; pour KB : document, section, extrait, juridiction, lien). Un emplacement inconnu n'affiche jamais de chiffre.
 - Affichage progressif : scénarios et verdicts dès la réponse de POST runs (status = partial), puis relecture de GET runs/{runId} jusqu'à status = done.
 - Hypothèses d'équipe affichées comme telles. Mention permanente « Simulation pédagogique, pas un conseil financier », plus les jurisdictionNotices du run.
+- Langue : l'interface s'affiche dans userLanguage (au minimum fr et en). Les libellés fixes (mesures, règles, rubriques) sont traduits à partir de clés stables. Les textes générés arrivent déjà traduits (narrative.sections[].text, verdicts[].message). Les extraits réglementaires (evidence.excerpt) sont affichés en anglais, avec la mention « extrait original (anglais) ».
 - Connexion Cognito (Amplify Auth ou SDK), jeton Bearer sur chaque appel.
 Tests : composants clés (remplacement des emplacements, affichage progressif, carte de mandat) avec des réponses d'API simulées conformes aux schémas.
 Définition de fini : l'application fonctionne contre une API simulée, et le build produit des fichiers statiques déployables sur S3 + CloudFront.
