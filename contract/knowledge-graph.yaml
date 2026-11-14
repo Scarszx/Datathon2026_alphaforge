@@ -1,0 +1,733 @@
+application:
+  name: "AlphaForge"
+  version: "0.3.0"
+  description: "Assistant agentique auto-explicatif d'aide à la décision d'investissement (simulation seulement). Datathon 2026."
+  status: "brouillon à valider par l'équipe"
+  # Règle d'équipe : ce fichier est la référence. Toute modification passe par un accord de l'équipe.
+  # Voir aussi : la page de présentation du contrat (même contenu, avec schémas).
+
+# ==========================================
+# 0. CONVENTIONS COMMUNES
+# ==========================================
+conventions:
+  api_base_path: "/v1"
+  format: "JSON UTF-8, champs en camelCase"
+  dates: "ISO 8601 UTC, ex. 2026-11-14T09:30:00Z. Dates de marché : YYYY-MM-DD."
+  amounts: "nombres (jamais des chaînes). Les pourcentages sont des nombres : 9.07 veut dire 9,07 %."
+  supported_currencies: ["CAD", "USD"]  # le jeu de données ne fournit que le taux USD/CAD
+  authentication:
+    provider: "srv-cognito"
+    scheme: "Authorization: Bearer <accessToken>"
+    user_identity: "userId = claim 'sub' du JWT. Jamais lu dans le corps de la requête ni fourni par le modèle."
+    public_routes: []  # le login se fait directement auprès de Cognito (SDK), pas via notre API
+  identifiers:
+    sessionId: "UUID v4 généré par le serveur"
+    messageId: "ULID (triable par ordre chronologique)"
+    portfolioId: "texte court, 'main' par défaut"
+    ticker: "symbole exact du jeu de données, ex. AAPL, RY.TO, BTC-USD"
+  pagination: "limit + cursor opaque; réponse { items, nextCursor }"
+  region: "A_CONFIRMER (compte d'atelier AWS; Bedrock est annoncé disponible à Montréal)"
+  error_format_ref: "schema-error"
+  error_codes:
+    UNAUTHORIZED: 401
+    FORBIDDEN: 403
+    VALIDATION_ERROR: 400
+    CONVERSATION_NOT_FOUND: 404
+    PORTFOLIO_NOT_FOUND: 404
+    ASSET_NOT_FOUND: 404
+    AGENT_TIMEOUT: 504
+    INTERNAL: 500
+
+# ==========================================
+# 1. LES SERVICES (composants)
+# ==========================================
+services:
+  - id: "srv-frontend"
+    name: "Front (SPA)"
+    type: "frontend"
+    tech_stack: "SPA (framework à choisir) + Amplify Auth (ou SDK Cognito)"
+    hosting: "S3 + CloudFront"
+    owner_agent: "Agent-Frontend"
+    pages:
+      - "/login (username, mot de passe)"
+      - "/chat (zone de conversation + menu latéral d'historique)"
+      - "/portefeuille (positions, valeur, répartition, performance)"
+    uses_services:
+      - "srv-cognito"       # connexion directe, obtient les jetons
+      - "srv-api-gateway"   # tout le reste
+    consumes_apis:
+      - "api-me-get"
+      - "api-me-profile-put"
+      - "api-conversations-list"
+      - "api-conversations-create"
+      - "api-conversations-update"
+      - "api-conversations-delete"
+      - "api-messages-list"
+      - "api-messages-create"
+      - "api-portfolios-list"
+      - "api-portfolio-holdings-put"
+      - "api-portfolio-summary"
+      - "api-market-search"
+      - "api-agents-registry"
+    rules:
+      - "Le front ne calcule rien : prix, poids, gains et répartitions viennent du back."
+      - "Il affiche toujours le champ explanation d'une réponse de l'assistant."
+
+  - id: "srv-cognito"
+    name: "Amazon Cognito (user pool)"
+    type: "managed_service"
+    description: "Stocke les comptes et mots de passe, émet et renouvelle les JWT. Aucun mot de passe n'est stocké dans nos tables."
+    notes:
+      - "Client d'application sans secret; flux SRP ou USER_PASSWORD_AUTH activé."
+      - "Comptes créés à la main pour le datathon, avec mot de passe définitif (admin-set-user-password --permanent) pour éviter le changement de mot de passe temporaire."
+
+  - id: "srv-api-gateway"
+    name: "API Gateway (HTTP API)"
+    type: "managed_service"
+    description: "Porte d'entrée unique pour le front. Authorizer JWT natif relié à Cognito."
+    routes_to:
+      srv-api-light: ["/me", "/me/profile", "/conversations*", "/portfolios (GET, PUT holdings)", "/agents"]
+      srv-agent-runtime: ["POST /conversations/{sessionId}/messages", "GET /portfolios/{portfolioId}/summary", "GET /market/search"]
+    depends_on:
+      - "srv-cognito"
+    known_limit: "Délai maximal d'intégration d'environ 30 s : le chat reste synchrone au départ (voir open_questions)."
+
+  - id: "srv-api-light"
+    name: "Lambda API (CRUD léger)"
+    type: "microservice"
+    tech_stack: "Python (sans pandas, démarrage à froid court)"
+    owner_agent: "Agent-Backend-API"
+    exposes_apis:
+      - "api-me-get"
+      - "api-me-profile-put"
+      - "api-conversations-list"
+      - "api-conversations-create"
+      - "api-conversations-update"
+      - "api-conversations-delete"
+      - "api-messages-list"
+      - "api-portfolios-list"
+      - "api-portfolio-holdings-put"
+      - "api-agents-registry"
+    access_to_dbs:
+      - id: "db-users"
+        mode: "read_write"
+      - id: "db-conversations"
+        mode: "read_write_delete"
+      - id: "db-messages"
+        mode: "read_delete"
+      - id: "db-portfolios"
+        mode: "read_write"
+    rules:
+      - "Vérifie à chaque appel que la ressource appartient au userId du JWT."
+      - "GET /portfolios crée le portefeuille 'main' vide s'il n'existe pas; GET /me crée le profil au premier appel."
+      - "PUT holdings valide chaque ticker contre universe.parquet (lecture S3 de ce seul fichier, ou copie embarquée)."
+
+  - id: "srv-agent-runtime"
+    name: "Lambda agents (orchestration + outils)"
+    type: "microservice"
+    tech_stack: "Python 3.x, Strands Agents, pandas + pyarrow (couche Lambda AWS SDK for pandas à valider)"
+    owner_agent: "Agent-Backend-Agents"
+    description: "Une seule Lambda qui a toutes les connexions nécessaires. Les agents et leurs outils y tournent. Les limites par agent sont appliquées dans le code (voir agents et tools)."
+    exposes_apis:
+      - "api-messages-create"
+      - "api-portfolio-summary"
+      - "api-market-search"
+    access_to_dbs:
+      - id: "db-conversations"
+        mode: "read_update"      # met à jour updatedAt
+      - id: "db-messages"
+        mode: "read_write"
+      - id: "db-portfolios"
+        mode: "read"
+      - id: "db-users"
+        mode: "read"             # profil investisseur
+    access_to_storage:
+      - id: "storage-dataset"
+        mode: "read"
+    uses_services:
+      - "srv-bedrock"
+      - "srv-cloudwatch"
+    contains_agents:
+      - "agent-orchestrator"
+      - "agent-analyst"
+      - "agent-governance"
+    permission_enforcement: "code"
+    known_limit: "Tous les agents partagent le rôle IAM de la Lambda. L'isolation par agent est logicielle (toolbox grant, validation des paramètres). Évolutions possibles sans changer le contrat : rôles étroits pris par outil (STS), ou Lambdas d'outils regroupées par droits."
+    performance_notes:
+      - "Charger seulement les colonnes utiles du Parquet et garder le résultat en mémoire entre appels."
+      - "Préchauffer la Lambda avant une démonstration (démarrage à froid avec pandas)."
+      - "Outils larges plutôt que nombreux petits outils : moins de cycles d'agent."
+      - "Ne jamais renvoyer des lignes brutes au modèle : les résultats d'outils sont rejoués à chaque cycle."
+
+  - id: "srv-bedrock"
+    name: "Amazon Bedrock"
+    type: "managed_service"
+    description: "Modèles de langage des agents. Modèle par agent défini dans le registre. Vérifier l'accès au modèle et l'IAM avant de changer de modèle."
+
+  - id: "srv-cloudwatch"
+    name: "Amazon CloudWatch Logs"
+    type: "managed_service"
+    description: "Reçoit les journaux JSON par agent et par outil (voir observability)."
+
+# ==========================================
+# 2. LES CONTRATS D'API (front <-> API Gateway)
+# ==========================================
+apis:
+  - id: "api-me-get"
+    provider: "srv-api-light"
+    method: "GET"
+    path: "/v1/me"
+    description: "Retourne le profil de l'utilisateur connecté, avec son profil investisseur. Crée le profil au premier appel."
+    auth: "jwt"
+    response_payload:
+      schema_ref: "schema-user"
+
+  - id: "api-me-profile-put"
+    provider: "srv-api-light"
+    method: "PUT"
+    path: "/v1/me/profile"
+    description: "Remplace le profil investisseur (risque, horizon, objectif, contraintes, préférences)."
+    auth: "jwt"
+    request_payload:
+      schema_ref: "schema-investor-profile"
+    response_payload:
+      schema_ref: "schema-user"
+
+  - id: "api-conversations-list"
+    provider: "srv-api-light"
+    method: "GET"
+    path: "/v1/conversations"
+    description: "Liste les conversations de l'utilisateur (menu latéral), plus récentes d'abord."
+    auth: "jwt"
+    query_params:
+      - { name: "limit", type: "integer", default: 20 }
+      - { name: "cursor", type: "string", required: false }
+    response_payload:
+      schema_ref: "schema-conversation-page"
+
+  - id: "api-conversations-create"
+    provider: "srv-api-light"
+    method: "POST"
+    path: "/v1/conversations"
+    description: "Crée une conversation et retourne son sessionId."
+    auth: "jwt"
+    request_payload:
+      schema_ref: "schema-conversation-create-request"
+    response_payload:
+      schema_ref: "schema-conversation"
+      status: 201
+
+  - id: "api-conversations-update"
+    provider: "srv-api-light"
+    method: "PATCH"
+    path: "/v1/conversations/{sessionId}"
+    description: "Renomme une conversation."
+    auth: "jwt"
+    request_payload:
+      schema_ref: "schema-conversation-update-request"
+    response_payload:
+      schema_ref: "schema-conversation"
+    errors: ["CONVERSATION_NOT_FOUND"]
+
+  - id: "api-conversations-delete"
+    provider: "srv-api-light"
+    method: "DELETE"
+    path: "/v1/conversations/{sessionId}"
+    description: "Supprime une conversation et ses messages."
+    auth: "jwt"
+    response_payload:
+      status: 204
+    errors: ["CONVERSATION_NOT_FOUND"]
+
+  - id: "api-messages-list"
+    provider: "srv-api-light"
+    method: "GET"
+    path: "/v1/conversations/{sessionId}/messages"
+    description: "Messages d'une conversation, ordre chronologique. Les messages de l'assistant contiennent leur explanation."
+    auth: "jwt"
+    query_params:
+      - { name: "limit", type: "integer", default: 50 }
+      - { name: "cursor", type: "string", required: false }
+    response_payload:
+      schema_ref: "schema-message-page"
+    errors: ["CONVERSATION_NOT_FOUND"]
+
+  - id: "api-messages-create"
+    provider: "srv-agent-runtime"
+    method: "POST"
+    path: "/v1/conversations/{sessionId}/messages"
+    description: "Envoie une question. Les agents répondent de façon synchrone; le message de l'assistant contient son explanation."
+    auth: "jwt"
+    request_payload:
+      schema_ref: "schema-message-create-request"
+    response_payload:
+      schema_ref: "schema-message-create-response"
+    errors: ["CONVERSATION_NOT_FOUND", "VALIDATION_ERROR", "AGENT_TIMEOUT"]
+    notes:
+      - "Le champ status du message ('done', 'pending', 'error') prévoit un passage à une réponse asynchrone (202 puis relecture) sans changer les objets."
+
+  - id: "api-portfolios-list"
+    provider: "srv-api-light"
+    method: "GET"
+    path: "/v1/portfolios"
+    description: "Portefeuilles de l'utilisateur. Crée 'main' vide s'il n'existe pas."
+    auth: "jwt"
+    response_payload:
+      schema_ref: "schema-portfolio-list"
+
+  - id: "api-portfolio-holdings-put"
+    provider: "srv-api-light"
+    method: "PUT"
+    path: "/v1/portfolios/{portfolioId}/holdings"
+    description: "Remplace toute la liste des positions. Le front envoie l'état complet de la table qu'il affiche."
+    auth: "jwt"
+    request_payload:
+      schema_ref: "schema-holdings-put-request"
+    response_payload:
+      schema_ref: "schema-portfolio"
+    errors: ["PORTFOLIO_NOT_FOUND", "VALIDATION_ERROR", "ASSET_NOT_FOUND"]
+
+  - id: "api-portfolio-summary"
+    provider: "srv-agent-runtime"
+    method: "GET"
+    path: "/v1/portfolios/{portfolioId}/summary"
+    description: "Positions enrichies (prix, valeur, poids, gains), répartitions, performance et risque, déjà calculés et convertis dans la devise du portefeuille."
+    auth: "jwt"
+    query_params:
+      - { name: "range", type: "string", enum: ["1m", "6m", "1y", "5y"], default: "1y" }
+    response_payload:
+      schema_ref: "schema-portfolio-summary"
+    errors: ["PORTFOLIO_NOT_FOUND"]
+
+  - id: "api-market-search"
+    provider: "srv-agent-runtime"
+    method: "GET"
+    path: "/v1/market/search"
+    description: "Recherche dans l'univers d'actifs du jeu de données (autocomplétion de ticker)."
+    auth: "jwt"
+    query_params:
+      - { name: "q", type: "string", required: true }
+      - { name: "assetClass", type: "string", required: false }
+    response_payload:
+      schema_ref: "schema-asset-search-response"
+
+  - id: "api-agents-registry"
+    provider: "srv-api-light"
+    method: "GET"
+    path: "/v1/agents"
+    description: "Registre public des agents (id, rôle, outils autorisés, limites) pour montrer la gouvernance à l'écran. Contenu statique tiré du registre ci-dessous."
+    auth: "jwt"
+    optional: true
+    response_payload:
+      schema_ref: "schema-agents-registry"
+
+# ==========================================
+# 3. LES SCHÉMAS DE DONNÉES (payloads et modèles)
+# ==========================================
+data_schemas:
+  - id: "schema-error"
+    fields:
+      - { name: "error", type: "object", required: true, description: "{ code, message, requestId }" }
+
+  - id: "schema-investor-profile"
+    description: "Profil fictif d'un investisseur (personas Amira, Mateo, Robert). Aucune donnée personnelle réelle."
+    fields:
+      - { name: "riskLevel", type: "string", required: true, enum: ["low", "low_moderate", "moderate", "high"] }
+      - { name: "horizonMinYears", type: "integer", required: true }
+      - { name: "horizonMaxYears", type: "integer", required: false }
+      - { name: "objective", type: "string", required: true, description: "ex. croissance à long terme, préservation du capital" }
+      - { name: "constraints", type: "array", items_type: "string", description: "ex. diversification minimale, pas de levier" }
+      - { name: "preferences", type: "array", items_type: "string", description: "ex. ESG, IA, éviter la spéculation" }
+      - { name: "excludedAssetClasses", type: "array", items_type: "string", description: "ex. crypto" }
+
+  - id: "schema-user"
+    fields:
+      - { name: "userId", type: "string", required: true, description: "claim sub de Cognito" }
+      - { name: "username", type: "string", required: true }
+      - { name: "displayName", type: "string" }
+      - { name: "baseCurrency", type: "string", enum: ["CAD", "USD"], description: "devise d'affichage par défaut" }
+      - { name: "investorProfile", type: "object", schema_ref: "schema-investor-profile", description: "null tant qu'il n'est pas rempli" }
+
+  - id: "schema-conversation"
+    fields:
+      - { name: "sessionId", type: "string", required: true }
+      - { name: "title", type: "string" }
+      - { name: "createdAt", type: "string", required: true }
+      - { name: "updatedAt", type: "string", required: true }
+
+  - id: "schema-conversation-create-request"
+    fields:
+      - { name: "title", type: "string", required: false }
+
+  - id: "schema-conversation-update-request"
+    fields:
+      - { name: "title", type: "string", required: true }
+
+  - id: "schema-conversation-page"
+    fields:
+      - { name: "items", type: "array", items_ref: "schema-conversation", required: true }
+      - { name: "nextCursor", type: "string", description: "null s'il n'y a plus de page" }
+
+  - id: "schema-explanation"
+    description: "Construit par le runtime à partir des appels d'outils réellement exécutés (journal de l'exécution), pas rédigé par le modèle. Ne contient jamais de raisonnement interne détaillé."
+    fields:
+      - { name: "sources", type: "array", items_ref: "schema-explanation-source", required: true }
+      - { name: "assumptions", type: "array", items_type: "string", description: "hypothèses explicites (ex. volatilité annualisée sur 252 jours)" }
+      - { name: "limitations", type: "array", items_type: "string", description: "limites et incertitudes (ex. le rendement passé ne prédit pas le futur)" }
+      - { name: "steps", type: "array", items_ref: "schema-explanation-step", required: true }
+      - { name: "checks", type: "array", items_ref: "schema-explanation-check", description: "contrôles de l'agent de gouvernance, visibles" }
+
+  - id: "schema-explanation-source"
+    fields:
+      - { name: "id", type: "string", required: true, description: "ex. prices_daily" }
+      - { name: "dataset", type: "string", description: "chemin versionné ex. prices/RY.TO.parquet@2026-11-12" }
+      - { name: "asOf", type: "string", description: "date d'extraction ou de dernière observation" }
+      - { name: "note", type: "string", description: "ex. adj_close, devise de cotation" }
+
+  - id: "schema-explanation-step"
+    fields:
+      - { name: "agentId", type: "string", required: true }
+      - { name: "tool", type: "string", required: true }
+      - { name: "params", type: "object", description: "paramètres de l'appel (ticker, dates...)" }
+      - { name: "status", type: "string", enum: ["ok", "error", "empty"], required: true }
+      - { name: "durationMs", type: "integer" }
+
+  - id: "schema-explanation-check"
+    fields:
+      - { name: "agentId", type: "string", required: true }
+      - { name: "rule", type: "string", required: true, description: "ex. risk_fit, diversification, simulation_only, missing_info" }
+      - { name: "status", type: "string", enum: ["pass", "warn", "fail", "not_verified"], required: true }
+      - { name: "message", type: "string", required: true }
+
+  - id: "schema-message"
+    fields:
+      - { name: "messageId", type: "string", required: true }
+      - { name: "sessionId", type: "string", required: true }
+      - { name: "role", type: "string", enum: ["user", "assistant"], required: true }
+      - { name: "content", type: "string", required: true }
+      - { name: "status", type: "string", enum: ["done", "pending", "error"], required: true }
+      - { name: "createdAt", type: "string", required: true }
+      - { name: "explanation", type: "object", schema_ref: "schema-explanation", description: "présent seulement quand role = assistant" }
+
+  - id: "schema-message-page"
+    fields:
+      - { name: "items", type: "array", items_ref: "schema-message", required: true }
+      - { name: "nextCursor", type: "string" }
+
+  - id: "schema-message-create-request"
+    fields:
+      - { name: "content", type: "string", required: true, description: "2000 caractères maximum" }
+
+  - id: "schema-message-create-response"
+    fields:
+      - { name: "userMessage", type: "object", schema_ref: "schema-message", required: true }
+      - { name: "assistantMessage", type: "object", schema_ref: "schema-message", required: true }
+
+  - id: "schema-holding"
+    description: "Une position. Aucun prix ni nom n'est stocké : ils viennent du jeu de données."
+    fields:
+      - { name: "ticker", type: "string", required: true, description: "doit exister dans universe.parquet" }
+      - { name: "quantity", type: "number", required: true, description: "supérieur à 0" }
+      - { name: "avgCost", type: "number", required: true, description: "prix de revient moyen par unité, dans la devise de cotation de l'actif" }
+
+  - id: "schema-portfolio"
+    fields:
+      - { name: "portfolioId", type: "string", required: true }
+      - { name: "name", type: "string", required: true }
+      - { name: "baseCurrency", type: "string", enum: ["CAD", "USD"], required: true }
+      - { name: "holdings", type: "array", items_ref: "schema-holding", required: true }
+      - { name: "updatedAt", type: "string", required: true }
+
+  - id: "schema-portfolio-list"
+    fields:
+      - { name: "items", type: "array", items_ref: "schema-portfolio", required: true }
+
+  - id: "schema-holdings-put-request"
+    fields:
+      - { name: "holdings", type: "array", items_ref: "schema-holding", required: true }
+
+  - id: "schema-portfolio-summary"
+    description: "Tout est calculé côté back et exprimé dans baseCurrency (conversion avec le taux USD/CAD du jeu de données)."
+    fields:
+      - { name: "portfolioId", type: "string", required: true }
+      - { name: "baseCurrency", type: "string", required: true }
+      - { name: "asOf", type: "string", required: true, description: "date de la dernière observation de prix utilisée" }
+      - { name: "totals", type: "object", description: "{ value, cost, pnl, pnlPct, dayChange, dayChangePct }" }
+      - { name: "holdings", type: "array", description: "par ligne : ticker, name, assetClass, quantity, avgCost, currency, price, value, weight, pnl, pnlPct, dayChangePct, sector, stale" }
+      - { name: "allocation", type: "object", description: "{ byAssetClass[], bySector[], byCurrency[] } avec { label, weight }" }
+      - { name: "performance", type: "object", description: "{ range, points: [{ date, value }] }" }
+      - { name: "risk", type: "object", description: "{ volatility, maxDrawdown } annualisés / sur la période, en pourcentage" }
+      - { name: "warnings", type: "array", items_type: "string", description: "ex. données manquantes ou dernier cours utilisé" }
+      - { name: "explanation", type: "object", schema_ref: "schema-explanation", description: "sources, hypothèses et limites des chiffres affichés" }
+
+  - id: "schema-asset"
+    fields:
+      - { name: "ticker", type: "string", required: true }
+      - { name: "name", type: "string", required: true }
+      - { name: "assetClass", type: "string", required: true, description: "valeurs de assets_universe.csv (actions, FNB, crypto)" }
+      - { name: "market", type: "string" }
+      - { name: "currency", type: "string" }
+      - { name: "sector", type: "string" }
+
+  - id: "schema-asset-search-response"
+    fields:
+      - { name: "items", type: "array", items_ref: "schema-asset", required: true }
+
+  - id: "schema-agents-registry"
+    fields:
+      - { name: "agents", type: "array", description: "par agent : id, name, role, allowedTools, delegatesTo, limits" }
+      - { name: "tools", type: "array", description: "par outil : id, description, reads" }
+
+# ==========================================
+# 4. LES BASES DE DONNÉES (DynamoDB : données applicatives)
+# ==========================================
+databases:
+  - id: "db-users"
+    type: "DynamoDB"
+    tables:
+      - name: "Users"
+        partition_key: "userId"
+        attributes: ["username", "displayName", "baseCurrency", "investorProfile", "createdAt"]
+        notes: "Aucun mot de passe : Cognito."
+
+  - id: "db-conversations"
+    type: "DynamoDB"
+    tables:
+      - name: "Conversations"
+        partition_key: "userId"
+        sort_key: "sessionId"
+        attributes: ["title", "createdAt", "updatedAt"]
+        notes: "Index local sur updatedAt pour trier par récence."
+
+  - id: "db-messages"
+    type: "DynamoDB"
+    tables:
+      - name: "Messages"
+        partition_key: "sessionId"
+        sort_key: "messageId"
+        attributes: ["userId", "role", "content", "status", "createdAt", "explanation"]
+        notes: "explanation est stocké avec le message de l'assistant. Si un item approche 400 Ko, déplacer explanation dans une table à part."
+
+  - id: "db-portfolios"
+    type: "DynamoDB"
+    tables:
+      - name: "Portfolios"
+        partition_key: "userId"
+        sort_key: "portfolioId"
+        attributes: ["name", "baseCurrency", "holdings", "updatedAt"]
+        notes: "holdings = liste de { ticker, quantity, avgCost }. Une version plus riche avec transactions est hors périmètre."
+
+# ==========================================
+# 5. LE STOCKAGE DES DONNÉES DE MARCHÉ (S3, lecture seule à l'exécution)
+# ==========================================
+storage:
+  - id: "storage-dataset"
+    type: "S3 (bucket privé)"
+    format: "Parquet (colonnes), un dossier daté et figé par version"
+    layout:
+      - path: "dataset/{version}/manifest.json"
+        content: "source, date d'extraction, liste des tickers, devises, traitements, version"
+      - path: "dataset/{version}/universe.parquet"
+        content: "une ligne par actif : asset_id, ticker, name, asset_class, market, currency, sector + indicateurs précalculés (rendement 1 an, volatilité 1 an, baisse maximale 1 an)"
+      - path: "dataset/{version}/prices/{ticker}.parquet"
+        content: "date, open, high, low, close, adj_close, volume, currency"
+      - path: "dataset/{version}/prices_all/year=YYYY/*.parquet"
+        content: "mêmes colonnes, tous les titres, par année (analyses croisées)"
+      - path: "dataset/{version}/fx/usdcad.parquet"
+        content: "date, usdcad, cadusd"
+      - path: "dataset/{version}/macro/macro.parquet"
+        content: "date, series_id, value, unit, frequency, label, source"
+      - path: "dataset/{version}/corporate_actions.parquet"
+        content: "dividendes et fractionnements par date ex"
+    read_by: ["srv-agent-runtime"]
+    written_by: ["job-ingestion"]
+    notes:
+      - "La version lue est fixée par une variable d'environnement de la Lambda. Elle est citée dans explanation.sources."
+      - "adj_close sert aux rendements. close n'est ajusté que pour les fractionnements. Les prix sont dans la devise de cotation (.TO = CAD, le reste = USD)."
+      - "Pas de remplissage ni d'alignement de calendrier dans les données : les outils doivent signaler les jours sans cours."
+      - "Ne pas mettre les CSV dans le dépôt public (conditions d'utilisation de Yahoo). Mettre le script d'ingestion et une note dans le README."
+
+jobs:
+  - id: "job-ingestion"
+    name: "Script d'ingestion du jeu de données"
+    type: "script exécuté une fois (portable ou tâche AWS), hors API"
+    owner_agent: "Agent-Data"
+    reads_from: ["ext-yahoo-finance", "ext-bank-of-canada", "ext-fred"]
+    writes_to: ["storage-dataset"]
+    base: "alphaforge_starter/build_dataset.py (jeu fourni : 31 actifs, 2021-11-12 à 2026-11-12), élargi à l'univers choisi par l'équipe"
+    outputs: ["Parquet par ticker", "universe.parquet avec indicateurs", "manifest.json"]
+    deadline_note: "Le compte AWS d'équipe est supprimé le 2026-11-16 en fin de journée : code sur GitHub, données sur les portables."
+
+external_sources:
+  - id: "ext-yahoo-finance"
+    name: "Yahoo Finance via yfinance"
+    used_by: ["job-ingestion"]
+    limits: "non officiel, limites de débit possibles, adj_close change si on retélécharge"
+  - id: "ext-bank-of-canada"
+    name: "Banque du Canada (API Valet)"
+    used_by: ["job-ingestion"]
+    provides: "taux USD/CAD, taux directeur, rendements, IPC canadien"
+  - id: "ext-fred"
+    name: "FRED (Réserve fédérale de Saint-Louis)"
+    used_by: ["job-ingestion"]
+    provides: "taux américains, IPC, chômage"
+
+# ==========================================
+# 6. LES AGENTS (registre; permissions appliquées dans le code)
+# ==========================================
+agents:
+  - id: "agent-orchestrator"
+    name: "Orchestrateur"
+    status: "proposé"
+    role: "Comprend la demande, choisit quels agents appeler, assemble la réponse en langage clair."
+    runs_in: "srv-agent-runtime"
+    model: "A_CHOISIR"
+    max_tokens: 1024
+    allowed_tools: []
+    delegates_to: ["agent-analyst", "agent-governance"]
+    limits: { max_agent_cycles: 6, timeout_seconds: 25 }
+    owner_agent: "Agent-Backend-Agents"
+
+  - id: "agent-analyst"
+    name: "Analyste"
+    status: "proposé"
+    role: "Cherche et calcule : rendements, volatilité, baisse maximale, corrélations, répartitions, à partir du portefeuille et des données."
+    runs_in: "srv-agent-runtime"
+    model: "A_CHOISIR"
+    max_tokens: 2048
+    allowed_tools: ["tool-search-assets", "tool-get-prices", "tool-get-macro", "tool-compute-metrics", "tool-get-portfolio"]
+    limits: { max_tool_calls: 12, max_rows_returned_per_call: 260, timeout_seconds: 25 }
+    fail_mode: "open"
+    owner_agent: "Agent-Backend-Agents"
+
+  - id: "agent-governance"
+    name: "Gouvernance"
+    status: "proposé"
+    role: "Vérifie que la proposition respecte le profil de l'investisseur et les limites de la simulation, signale les conflits et les informations manquantes."
+    runs_in: "srv-agent-runtime"
+    model: "A_CHOISIR"
+    max_tokens: 1024
+    allowed_tools: ["tool-get-profile", "tool-get-portfolio", "tool-compute-metrics"]
+    limits: { max_tool_calls: 6, timeout_seconds: 15 }
+    fail_mode: "closed"
+    fail_mode_note: "Si le contrôle ne peut pas être fait, la réponse le dit (status not_verified); elle ne passe jamais pour validée."
+    owner_agent: "Agent-Backend-Agents"
+
+  # Pas d'agent d'explicabilité dédié : le champ explanation est construit par le runtime à partir du journal des appels d'outils.
+
+# ==========================================
+# 7. LES OUTILS (interface entre agents et données)
+# ==========================================
+tools:
+  - id: "tool-search-assets"
+    name: "search_assets"
+    description: "Cherche des actifs de l'univers par nom ou symbole."
+    used_by: ["agent-analyst"]
+    params:
+      - { name: "query", type: "string", required: true }
+      - { name: "asset_class", type: "string", required: false }
+    returns: "liste de { ticker, name, assetClass, sector, currency } (20 maximum)"
+    reads: ["storage-dataset: universe.parquet"]
+
+  - id: "tool-get-prices"
+    name: "get_prices"
+    description: "Prix ajustés (adj_close) d'un actif, dans sa devise de cotation."
+    used_by: ["agent-analyst"]
+    params:
+      - { name: "ticker", type: "string", required: true, validation: "doit exister dans universe.parquet" }
+      - { name: "start", type: "string", required: true, format: "YYYY-MM-DD" }
+      - { name: "end", type: "string", required: true, format: "YYYY-MM-DD, au plus 5 ans après start" }
+      - { name: "frequency", type: "string", enum: ["daily", "weekly", "monthly"], default: "daily" }
+    returns: "{ ticker, currency, frequency, adjusted, points: [[date, valeur]], source, notes[] } avec 260 points maximum (bascule en hebdomadaire ou mensuel au-delà)"
+    reads: ["storage-dataset: prices/{ticker}.parquet"]
+    behavior:
+      - "Un jour sans cours (férié, week-end) n'est pas inventé : la note dit quel dernier cours a été utilisé."
+      - "Ticker inconnu : message qui dit quoi corriger et propose les plus proches, pas d'exception."
+
+  - id: "tool-get-macro"
+    name: "get_macro"
+    description: "Série macroéconomique ou taux de change USD/CAD."
+    used_by: ["agent-analyst"]
+    params:
+      - { name: "series_id", type: "string", required: true, validation: "présent dans macro.parquet ou 'USDCAD'" }
+      - { name: "start", type: "string", required: true, format: "YYYY-MM-DD" }
+      - { name: "end", type: "string", required: true, format: "YYYY-MM-DD" }
+    returns: "{ series_id, unit, frequency, points, source, notes[] }"
+    reads: ["storage-dataset: macro/macro.parquet", "storage-dataset: fx/usdcad.parquet"]
+    behavior:
+      - "Les données mensuelles sont datées du mois de référence, pas de leur publication : l'outil le signale dans notes."
+
+  - id: "tool-compute-metrics"
+    name: "compute_metrics"
+    description: "Calcule des indicateurs sur un ou plusieurs actifs et renvoie des chiffres (jamais les lignes brutes)."
+    used_by: ["agent-analyst", "agent-governance"]
+    params:
+      - { name: "tickers", type: "array", items_type: "string", required: true, validation: "20 maximum, tous dans l'univers" }
+      - { name: "start", type: "string", required: true, format: "YYYY-MM-DD" }
+      - { name: "end", type: "string", required: true, format: "YYYY-MM-DD" }
+      - { name: "metrics", type: "array", items_type: "string", enum: ["total_return", "volatility", "max_drawdown", "correlation"], required: true }
+    returns: "{ metrics: { ticker: { total_return, volatility, max_drawdown } }, correlation: matrice, period, assumptions[], source }"
+    reads: ["storage-dataset: prices/{ticker}.parquet", "storage-dataset: fx/usdcad.parquet"]
+    behavior:
+      - "Utilise adj_close. Les séries sont alignées sur les dates communes et la méthode est écrite dans assumptions."
+      - "Rendements exprimés dans la devise de cotation, ou convertis si demandé."
+
+  - id: "tool-get-portfolio"
+    name: "get_portfolio"
+    description: "Positions du portefeuille de l'utilisateur courant."
+    used_by: ["agent-analyst", "agent-governance"]
+    params: []  # userId et portfolioId viennent du contexte de la requête, jamais du modèle
+    returns: "{ portfolioId, baseCurrency, holdings: [{ ticker, quantity, avgCost }] }"
+    reads: ["db-portfolios"]
+
+  - id: "tool-get-profile"
+    name: "get_profile"
+    description: "Profil investisseur de l'utilisateur courant."
+    used_by: ["agent-governance"]
+    params: []  # userId vient du contexte
+    returns: "schema-investor-profile, ou null si non rempli (la gouvernance doit alors le signaler)"
+    reads: ["db-users"]
+
+# ==========================================
+# 8. TRAÇABILITÉ (qui a fait quoi)
+# ==========================================
+observability:
+  destination: "srv-cloudwatch"
+  agent_naming: "Chaque Agent Strands reçoit name = id de l'agent (sans cela, toutes les traces s'appellent 'Strands Agent')."
+  events:
+    - name: "agent.usage"
+      one_per: "invocation d'agent"
+      fields: ["agentId", "sessionId", "messageId", "modelId", "inputTokens", "outputTokens", "cycles", "stopReason"]
+    - name: "tool.call"
+      one_per: "appel d'outil"
+      fields: ["agentId", "sessionId", "messageId", "tool", "params", "status", "durationMs", "source"]
+  rules:
+    - "Compteurs et paramètres d'outils seulement : jamais le texte des questions ou des réponses."
+    - "Le champ explanation d'un message est construit à partir des événements tool.call de cette exécution."
+  optional: "Traces OpenTelemetry vers un outil d'observabilité, si le temps le permet."
+
+# ==========================================
+# 9. RÈGLES DE GOUVERNANCE (communes à tous)
+# ==========================================
+rules:
+  - { id: "rule-simulation-only", statement: "Simulation seulement. Aucune route ni outil n'exécute une transaction. Aucun conseil financier personnalisé : les réponses portent un avertissement visible dans le front." }
+  - { id: "rule-identity-from-jwt", statement: "userId vient du JWT. Un outil qui lit des données utilisateur le reçoit du contexte, jamais d'un paramètre fourni par le modèle." }
+  - { id: "rule-tool-validation", statement: "Chaque outil valide ses paramètres (format de date, ticker dans l'univers, bornes) et construit lui-même la requête. Pas de requête libre écrite par un agent." }
+  - { id: "rule-no-raw-rows", statement: "Un outil renvoie des chiffres ou au plus 260 points, jamais des milliers de lignes." }
+  - { id: "rule-explanation-from-trace", statement: "explanation est fidèle aux actions observées : sources, étapes, contrôles. Ne pas inventer de justification, ne pas exposer le raisonnement interne détaillé du modèle." }
+  - { id: "rule-facts-vs-assumptions", statement: "Distinguer faits (issus des données), hypothèses et scénarios fictifs. Signaler les incertitudes et les données manquantes." }
+  - { id: "rule-past-not-future", statement: "Le rendement passé décrit le passé; ne pas le présenter comme une prédiction." }
+  - { id: "rule-dataset-pinned", statement: "Toujours citer la version du jeu de données et la devise. Utiliser adj_close pour les rendements." }
+  - { id: "rule-no-real-data", statement: "Profils et portefeuilles entièrement fictifs. Aucune donnée bancaire ou client réelle." }
+  - { id: "rule-contract-changes", statement: "Ce fichier est la référence commune. Une modification du contrat se discute en équipe avant d'être codée." }
+
+# ==========================================
+# 10. POINTS OUVERTS
+# ==========================================
+open_questions:
+  - "Chat synchrone (départ) ou asynchrone : à reconsidérer si les agents dépassent environ 25 s."
+  - "Modèle Bedrock de chaque agent et région : à confirmer avec l'accès réel du compte d'atelier."
+  - "Univers d'actifs à télécharger au-delà des 31 du jeu fourni, et données ESG, fondamentaux, composition des FNB."
+  - "Empaquetage de pandas/pyarrow dans la Lambda et temps de chargement à froid : à tester tôt."
+  - "Isolation IAM par agent : choix actuel = rôle unique et limites dans le code. Évolutions possibles : rôles étroits par outil (STS) ou Lambdas d'outils."
+  - "Route /v1/agents (registre public) : optionnelle."
