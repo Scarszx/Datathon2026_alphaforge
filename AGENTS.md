@@ -7,3 +7,13 @@ Avant toute tâche, lis ce fichier en entier. Il décrit les services, les route
 - C'est la référence commune : respecte les routes, les schémas et les noms qu'il définit.
 - Ne le modifie pas seul. Un changement de contrat se discute avec l'équipe avant d'être codé.
 - Si ce que tu dois faire n'y figure pas, ou le contredit, signale-le au lieu d'inventer.
+
+## Commandes AWS et Terraform
+
+Le projet utilise le compte AWS de l'événement, jamais un compte personnel. Ses identifiants sont dans `.aws-local/` (ignoré par git).
+
+- Charge-les dans la même commande que tout appel `aws` ou `terraform` : `source scripts/aws-env.sh && aws ...`. Une variable chargée dans une commande précédente ne survit pas forcément à la suivante.
+- Le script affiche le compte actif : il doit contenir `WSParticipantRole`. Sinon, ou si `.aws-local/` est absent, arrête-toi et demande, au lieu d'utiliser un autre profil.
+- Si les identifiants ont expiré (`ExpiredToken`), demande à un humain de lancer `scripts/aws-refresh-creds.sh`.
+- N'écris jamais d'identifiants ailleurs que dans `.aws-local/`, et jamais dans un fichier suivi par git.
+- Ne lance pas `terraform apply` et ne crée, ne modifie ni ne supprime de ressource AWS sans demande explicite.
