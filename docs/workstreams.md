@@ -24,7 +24,7 @@ Les chantiers déjà terminés en v0.3.0 (✅) restent valables. Leurs compléme
 ## Ordre
 
 ```
-✅ WS0 socle ─► WS0b socle v0.4 (séquentiel, court, sur main)
+✅ WS0 socle ─► ✅ WS0b socle v0.4 (séquentiel, court, sur main)
                       │
                       ├──► ✅ WS1 infra  + WS1b infra v0.4 (Analyses, KB, Guardrail, IAM, routes)  ─┐
                       ├──► ✅ WS2 db     + WS2b db v0.4 (repository analyses)                       ─┤
@@ -41,7 +41,7 @@ Les chantiers déjà terminés en v0.3.0 (✅) restent valables. Leurs compléme
 | Chantier | Branche | Écrit seulement dans | Dépend de |
 |---|---|---|---|
 | ✅ WS0 socle | `main` | racine (`.gitignore`), `backend/common/` (squelette), `pyproject.toml` | contrat |
-| WS0b socle v0.4 | `main` | `backend/common/config.py`, `backend/common/http.py`, `backend/common/ids.py`, `backend/common/repositories/analyses.py` (signatures), tests WS0 associés | contrat v0.4.0 |
+| ✅ WS0b socle v0.4 | `main` | `backend/common/config.py`, `backend/common/http.py`, `backend/common/ids.py`, `backend/common/repositories/analyses.py` (signatures), tests WS0 associés | contrat v0.4.0 |
 | ✅ WS1 infra | `ws/infra` | `infra/` | WS0 |
 | WS1b infra v0.4 | `ws/infra-v4` | `infra/` | WS0b |
 | ✅ WS2 db | `ws/db` | `backend/common/repositories/`, `backend/common/tests/` | WS0 |
@@ -119,7 +119,9 @@ Ce chantier a fixé `.gitignore`, l'arborescence, et dans `backend/common/` : `c
 
 ---
 
-## WS0b socle v0.4 (séquentiel, sur `main`)
+## ✅ WS0b socle v0.4 (séquentiel, sur `main`) — terminé
+
+Commits `2082158` à `fcb4dd1`. En plus de la liste ci-dessous : `get_latest_mandate(session_id, user_id)` et les fonctions `mandate_item_key` / `run_item_key` dans `analyses.py`, et le test `backend/common/tests/test_analyses_keys.py` qui fige les signatures. MODEL_ANALYST et MODEL_GOVERNANCE restent présents (dépréciés) jusqu'à WS1b.
 
 ```text
 Chantier : compléments du socle pour le contrat v0.4.0. Dossiers attribués : backend/common/config.py, backend/common/http.py, backend/common/ids.py, backend/common/repositories/__init__.py, backend/common/repositories/analyses.py (nouveau), et les tests WS0 correspondants (test_config.py, test_http.py, test_ids.py).
@@ -133,6 +135,7 @@ Chantier : compléments du socle pour le contrat v0.4.0. Dossiers attribués : b
 4. repositories/analyses.py : signatures typées seulement, avec docstrings et raise NotImplementedError :
    put_mandate(session_id, user_id, mandate: dict) -> dict       # attribue version = dernière + 1, itemKey MANDATE#<version sur 3 chiffres>
    get_mandate(session_id, user_id, version: int) -> dict | None
+   get_latest_mandate(session_id, user_id) -> dict | None
    list_mandates(session_id, user_id) -> list[dict]             # plus récente d'abord
    put_run(session_id, user_id, run: dict) -> dict             # itemKey RUN#<runId>
    update_run(session_id, user_id, run_id, fields: dict) -> dict  # partial -> done
