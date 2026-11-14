@@ -32,3 +32,10 @@ def test_message_ids_triables_par_ordre_chronologique():
     # et deux horodatages différents donnent un ordre lexicographique cohérent
     anterieur = str(ULID.from_timestamp(ULID.parse(premier).timestamp - 1))
     assert anterieur < premier
+
+
+def test_run_id_est_un_ulid():
+    run_id = ids.new_run_id()
+    assert FORMAT_ULID.match(run_id)
+    assert str(ULID.parse(run_id)) == run_id
+    assert ids.new_run_id() != run_id
