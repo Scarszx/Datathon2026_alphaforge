@@ -8,6 +8,14 @@ Avant toute tâche, lis ce fichier en entier. Il décrit les services, les route
 - Ne le modifie pas seul. Un changement de contrat se discute avec l'équipe avant d'être codé.
 - Si ce que tu dois faire n'y figure pas, ou le contredit, signale-le au lieu d'inventer.
 
+## Solution retenue
+
+Lis ensuite `SOLUTION.md`. Il explique la solution retenue et les raisons de chaque décision : flux d'une session, rôle des agents et des modules, règles R1-R10, Knowledge Base réglementaire, méthodes de calcul, plan.
+
+- Pour les noms (routes, schémas, champs), le contrat fait foi.
+- Les décisions de la section « Ce qu'on a écarté » sont prises : ne les rouvre pas sans demande explicite.
+- Le découpage du travail en chantiers est dans `docs/workstreams.md`.
+
 ## Commandes AWS et Terraform
 
 Le projet utilise le compte AWS de l'événement, jamais un compte personnel. Ses identifiants sont dans `.aws-local/` (ignoré par git).
