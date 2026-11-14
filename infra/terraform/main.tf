@@ -60,7 +60,7 @@ locals {
   # Modèle de fondation derrière chaque profil (préfixe de routage retiré).
   # Région "*" : le routage global peut viser n'importe quelle région du catalogue.
   foundation_model_arns = [
-    for m in local.model_ids : "arn:aws:bedrock:*::foundation-model/${regex_replace(m, "^(global|us|eu|au|jp|in)[.]", "")}"
+    for m in local.model_ids : "arn:aws:bedrock:*::foundation-model/${replace(m, "/^(global|us|eu|au|jp|in)[.]/", "")}"
   ]
   # L'ARN d'un profil d'inférence porte le compte de l'appelant.
   inference_profile_arns = [
