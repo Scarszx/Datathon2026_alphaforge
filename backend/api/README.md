@@ -44,13 +44,27 @@ passe les deux dossiers explicitement jusqu'à sa mise à jour par l'intégratio
 
 ## Dépendances
 
-- `backend/api/requirements.txt` ne contient pas pandas, conformément au
-  contrat pour la Lambda légère.
-- En production, la validation des tickers lit le seul
-  `dataset/{DATASET_VERSION}/universe.parquet` avec `pyarrow` et boto3, puis
-  met le résultat en cache entre invocations chaudes.
-- Les variables d'environnement utilisées sont celles de
-  `backend/common/config.py` (tables, `DATASET_BUCKET`, `DATASET_VERSION`).
+- `backend/api/requirements.txt` ne contient que `python-ulid` : ni pandas,
+  ni pyarrow à l'exécution, conformément au contrat pour la Lambda légère.
+- Les variables d'environnement de tables sont celles de
+  `backend/common/config.py`.
+- `PUT /holdings` valide les tickers contre la copie embarquée
+  `tickers.json`, autorisée par le contrat pour `srv-api-light`.
 
 Voir `NOTES-api.md` pour les hypothèses et les points à coordonner avec
 l'équipe.
+
+## Régénérer `tickers.json`
+
+Si WS3 change l'univers, régénère la copie embarquée avant de redéployer :
+
+```bash
+python -m backend.api.scripts.build_tickers \
+    --input data/output/<version>/universe.parquet \
+    --output backend/api/tickers.json \
+    --source "universe.parquet@<date-ou-version>"
+```
+
+Le script accepte aussi un CSV contenant une colonne `ticker`. `pyarrow`
+n'est requis que pour lire un Parquet lors de cette régénération locale, pas
+par la Lambda.
