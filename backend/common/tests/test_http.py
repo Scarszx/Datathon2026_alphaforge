@@ -25,6 +25,10 @@ def test_codes_et_statuts_du_contrat():
         "CONVERSATION_NOT_FOUND": 404,
         "PORTFOLIO_NOT_FOUND": 404,
         "ASSET_NOT_FOUND": 404,
+        "MANDATE_NOT_FOUND": 404,
+        "RUN_NOT_FOUND": 404,
+        "MANDATE_NOT_CONFIRMED": 409,
+        "GUARDRAIL_BLOCKED": 422,
         "AGENT_TIMEOUT": 504,
         "INTERNAL": 500,
     }
@@ -59,3 +63,14 @@ def test_request_id_depuis_evenement():
     evenement = {"requestContext": {"requestId": "abc-42"}}
     assert http.request_id_from_event(evenement) == "abc-42"
     assert http.request_id_from_event({}) is None
+
+
+@pytest.mark.parametrize(
+    "code,statut",
+    [("MANDATE_NOT_FOUND", 404), ("RUN_NOT_FOUND", 404), ("MANDATE_NOT_CONFIRMED", 409), ("GUARDRAIL_BLOCKED", 422)],
+)
+def test_codes_v040(code, statut):
+    """Codes ajoutés par le contrat v0.4.0 (mandats, runs, Guardrails)."""
+    reponse = http.error_response(http.ApiError(code, "test"))
+    assert reponse["statusCode"] == statut
+    assert json.loads(reponse["body"])["error"]["code"] == code
