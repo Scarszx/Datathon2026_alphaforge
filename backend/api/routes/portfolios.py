@@ -17,7 +17,9 @@ from backend.api.validation import (
 from backend.common.http import ApiError, json_response
 from backend.common.repositories import portfolios as repo
 
-_NOT_FOUND = ApiError("PORTFOLIO_NOT_FOUND", "Portefeuille inconnu.")
+def _not_found() -> ApiError:
+    """Nouvelle erreur à chaque appel : ne pas partager le requestId."""
+    return ApiError("PORTFOLIO_NOT_FOUND", "Portefeuille inconnu.")
 
 
 def list_portfolios(event: dict[str, Any], user_id: str) -> dict[str, Any]:
@@ -40,7 +42,7 @@ def put_holdings(
     holdings = validate_holdings(parse_json_body(event))
     portfolio_id = path_parameter(event, "portfolioId")
     if repo.get_portfolio(user_id, portfolio_id) is None:
-        raise _NOT_FOUND
+        raise _not_found()
     ticker_validator([holding["ticker"] for holding in holdings])
     portfolio = repo.replace_holdings(user_id, portfolio_id, holdings)
     return json_response(200, portfolio)

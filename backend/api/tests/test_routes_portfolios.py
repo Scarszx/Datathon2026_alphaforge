@@ -120,6 +120,29 @@ def test_put_holdings_refuse_les_corps_invalides(fake_portfolios, body):
     assert fake_portfolios["replace"] == []
 
 
+def test_deux_404_successifs_recoivent_leur_request_id(
+    fake_portfolios, ticker_validator
+):
+    body = {"holdings": [{"ticker": "RY.TO", "quantity": 1, "avgCost": 1}]}
+
+    def request_for(request_id: str, sub: str):
+        return handle_request(
+            event(
+                "PUT /v1/portfolios/{portfolioId}/holdings",
+                path_parameters={"portfolioId": "main"},
+                body=body,
+                claims={"sub": sub},
+                request_id=request_id,
+            ),
+            ticker_validator=ticker_validator,
+        )
+
+    first = request_for("req-AAA", "user-2")
+    second = request_for("req-BBB", "user-3")
+    assert body_of(first)["error"]["requestId"] == "req-AAA"
+    assert body_of(second)["error"]["requestId"] == "req-BBB"
+
+
 def test_put_holdings_d_un_portefeuille_etranger_est_invisible(
     fake_portfolios, ticker_validator
 ):

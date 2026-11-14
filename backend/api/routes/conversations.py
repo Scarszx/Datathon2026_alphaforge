@@ -20,7 +20,9 @@ from backend.common.http import ApiError, CORS_HEADERS, json_response
 from backend.common.repositories import conversations as repo
 from backend.common.repositories import messages as messages_repo
 
-_NOT_FOUND = ApiError("CONVERSATION_NOT_FOUND", "Conversation inconnue.")
+def _not_found() -> ApiError:
+    """Nouvelle erreur à chaque appel : ne pas partager le requestId."""
+    return ApiError("CONVERSATION_NOT_FOUND", "Conversation inconnue.")
 
 
 def _no_content() -> dict[str, Any]:
@@ -30,7 +32,7 @@ def _no_content() -> dict[str, Any]:
 
 def _ensure_owner(user_id: str, session_id: str) -> None:
     if repo.get_conversation(user_id, session_id) is None:
-        raise _NOT_FOUND
+        raise _not_found()
 
 
 def list_conversations(event: dict[str, Any], user_id: str) -> dict[str, Any]:

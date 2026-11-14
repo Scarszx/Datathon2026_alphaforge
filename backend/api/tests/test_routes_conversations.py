@@ -159,6 +159,27 @@ def test_delete_conversation_supprime_messages_puis_conversation(
     ]
 
 
+def test_deux_404_successifs_recoivent_leur_request_id(fake_conversations):
+    first = handle_request(
+        event(
+            "DELETE /v1/conversations/{sessionId}",
+            path_parameters={"sessionId": CONVERSATION["sessionId"]},
+            claims={"sub": "user-2"},
+            request_id="req-AAA",
+        )
+    )
+    second = handle_request(
+        event(
+            "DELETE /v1/conversations/{sessionId}",
+            path_parameters={"sessionId": CONVERSATION["sessionId"]},
+            claims={"sub": "user-2"},
+            request_id="req-BBB",
+        )
+    )
+    assert body_of(first)["error"]["requestId"] == "req-AAA"
+    assert body_of(second)["error"]["requestId"] == "req-BBB"
+
+
 def test_delete_conversation_etrangere_est_invisible(fake_conversations, monkeypatch):
     deleted_messages: list[str] = []
     monkeypatch.setattr(
