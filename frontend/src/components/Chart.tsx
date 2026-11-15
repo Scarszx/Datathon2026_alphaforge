@@ -32,7 +32,7 @@ export default function Chart({
   const line = values.map((v, i) => `${i ? "L" : "M"}${(xp(i) * 10).toFixed(1)} ${(yp(v) * 3).toFixed(1)}`).join(" ");
   const ref = baseline ?? values[0];
   const up = values[n - 1] >= ref;
-  const color = up ? "#e41c23" : "#111318";
+  const color = up ? "#143D30" : "#111318";
   const labels = [0, 0.33, 0.66, 1].map((f) => timestamps[Math.round(f * (n - 1))]);
 
   return (

@@ -10,7 +10,7 @@ import { amount, money, pct, plainPct, shortDate, signedAmount, toSeconds } from
 const RANGES: { key: SummaryRange; label: string }[] = [
   { key: "1m", label: "1 M" }, { key: "6m", label: "6 M" }, { key: "1y", label: "1 A" }, { key: "5y", label: "5 A" },
 ];
-const PALETTE = ["var(--red)", "#f3a3a6", "#111318", "#6b7280", "#d6d9de", "#a1a6b0", "#c3141a"];
+const PALETTE = ["#143D30", "#1B5E45", "#3E8F68", "#C4A15A", "#D08A62", "#8E9892", "#D5DDD8"];
 
 type Row = { key: number; ticker: string; quantity: string; avgCost: string };
 let rowKey = 0;
