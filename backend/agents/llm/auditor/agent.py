@@ -19,7 +19,7 @@ from backend.agents.llm.auditor import prompts
 from backend.agents.llm.auditor.schemas import AuditReport
 from backend.agents.llm.base import AgentFailure, run_agent
 from backend.agents.observability import log_event
-from backend.agents.rules.rules import RULE_SUBJECTS, RULE_TOPICS
+from backend.agents.rules.rules import RULE_SUBJECTS, RULE_TOPICS, needs_regulation
 from backend.agents.tools.context import RequestContext
 from backend.agents.verifier.verifier import forbidden_phrases, handwritten_numbers
 
@@ -50,7 +50,9 @@ def _safe_message(message: str, fallback: str) -> str:
 
 def audit(ctx: RequestContext, verdicts: list[dict[str, Any]], registry: EvidenceRegistry) -> list[dict[str, Any]]:
     """Renvoie les verdicts enrichis (citations, messageEn) ; inscrit les KB-nn au registre."""
-    groups = verdict_groups(verdicts)
+    groups = {k: g for k, g in verdict_groups(verdicts).items() if needs_regulation(g["rule"], g["reasonCode"])}
+    if not groups:
+        return verdicts  # rien à fonder : motifs par défaut, aucun appel de modèle
     try:
         report = run_agent(AGENT_ID, prompts.SYSTEM_PROMPT, prompts.audit_prompt(json.dumps(list(groups.values()), ensure_ascii=False)), ctx, AuditReport)
     except AgentFailure as failure:

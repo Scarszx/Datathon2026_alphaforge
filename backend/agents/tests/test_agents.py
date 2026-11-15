@@ -190,3 +190,13 @@ def test_redacteur_quatre_sections(ctx, scripts):
     assert [s["key"] for s in sections] == ["data_used", "why", "limits", "what_would_change"]
     prompt = scripts.models["agent-writer"][0].calls[0]["messages"][-1]["content"][0]["text"]
     assert json.loads(prompt.split("<analysis_record>\n", 1)[1].split("\n</analysis_record>", 1)[0]) == {"evidence": []}
+
+
+def test_auditeur_ne_cherche_pas_les_verdicts_sans_objet(ctx, scripts):
+    """R7 sans cryptoactif, R8 sans préférence ESG et R10 (aucun sujet) n'ouvrent aucune recherche ni appel de modèle."""
+    verdicts = [
+        {"rule": "R7", "scenario": 0, "status": "pass", "reasonCode": "NO_CRYPTO_EXPOSURE", "evidence": [], "citations": [], "messageEn": "No crypto."},
+        {"rule": "R8", "scenario": 0, "status": "pass", "reasonCode": "ESG_NOT_REQUESTED", "evidence": [], "citations": [], "messageEn": "No ESG."},
+        {"rule": "R10", "status": "pass", "reasonCode": "MACRO_PUBLICATION_RESPECTED", "evidence": [], "citations": [], "messageEn": "Macro ok."},
+    ]
+    assert auditor.audit(ctx, verdicts, EvidenceRegistry("en")) == verdicts  # aucun script d'agent consommé

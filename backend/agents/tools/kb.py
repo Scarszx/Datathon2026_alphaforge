@@ -8,6 +8,7 @@ peut s'y glisser) avant d'être montré à un modèle.
 
 from __future__ import annotations
 
+import re
 from pathlib import PurePosixPath
 from typing import Any
 
@@ -37,7 +38,19 @@ DOCUMENT_TITLES = {
 }
 
 MAX_PASSAGES = 5
-MAX_EXCERPT_CHARS = 700
+MAX_EXCERPT_CHARS = 1200  # médiane des passages de la base : ~1400 caractères ; 700 coupait 29 passages sur 31 en pleine phrase
+
+
+def excerpt_of(text: str, limit: int = MAX_EXCERPT_CHARS) -> str:
+    """Texte brut de la base, coupé à la dernière fin de phrase avant la limite (jamais résumé ni traduit)."""
+    flat = " ".join(text.split())
+    if len(flat) <= limit:
+        return flat
+    head = flat[:limit]
+    ends = [m.end() for m in re.finditer(r"[.!?;:](?=\s)|[.!?;:]\"?$", head)]
+    if ends and ends[-1] >= limit * 0.4:
+        return head[: ends[-1]].rstrip()
+    return head.rsplit(" ", 1)[0].rstrip() + " …"
 
 
 def document_title(uri: str | None) -> str:
@@ -103,7 +116,7 @@ def retrieve(query: str, jurisdictions: list[str], subjects: list[str] | None = 
             uri = (result.get("location") or {}).get("s3Location", {}).get("uri") or metadata.get("x-amz-bedrock-kb-source-uri")
             page = metadata.get("x-amz-bedrock-kb-document-page-number")
             # Extrait fidèle (registre, jamais traduit) ; la version neutralisée est celle montrée au modèle.
-            excerpt = " ".join(((result.get("content") or {}).get("text", "")).split())[:MAX_EXCERPT_CHARS]
+            excerpt = excerpt_of((result.get("content") or {}).get("text", ""))
             passages.append({
                 "document": document_title(uri),
                 "section": f"page {int(page)}" if isinstance(page, (int, float)) else None,
