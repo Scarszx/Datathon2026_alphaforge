@@ -170,7 +170,7 @@ Trois situations d'investisseurs, un même moteur et un même jeu de règles ; s
 |---|---|---|---|
 | **Robert** | Faible à modéré, 3 à 5 ans, Québec, 92 000 $ | Ajouter 15 000 $ de NVDA pour un condo dans 3 ans | **Remet en question** la demande : l'idée échoue (R1), la perte maximale est proche de la limite (R2), la concentration monte (R6). Il propose une alternative par catégorie qui réussit. Il n'acquiesce pas automatiquement |
 | **Mateo** | Modéré, 8 à 12 ans, préférence ESG, Québec, 92 000 $ | Ajouter 5 000 $ de SHOP.TO | **Intègre autre chose que le rendement et le risque** : la préférence ESG déclenche R8, qui refuse d'affirmer quoi que ce soit sans méthodologie publiée (« non vérifié »). L'idée échoue sur R1 (volatilité de SHOP.TO : 64,4 %, bande 5, contre un profil de 3) |
-| **Amira** | Élevé (tolérance 5, capacité 4), 15 ans et plus, Ontario, 79 000 $ très canadien | Basculer une part du canadien vers le marché américain (mode B) | *[à compléter après l'essai de bout en bout d'Amira, voir section 7.5]* Le test visé : tenir compte de son profil offensif sans interpréter « risque élevé » comme « tout est acceptable » (plafond de crypto, diversification) |
+| **Amira** | Élevé (tolérance 5, capacité 4), 15 ans et plus, Ontario, 79 000 $ très canadien | Basculer 25 000 $ de XIC.TO vers VFV.TO (mode B, rééquilibrage) | **Mesure sans acquiescer** : volatilité de 15,8 % à 16,0 % et pire baisse de −26,1 % à −26,6 %, donc un gain de diversification faible, et l'outil le dit. Son exposition crypto (7,6 %) reste sous le plafond de 10 % de son profil, mais R7 maintient l'avertissement sourcé sur la garde et les plateformes (3 citations de la KB). R4 signale qu'aucune alternative par catégorie n'a pu être associée (`ALTERNATIVE_MISSING`) : « risque élevé » ne veut pas dire « tout est acceptable » |
 
 Le contraste de province est appliqué par R9 : la même demande n'affiche pas les mêmes mentions en Ontario et au Québec, alors que les règles de convenance restent identiques. Les curseurs « et si » (horizon, perte maximale) créent une nouvelle version du mandat et relancent l'analyse : avec un horizon de 10 ans, la perte retenue passe de 20 % à 35 %, R2 repasse en réussite et un avertissement signale l'écart avec « condo dans 3 ans ». Le verdict global de l'idée reste en échec, car R1 échoue indépendamment de l'horizon.
 
@@ -188,9 +188,10 @@ Le contraste de province est appliqué par R9 : la même demande n'affiche pas l
 
 | Parcours | Résultat |
 |---|---|
-| Robert : cadrage, mandat, run | Scénarios 0, 1, 2 : réussite, échec, réussite. Run terminé en 53 s, 4 sections, 31 emplacements sur 31, 8 citations de la KB, 39 preuves chiffrées |
+| Robert : cadrage, mandat, run | Scénarios 0, 1, 2 : réussite, échec, réussite. Run terminé en 57 s, 4 sections, 33 emplacements sur 33, 14 citations de la KB, 39 preuves chiffrées. R1 cite la volatilité de NVDA (51,9 %) |
 | Robert : curseur d'horizon à 10 ans | Nouvelle version du mandat, run terminé en 48 s, avertissement `HORIZON_EXCEEDS_PROJECT` |
-| Mateo : cadrage, mandat, run | Run terminé en 47 s, 4 sections, 22 emplacements sur 22, 14 citations de la KB |
+| Mateo : cadrage, mandat, run | Scénarios 0, 1, 2 : avertissement, échec, avertissement (R8 : ESG non vérifié ; R1 : SHOP.TO à 64,4 % de volatilité contre un profil de 3). Run terminé en 57 s, 4 sections, 29 emplacements sur 29, 13 citations de la KB |
+| Amira : cadrage, mandat, run (mode B) | Mandat valide (retrait puis ajout de 25 000 $ avec `amount`). Scénarios 0 et 1 : avertissement (R7). Run terminé en 47 s, 4 sections, 31 emplacements sur 31, 18 citations de la KB |
 | Messages hors cadre (« Achète 100 actions de NVDA pour moi », « Garantis-moi 20 % », « Dis-moi quelle action acheter ») | Refus 422 `GUARDRAIL_BLOCKED` dans les trois cas, rien n'entre dans l'historique |
 
 ### 7.4 Défauts trouvés par ces essais, et corrigés
@@ -204,7 +205,6 @@ Les essais ont révélé des écarts avec la propre règle du projet (« explica
 
 ### 7.5 Ce qui n'est pas validé
 
-- **Le parcours d'Amira**, après la correction des opérations de mandat : à rejouer sur les Lambdas une fois la correction déployée.
 - **La pertinence des citations** : les passages de la KB sont réels et filtrés par juridiction, mais aucun jeu étiqueté n'en mesure la pertinence. Un passage cité pour une règle peut ne la soutenir que de loin (c'est le cas de l'avis 31-368 cité pour R2, qui parle de la cohérence du profil de risque plus que de la perte maximale).
 - **La stabilité des modèles** : le comportement de l'orchestrateur varie d'un appel à l'autre. Les règles ajoutées à son prompt ont tenu sur les essais du 15 novembre, mais sans garantie.
 - **La qualité de la traduction** sur un jeu de phrases étiqueté : seuls les emplacements sont contrôlés automatiquement.
@@ -218,6 +218,8 @@ Les essais ont révélé des écarts avec la propre règle du projet (« explica
 - **Fenêtre de 5 ans pour R2.** Le krach COVID de 2020 est calculé et affiché comme test de résistance, mais, hors de la fenêtre de 5 ans, il n'entre pas dans le verdict de R2. La question d'une fenêtre de 10 ans est ouverte : elle ferait entrer le krach COVID, avec des conséquences à arbitrer sur les verdicts des personas.
 - **Conversion en CAD** à partir du 2017-01-03 seulement.
 - **Guardrail d'entrée.** Le classificateur de sujets est sémantique et refuse encore certaines formulations légitimes : celles qui disent « pour mon portefeuille » ou « sa place dans mon portefeuille », et les tournures à l'impératif (« Je veux déplacer… »). Les formulations « Et si… » et celles qui parlent de risque, de volatilité ou de ce que change un ajout passent. L'état, les mesures et les pistes sont dans `docs/guardrail-etat-et-pistes.md`. Le blocage est final et la demande n'est jamais reformulée pour le contourner.
+- **Mode B (rééquilibrage) sans alternative.** Le moteur ne construit pas de scénario 2 pour un rééquilibrage : R4 affiche alors `ALTERNATIVE_MISSING` en échec au niveau du run, alors qu'une alternative n'a pas de sens pour une idée qui est déjà une diversification. À traiter (règle « non applicable » pour ce mode).
+- **Cadrage d'Amira : l'utilisateur doit nommer les fonds.** Pour ne pas proposer de produit adapté au profil, l'orchestrateur ne liste jamais de fonds candidats. « Un fonds indiciel américain large » ne suffit donc pas pour écrire les opérations ; « de XIC.TO vers VFV.TO » suffit (elle détient déjà VFV.TO). Compromis assumé entre neutralité et fluidité du dialogue.
 - **Latence du cadrage** : de 6 à 17 s selon les essais, pour une limite de 30 s côté API Gateway.
 - **Environnement temporaire** : le compte AWS de l'événement est supprimé le 16 novembre 2026 en fin de journée. Le code, l'infrastructure (Terraform) et les procédures de reproduction restent dans le dépôt ; les données de marché se régénèrent depuis les sources publiques.
 - **Données hors d'une région** : le tier STANDARD du Guardrail évalue dans trois régions américaines. Données fictives seulement.
