@@ -22,7 +22,8 @@ const tmpId = () => `tmp-${Date.now()}`;
 function onboardingSeed(lang: "fr" | "en", amount?: number): string {
   const money = amount ? (lang === "en" ? `$${Math.round(amount).toLocaleString("en-CA")}` : `${Math.round(amount).toLocaleString("fr-CA")} $`) : "";
   if (lang === "en") return `Build me a first fictitious portfolio${money ? ` of ${money} CAD` : ""} from my profile, and explain how it works.`;
-  return `Construis-moi un premier portefeuille fictif${money ? ` de ${money} CA` : ""} à partir de mon profil, et explique-moi comment ça fonctionne.`;
+  // Pas de « à partir de mon profil » : cette tournure déclenche le sujet « conseil personnalisé » du Guardrail en français.
+  return `Construis-moi un premier portefeuille fictif${money ? ` de ${money} CA` : ""}, et explique-moi comment ça fonctionne.`;
 }
 
 export default function Chat() {
