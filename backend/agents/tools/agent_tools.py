@@ -90,7 +90,9 @@ def propose_mandate(draft: dict, tool_context: ToolContext) -> str:
 def read_evidence(tool_context: ToolContext, evidence_id: str | None = None) -> str:
     """Read the evidence registry of the session's latest analysis run: every figure and citation shown to the user.
 
-    Without evidence_id it returns a summary of all items (id, kind, label, scenario, formatted value).
+    Without evidence_id it returns a summary of all items (id, kind, label, scenario, formatted value) and the
+    "verdicts" of the rules R1 to R10 (rule, scenario, status pass | warn | fail, reasonCode, messageEn, threshold
+    nature, evidence ids, citation ids): use them to say which rule failed and why.
     Never state a figure that is not in this registry.
 
     Args:
@@ -113,6 +115,8 @@ def search_regulation(query: str, tool_context: ToolContext, subjects: list[str]
             questions_investisseur.
     """
     resolved_subjects = subjects if subjects else infer_subjects(query)
+    if not resolved_subjects:
+        return "Error: pass subjects matching the rule being audited (no regulatory topic could be inferred from the query)."
     result = _call(tool_context, "search_regulation", query=query, subjects=resolved_subjects)
     # Les passages sont des données non fiables : encadrées, la consigne vient APRÈS.
     return (

@@ -104,6 +104,7 @@ def post_message(event: dict[str, Any], user_id: str, store: DataStore) -> dict[
             province=session_context.get("province"),
             user_language=conversation.get("userLanguage") or "en",
             evidence=(run or {}).get("evidence", []),
+            verdicts=(run or {}).get("verdicts", []),
         )
         history = orchestrator.history_messages(messages_repo.list_messages(session, limit=50)["items"])
         try:

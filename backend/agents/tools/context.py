@@ -26,6 +26,8 @@ class RequestContext:
     user_language: str = "en"
     # Registre du run lu par read_evidence (dernier run de la session, ou run en cours).
     evidence: list[dict[str, Any]] = field(default_factory=list)
+    # Verdicts R1-R10 du même run : read_evidence les expose pour expliquer un échec.
+    verdicts: list[dict[str, Any]] = field(default_factory=list)
     # Journal des appels d'outils de cette exécution (source de explanation).
     tool_calls: list[dict[str, Any]] = field(default_factory=list)
     # Passages renvoyés par search_regulation, par référence (P1, P2…) : l'auditeur

@@ -220,7 +220,15 @@ def read_evidence(ctx: RequestContext, evidence_id: str | None = None) -> dict[s
     for item in ctx.evidence:
         entry = {k: item[k] for k in ("id", "kind", "label", "scenario", "formatted", "document") if k in item}
         summary.append(entry)
-    return {"items": summary}
+    verdicts = [
+        {
+            "rule": v["rule"], "scenario": v.get("scenario"), "status": v["status"], "reasonCode": v["reasonCode"],
+            "messageEn": v["messageEn"], "thresholdNature": (v.get("threshold") or {}).get("nature"),
+            "evidence": v.get("evidence", []), "citations": v.get("citations", []),
+        }
+        for v in ctx.verdicts
+    ]
+    return {"items": summary, "verdicts": verdicts}
 
 
 # --- module-engine --------------------------------------------------------
@@ -394,7 +402,9 @@ def check_rules(ctx: RequestContext) -> dict[str, Any]:
 def search_regulation(ctx: RequestContext, query: str, subjects: list[str] | None = None) -> dict[str, Any]:
     if not isinstance(query, str) or not query.strip():
         return _error("query must be a non-empty English sentence.")
-    if subjects is not None and (not isinstance(subjects, list) or any(s not in kb.KNOWN_SUBJECTS for s in subjects)):
+    if not subjects:
+        return _error("subjects is required: pass the subjects of the rule being audited.")
+    if not isinstance(subjects, list) or any(s not in kb.KNOWN_SUBJECTS for s in subjects):
         return _error(f"subjects must be a list among: {', '.join(kb.KNOWN_SUBJECTS)}.")
     passages = kb.retrieve(query.strip()[:500], ctx.jurisdictions, subjects, client=ctx.clients.get("kb"))
     shown = []

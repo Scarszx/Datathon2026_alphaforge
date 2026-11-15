@@ -44,6 +44,15 @@ RULE_SUBJECTS = {
 }
 
 
+# Verdicts « sans objet » : le mandat ne contient ni cryptoactif ni préférence ESG. Une recherche
+# réglementaire ne trouverait rien qui les fonde (constaté : citations vides) ; R10 n'a aucun sujet.
+NO_SEARCH_REASONS = {"NO_CRYPTO_EXPOSURE", "ESG_NOT_REQUESTED"}
+
+
+def needs_regulation(rule: str, reason_code: str) -> bool:
+    return bool(RULE_SUBJECTS.get(rule)) and reason_code not in NO_SEARCH_REASONS
+
+
 def infer_subjects(query: str) -> list[str]:
     """Déduit les sujets KB d'une requête de l'auditeur si le modèle a omis subjects."""
     q = query.lower()
@@ -58,7 +67,7 @@ def infer_subjects(query: str) -> list[str]:
         overlap = len(words & set(topic.lower().replace("-", " ").split()))
         if overlap > best_overlap:
             best_rule, best_overlap = rule, overlap
-    return list(RULE_SUBJECTS[best_rule]) if best_rule else ["profil_risque", "convenance"]
+    return list(RULE_SUBJECTS[best_rule]) if best_rule else []  # inconnu : pas de repli vers un autre corpus
 
 
 def _verdict(rule: str, scenario: int | None, status: str, reason: str, message: str,
