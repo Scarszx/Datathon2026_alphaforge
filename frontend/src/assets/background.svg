@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 576" preserveAspectRatio="xMidYMid slice">
+  <!-- Fond menthe et vagues, reproduit en vectoriel à partir de l'image fournie (décoratif seulement). -->
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="1" y2="0.6">
+      <stop offset="0" stop-color="#EEF7F4"/>
+      <stop offset="0.45" stop-color="#E6F5EE"/>
+      <stop offset="1" stop-color="#D3F0E0"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.72" cy="0.05" r="0.45">
+      <stop offset="0" stop-color="#B8E8CE" stop-opacity="0.7"/>
+      <stop offset="1" stop-color="#B8E8CE" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="waveRight" x1="1" y1="0.1" x2="0.55" y2="1">
+      <stop offset="0" stop-color="#A6E6C2"/>
+      <stop offset="1" stop-color="#C9EFD9" stop-opacity="0.6"/>
+    </linearGradient>
+    <linearGradient id="waveFront" x1="1" y1="0.5" x2="0.3" y2="1">
+      <stop offset="0" stop-color="#7DD6A3"/>
+      <stop offset="0.6" stop-color="#A5E4C0"/>
+      <stop offset="1" stop-color="#D6F3E2" stop-opacity="0.7"/>
+    </linearGradient>
+    <linearGradient id="waveLeft" x1="0" y1="0.7" x2="0.4" y2="1">
+      <stop offset="0" stop-color="#C6EED8"/>
+      <stop offset="1" stop-color="#E2F6EA" stop-opacity="0.5"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="576" fill="url(#sky)"/>
+  <rect width="1024" height="576" fill="url(#glow)"/>
+  <path d="M640 576 C 720 420, 860 230, 1024 75 L 1024 576 Z" fill="url(#waveRight)" opacity="0.85"/>
+  <path d="M0 408 C 140 400, 260 470, 360 520 C 420 548, 470 566, 520 576 L 0 576 Z" fill="url(#waveLeft)" opacity="0.9"/>
+  <path d="M250 576 C 430 500, 600 420, 720 378 C 830 340, 940 305, 1024 290 L 1024 576 Z" fill="url(#waveFront)" opacity="0.9"/>
+  <path d="M250 576 C 430 500, 600 420, 720 378 C 830 340, 940 305, 1024 290" fill="none" stroke="#FFFFFF" stroke-opacity="0.55" stroke-width="1.5"/>
+</svg>
