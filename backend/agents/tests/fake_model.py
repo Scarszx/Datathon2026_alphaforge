@@ -39,6 +39,8 @@ class ScriptedModel(Model):
             "system_prompt": system_prompt,
         })
         response = self.script.pop(0) if self.script else "No more scripted responses."
+        if isinstance(response, Exception):
+            raise response
         yield {"messageStart": {"role": "assistant"}}
         if isinstance(response, str):
             yield {"contentBlockStart": {"start": {}}}

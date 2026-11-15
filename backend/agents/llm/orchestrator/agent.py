@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from backend.agents import models
 from backend.agents.llm.base import AgentFailure, run_agent
 from backend.agents.llm.orchestrator import prompts
 from backend.agents.llm.orchestrator.schemas import OrchestratorTurn, TranslationBatch
@@ -12,7 +13,7 @@ from backend.agents.tools.context import RequestContext
 from backend.agents.verifier.verifier import placeholders
 
 AGENT_ID = "agent-orchestrator"
-TRANSLATION_BATCH = 6  # quelques textes par appel : rester sous max_tokens (1024)
+TRANSLATION_BATCH = 32  # TRANSLATION_SPEC (max_tokens = 8192) couvre l'ensemble des motifs et mentions en un appel
 
 
 def history_messages(items: list[dict[str, Any]], limit: int = 20) -> list[dict[str, Any]]:
@@ -58,7 +59,7 @@ def translate(ctx: RequestContext, texts: list[str], target_language: str) -> li
             output = run_agent(
                 AGENT_ID, prompts.TRANSLATE_PROMPT,
                 prompts.translate_prompt(target_language, json.dumps(batch, ensure_ascii=False)),
-                ctx, TranslationBatch, with_tools=False,
+                ctx, TranslationBatch, with_tools=False, spec=models.TRANSLATION_SPEC,
             )
             items = list(output.items) if len(output.items) == len(batch) else list(batch)
         except AgentFailure:

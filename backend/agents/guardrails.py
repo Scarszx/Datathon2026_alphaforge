@@ -24,6 +24,8 @@ class GuardrailResult:
     blocked: bool
     text: str  # texte d'origine, ou masqué, ou message de refus si blocked
     checked: bool  # False si le Guardrail n'a pas pu s'exécuter (fail-open)
+    blocked_by_pii: bool = False
+    blocked_by_topic: bool = False
 
 
 def _client():
@@ -43,6 +45,12 @@ def _has_blocked_action(node: Any) -> bool:
     if isinstance(node, list):
         return any(_has_blocked_action(v) for v in node)
     return False
+
+
+def _policy_blocked(assessments: Any, policy_key: str) -> bool:
+    if not isinstance(assessments, list):
+        return False
+    return any(_has_blocked_action(a.get(policy_key)) for a in assessments if isinstance(a, dict))
 
 
 def apply(text: str, source: str, client=None) -> GuardrailResult:
@@ -71,10 +79,22 @@ def apply(text: str, source: str, client=None) -> GuardrailResult:
             res = GuardrailResult(False, text, True)
             telemetry.set_span_output(span, {"blocked": res.blocked, "checked": res.checked})
             return res
-        if _has_blocked_action(response.get("assessments")):
-            log_event("guardrail.blocked", source=source)
-            res = GuardrailResult(True, replacement or "This request is outside what this simulation can do.", True)
-            telemetry.set_span_output(span, {"blocked": res.blocked, "checked": res.checked})
+        assessments = response.get("assessments")
+        if _has_blocked_action(assessments):
+            by_pii = _policy_blocked(assessments, "sensitiveInformationPolicy")
+            by_topic = _policy_blocked(assessments, "topicPolicy")
+            log_event("guardrail.blocked", source=source, byPii=by_pii, byTopic=by_topic)
+            res = GuardrailResult(
+                True,
+                replacement or "This request is outside what this simulation can do.",
+                True,
+                blocked_by_pii=by_pii,
+                blocked_by_topic=by_topic,
+            )
+            telemetry.set_span_output(
+                span,
+                {"blocked": res.blocked, "checked": res.checked, "byPii": by_pii, "byTopic": by_topic},
+            )
             return res
         res = GuardrailResult(False, replacement or text, True)
         telemetry.set_span_output(span, {"blocked": res.blocked, "checked": res.checked, "anonymized": True})

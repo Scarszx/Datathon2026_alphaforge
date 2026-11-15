@@ -31,9 +31,34 @@ RULE_TOPICS = {
 }
 
 RULE_SUBJECTS = {
-    "R1": ["profil_risque", "convenance"], "R2": ["convenance"], "R3": ["convenance"], "R4": ["convenance"],
-    "R5": ["oeo"], "R6": ["convenance"], "R7": ["crypto"], "R8": ["esg"], "R9": ["titres_proteges"], "R10": [],
+    "R1": ["profil_risque", "convenance"],
+    "R2": ["kyc", "convenance"],
+    "R3": ["profil_risque", "convenance"],
+    "R4": ["profil_risque", "convenance"],
+    "R5": ["oeo", "aide_decision", "recommandation"],
+    "R6": ["convenance"],
+    "R7": ["crypto"],
+    "R8": ["esg"],
+    "R9": ["titres_proteges"],
+    "R10": [],
 }
+
+
+def infer_subjects(query: str) -> list[str]:
+    """Déduit les sujets KB d'une requête de l'auditeur si le modèle a omis subjects."""
+    q = query.lower()
+    for rule, subjects in RULE_SUBJECTS.items():
+        if subjects and (rule.lower() in q.split() or f"{rule.lower()}:" in q):
+            return list(subjects)
+    words = set(q.replace("-", " ").split())
+    best_rule, best_overlap = None, 0
+    for rule, topic in RULE_TOPICS.items():
+        if not RULE_SUBJECTS.get(rule):
+            continue
+        overlap = len(words & set(topic.lower().replace("-", " ").split()))
+        if overlap > best_overlap:
+            best_rule, best_overlap = rule, overlap
+    return list(RULE_SUBJECTS[best_rule]) if best_rule else ["profil_risque", "convenance"]
 
 
 def _verdict(rule: str, scenario: int | None, status: str, reason: str, message: str,

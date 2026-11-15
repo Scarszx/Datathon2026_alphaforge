@@ -22,6 +22,10 @@ def test_get_agents_renvoie_le_registre_public_v04():
         "module-rules",
         "module-verifier",
     ]
+    modules_by_id = {module["id"]: module for module in registry["modules"]}
+    assert "COVID 2020" in modules_by_id["module-engine"]["role"]
+    tools_by_id = {tool["id"]: tool for tool in registry["tools"]}
+    assert "covid_2020" in tools_by_id["tool-stress-test"]["description"]
     assert [tool["id"] for tool in registry["tools"]] == [
         "tool-search-assets",
         "tool-get-prices",
@@ -51,7 +55,7 @@ def test_le_registre_respecte_les_droits_et_limites_du_contrat():
     ]
     assert by_id["agent-orchestrator"]["delegatesTo"] == []
     assert by_id["agent-orchestrator"]["limits"] == {
-        "max_agent_cycles": 6,
+        "max_agent_cycles": 8,
         "timeout_seconds": 25,
     }
     assert by_id["agent-auditor"]["allowedTools"] == [
@@ -59,13 +63,13 @@ def test_le_registre_respecte_les_droits_et_limites_du_contrat():
         "tool-read-evidence",
     ]
     assert by_id["agent-auditor"]["limits"] == {
-        "max_tool_calls": 8,
-        "timeout_seconds": 20,
+        "max_tool_calls": 16,
+        "timeout_seconds": 60,
     }
     assert by_id["agent-writer"]["allowedTools"] == ["tool-read-evidence"]
     assert by_id["agent-writer"]["limits"] == {
-        "max_tool_calls": 3,
-        "timeout_seconds": 25,
+        "max_tool_calls": 4,
+        "timeout_seconds": 60,
     }
     assert all(
         module["id"] and module["name"] and module["role"]

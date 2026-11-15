@@ -84,8 +84,16 @@ def post_message(event: dict[str, Any], user_id: str, store: DataStore) -> dict[
         input_data={"content": content, "knownUserLanguage": conversation.get("userLanguage")},
     ) as span:
         check = guardrails.apply(content, "INPUT")
-        if check.blocked:
-            telemetry.set_span_output(span, {"blocked": True, "stage": "input_original"})
+        if check.blocked and (check.blocked_by_pii or not check.blocked_by_topic):
+            telemetry.set_span_output(
+                span,
+                {
+                    "blocked": True,
+                    "stage": "input_original",
+                    "byPii": check.blocked_by_pii,
+                    "byTopic": check.blocked_by_topic,
+                },
+            )
             raise ApiError("GUARDRAIL_BLOCKED", check.text)
 
         session_context, mandate, run = _session_context(user_id, session, conversation)
@@ -108,9 +116,28 @@ def post_message(event: dict[str, Any], user_id: str, store: DataStore) -> dict[
             raise ApiError("INTERNAL", "Erreur interne.") from failure
 
         language = turn.user_language.lower() if ISO_RE.match(turn.user_language.lower()) else ctx.user_language
+        if language == "en" and check.blocked:
+            telemetry.set_span_output(
+                span,
+                {
+                    "blocked": True,
+                    "stage": "input_original",
+                    "byPii": check.blocked_by_pii,
+                    "byTopic": check.blocked_by_topic,
+                },
+            )
+            raise ApiError("GUARDRAIL_BLOCKED", check.text)
         translated = guardrails.apply(turn.english_request, "INPUT")
         if translated.blocked:
-            telemetry.set_span_output(span, {"blocked": True, "stage": "input_translated"})
+            telemetry.set_span_output(
+                span,
+                {
+                    "blocked": True,
+                    "stage": "input_translated",
+                    "byPii": translated.blocked_by_pii,
+                    "byTopic": translated.blocked_by_topic,
+                },
+            )
             raise ApiError("GUARDRAIL_BLOCKED", translated.text)
         reply = guardrails.apply(turn.reply, "OUTPUT").text
 

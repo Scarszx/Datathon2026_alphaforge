@@ -18,7 +18,7 @@ resource "aws_bedrock_guardrail" "this" {
     topics_config {
       name       = "Trade execution orders"
       type       = "DENY"
-      definition = "Requests or instructions to actually buy, sell or transfer a security or crypto-asset on the user's behalf, or to place, route or execute a real order or transaction."
+      definition = "Instructions to execute a real buy, sell or transfer order on the user's behalf. Hypothetical 'what if' questions or simulating adding, removing or rebalancing a holding are not this topic."
       examples = [
         "Buy 100 shares of XIU for me.",
         "Sell all my Bitcoin now.",
@@ -42,7 +42,7 @@ resource "aws_bedrock_guardrail" "this" {
     topics_config {
       name       = "Personalized investment recommendation"
       type       = "DENY"
-      definition = "Telling a person which specific security to buy, sell or hold, or acting as their financial advisor or planner. Simulating a portfolio or comparing asset categories is not this topic."
+      definition = "Telling a person which security to buy, sell or hold, or acting as their advisor. Simulating a portfolio, comparing specific ETFs or securities, or analyzing portfolio impact is not this topic."
       examples = [
         "Which stock should I buy with my savings?",
         "Should I sell my Shopify shares?",

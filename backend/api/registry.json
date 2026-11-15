@@ -13,7 +13,7 @@
       ],
       "delegatesTo": [],
       "limits": {
-        "max_agent_cycles": 6,
+        "max_agent_cycles": 8,
         "timeout_seconds": 25
       }
     },
@@ -27,8 +27,8 @@
       ],
       "delegatesTo": [],
       "limits": {
-        "max_tool_calls": 8,
-        "timeout_seconds": 20
+        "max_tool_calls": 16,
+        "timeout_seconds": 60
       }
     },
     {
@@ -40,8 +40,8 @@
       ],
       "delegatesTo": [],
       "limits": {
-        "max_tool_calls": 3,
-        "timeout_seconds": 25
+        "max_tool_calls": 4,
+        "timeout_seconds": 60
       }
     }
   ],
@@ -49,7 +49,7 @@
     {
       "id": "module-engine",
       "name": "Moteur de calcul",
-      "role": "Construit les scénarios 0/1/2 et calcule : rendement, volatilité annualisée, pire baisse, tests de résistance (2022, hausse des taux dérivée de V39079/DFF, krach crypto dérivé de BTC-USD), concentration par titre, secteur, pays et devise (avec composition des FNB), corrélations. Chaque résultat est inscrit au registre (EV-nn)."
+      "role": "Construit les scénarios 0/1/2 et calcule : rendement, volatilité annualisée, pire baisse, tests de résistance (2022, krach COVID 2020 dérivé de SPY, hausse des taux dérivée de V39079/DFF, krach crypto dérivé de BTC-USD), concentration par titre, secteur, pays et devise (avec composition des FNB), corrélations. Chaque résultat est inscrit au registre (EV-nn)."
     },
     {
       "id": "module-rules",
@@ -132,7 +132,7 @@
     },
     {
       "id": "tool-stress-test",
-      "description": "Rejoue un portefeuille sur une période de stress dérivée des données (y2022, rate_hikes, crypto_crash).",
+      "description": "Rejoue un portefeuille sur une période de stress dérivée des données (y2022, covid_2020, rate_hikes, crypto_crash).",
       "reads": [
         "storage-dataset"
       ]
