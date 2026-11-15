@@ -13,15 +13,35 @@
 # simulation (« What if I add 10 % of XIU… », « Compare XSP and ZEQT… »).
 # Règle : des exemples clairement impératifs, en parlant du titre visé
 # (« that stock », « that company ») plutôt que d'un ticker.
+#
+# VARIANTE B du comparatif du 2026-11-15 : tier STANDARD pour les sujets refusés
+# (+32 % de rappel et +18 % de précision équilibrée documentés par AWS sur la
+# détection de sujets, définitions jusqu'à 1000 caractères). Le tier STANDARD
+# exige l'inférence multi-région (cross_region_config, profil us.guardrail.v1:0,
+# sans coût supplémentaire) et des droits IAM sur les ARN de profil des régions
+# de destination pour ApplyGuardrail. Requiert un provider >= 6.6.0
+# (cross_region_config et topic_policy_config.tier_config) ; la longueur
+# maximale des définitions passe de 200 à 1000 caractères avec le provider
+# >= 6.62.0. Les 3 sujets restent bloqués dans les deux sens : on mesure si le
+# tier STANDARD élimine les faux positifs que le tier CLASSIC produit.
 
 resource "aws_bedrock_guardrail" "this" {
   name        = "${var.name_prefix}-guardrail"
   description = "AlphaForge input/output filter: trade orders, return promises, personalized regulated advice, banking PII."
 
+  # Tier STANDARD des sujets refusés : exige l'inférence multi-région.
+  cross_region_config {
+    guardrail_profile_identifier = "arn:aws:bedrock:${var.aws_region}:${local.account_id}:guardrail-profile/us.guardrail.v1:0"
+  }
+
   blocked_input_messaging   = "This request is outside what AlphaForge can do. It is a simulation and decision-support tool: it cannot place trades, promise returns or give personalized investment advice. You can ask it to simulate the impact of a change on your fictional portfolio instead."
   blocked_outputs_messaging = "The response was withheld because it could read as a trade order, a return promise or personalized investment advice. AlphaForge only simulates and explains, using its dataset and regulatory sources."
 
   topic_policy_config {
+    tier_config {
+      tier_name = "STANDARD"
+    }
+
     topics_config {
       name       = "Trade execution orders"
       type       = "DENY"
