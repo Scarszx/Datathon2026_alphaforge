@@ -172,3 +172,25 @@ def test_messages_par_defaut_en_anglais_sans_chiffre(store):
     item, result = _engine(store)
     for verdict in rules.check_rules(store, item, result):
         assert verdict["messageEn"] and not any(ch.isdigit() for ch in verdict["messageEn"])
+def test_r4_non_applicable_pour_un_reequilibrage(store):
+    """Mode B : pas de scénario 2 par construction. R4 n'échoue pas à tort et ne se dit pas réussie : non vérifiée."""
+    item, result = _engine(store)
+    item["mandate"] = {**item["mandate"], "mode": "rebalance"}
+    result.scenarios = result.scenarios[:2]
+    verdict = _by(rules.check_rules(store, item, result), "R4")
+    assert verdict["status"] == "not_verified" and verdict["reasonCode"] == "ALTERNATIVE_NOT_APPLICABLE"
+def test_r6_concentration_sectorielle_avertit_sans_echouer():
+    """Un secteur GICS au-delà de 40 % (par transparence) donne WARN ; une catégorie de FNB n'est pas un secteur."""
+    concentration = {"topSingle": {"ticker": "A", "weight": 5.0}, "lookThroughComplete": True,
+                     "bySector": [{"label": "Broad market (Canada)", "weight": 70.0}, {"label": "Information Technology", "weight": 45.0}]}
+    scenario = _scenario(concentration=concentration, evidence={"topSingleWeight": "EV-1", "topSectorWeight": "EV-2"})
+    verdict = rules.r6(scenario)
+    assert verdict["status"] == "warn" and verdict["reasonCode"] == "SECTOR_CONCENTRATION_ELEVATED"
+    assert verdict["evidence"] == ["EV-2"] and verdict["threshold"] == {"value": 40, "nature": "team_assumption"}
+    concentration["bySector"] = [{"label": "Broad market (Canada)", "weight": 70.0}, {"label": "Information Technology", "weight": 25.0}]
+    assert rules.r6(scenario)["status"] == "pass"
+def test_r6_le_titre_unique_reste_prioritaire_sur_le_secteur():
+    concentration = {"topSingle": {"ticker": "A", "weight": 25.0}, "lookThroughComplete": True,
+                     "bySector": [{"label": "Information Technology", "weight": 60.0}]}
+    verdict = rules.r6(_scenario(concentration=concentration, evidence={"topSingleWeight": "EV-1"}))
+    assert verdict["status"] == "fail" and verdict["reasonCode"] == "CONCENTRATION_HIGH"

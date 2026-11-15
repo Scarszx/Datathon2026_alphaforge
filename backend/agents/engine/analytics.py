@@ -164,6 +164,39 @@ def portfolio_metrics(prices: pd.DataFrame, weights: dict[str, float]) -> dict[s
     }
 
 
+BOOTSTRAP_RESAMPLES = 500
+BOOTSTRAP_BLOCK_DAYS = 21
+BOOTSTRAP_SEED = 20261115
+
+
+def bootstrap_ranges(index: pd.Series, *, resamples: int = BOOTSTRAP_RESAMPLES, block: int = BOOTSTRAP_BLOCK_DAYS,
+                     seed: int = BOOTSTRAP_SEED) -> dict[str, float]:
+    """Incertitude d'échantillonnage : fourchette 5e-95e percentile de la volatilité et de la pire baisse.
+
+    Bootstrap par blocs mobiles (blocs de 21 jours, pour garder l'autocorrélation et les grappes de volatilité)
+    sur les rendements quotidiens du portefeuille, graine fixe (résultat reproductible). Elle mesure à quel point
+    la période observée aurait pu donner un autre chiffre ; elle ne prédit rien sur l'avenir.
+    """
+    returns = index.pct_change().dropna().to_numpy()
+    n = len(returns)
+    if n < 2 * block:
+        return {}
+    rng = np.random.default_rng(seed)
+    blocks_needed = int(math.ceil(n / block))
+    starts = rng.integers(0, n - block + 1, size=(resamples, blocks_needed))
+    offsets = np.arange(block)
+    sample = returns[(starts[:, :, None] + offsets[None, None, :]).reshape(resamples, -1)[:, :n]]
+    vols = sample.std(axis=1, ddof=1) * math.sqrt(252) * 100.0
+    paths = np.cumprod(1.0 + sample, axis=1)
+    paths = np.concatenate([np.ones((resamples, 1)), paths], axis=1)
+    drawdowns = (paths / np.maximum.accumulate(paths, axis=1) - 1.0).min(axis=1) * 100.0
+    return {
+        "volatilityLow": float(np.percentile(vols, 5)), "volatilityHigh": float(np.percentile(vols, 95)),
+        "maxDrawdownLow": float(np.percentile(drawdowns, 5)), "maxDrawdownHigh": float(np.percentile(drawdowns, 95)),
+        "resamples": resamples, "blockDays": block,
+    }
+
+
 def asset_metrics(store: DataStore, ticker: str, start: pd.Timestamp, end: pd.Timestamp) -> dict[str, float]:
     """Mesures d'un actif sur son calendrier natif, dans sa devise de cotation."""
     series = native_series(store, ticker)

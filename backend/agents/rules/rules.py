@@ -12,6 +12,7 @@ from __future__ import annotations
 from typing import Any
 
 from backend.agents.engine.scenarios import EngineResult, ScenarioAnalysis, _crypto_refused
+from backend.agents.engine.concentration import top_sector
 from backend.agents.rules.settings import settings
 
 ORDER = {"pass": 0, "not_verified": 0, "warn": 1, "fail": 2}
@@ -155,6 +156,14 @@ def r6(scenario: ScenarioAnalysis) -> dict[str, Any]:
         status, reason, message = "warn", "CONCENTRATION_ELEVATED", "A single security, including through fund holdings, carries a large share of the portfolio."
     else:
         status, reason, message = "pass", "CONCENTRATION_OK", "No single security, including through fund holdings, dominates the portfolio."
+    sector_label, sector_weight = top_sector(scenario.concentration)
+    sector_warn = float(conf.get("sectorWarnPct", 0) or 0)
+    if sector_warn and status == "pass" and sector_weight > sector_warn:
+        # Hypothèse d'équipe : un seul secteur (par transparence) au-delà du seuil = avertissement (jamais un échec).
+        threshold = {"value": sector_warn, "nature": "team_assumption"}
+        status, reason = "warn", "SECTOR_CONCENTRATION_ELEVATED"
+        message = "A single sector, including through fund holdings, carries a large share of the portfolio."
+        evidence = _ev(scenario, "topSectorWeight") or evidence
     if scenario.concentration and not scenario.concentration.get("lookThroughComplete", True):
         message += " Fund look-through is incomplete for some funds."
     return _verdict("R6", scenario.index, status, reason, message, evidence, threshold)
@@ -210,6 +219,11 @@ def run_level_rules(result: EngineResult, scenario_verdicts: list[dict[str, Any]
         verdicts.append(_verdict("R4", None, "pass", "ALTERNATIVE_NOT_REQUIRED", "The idea raises no warning: no alternative is required."))
     elif has_alternative:
         verdicts.append(_verdict("R4", None, "pass", "ALTERNATIVE_PRESENTED", "At least one reasonable alternative by asset category is presented."))
+    elif mandate_item["mandate"].get("mode") == "rebalance":
+        # Un rééquilibrage est déjà une réallocation : le moteur ne construit pas de scénario 2 pour ce mode.
+        # On ne prétend ni réussite ni échec : la règle n'est pas vérifiée pour ce mode.
+        verdicts.append(_verdict("R4", None, "not_verified", "ALTERNATIVE_NOT_APPLICABLE",
+                                 "A rebalancing is already a reallocation: no alternative by asset category is built for this mode."))
     else:
         verdicts.append(_verdict("R4", None, "fail", "ALTERNATIVE_MISSING", "The idea raises a warning but no compatible alternative category was found in the dataset."))
 

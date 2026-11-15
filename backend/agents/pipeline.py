@@ -50,6 +50,8 @@ def team_assumptions(mandate_item: dict[str, Any]) -> list[str]:
         f"Analysis window: trailing {conf['windowYears']} years (team assumption).",
         "Risk level implied by annualized volatility bands (team assumption, R1).",
         f"Single-security concentration: warning above {conf['singleSecurity']['warnPct']}%, failure above {conf['singleSecurity']['failPct']}% (team assumption, R6).",
+        f"Single-sector concentration (look-through): warning above {conf['singleSecurity'].get('sectorWarnPct', 'n/a')}% (team assumption, R6).",
+        "Resampling ranges (90%) come from a moving-block bootstrap with a fixed seed: they show sensitivity to the observed period, not a forecast.",
         "Crypto-asset caps by risk profile (team assumption, R7).",
     ]
     if "maxAcceptableLossPct" not in mandate_item["mandate"]:
