@@ -34,7 +34,7 @@ Les chantiers déjà terminés en v0.3.0 (✅) restent valables. Leurs compléme
                       └──►    WS6 front  (session en 3 colonnes)                                     ─┘
 ```
 
-**WS0b doit être commité sur `main` avant les autres chantiers v0.4.** Il fixe les noms partagés : variables d'environnement, codes d'erreur, signatures du repository `analyses`. WS1b à WS6 tournent ensuite en parallèle.
+WS0b, WS1b et WS2b sont fusionnés dans `main`. **Restent WS3, WS4b, WS5 et WS6, indépendants entre eux : ils peuvent tourner en parallèle.** Lance WS5 en premier, c'est le plus long.
 
 ## Propriété des dossiers
 
@@ -65,13 +65,13 @@ git worktree add ../alphaforge-frontend -b ws/frontend
 
 Attention :
 - `mes_docs_perso/` est exclu de git, donc absent des worktrees. Les prompts donnent son chemin absolu.
-- `docs/for_KB/` (corpus de la Knowledge Base) doit être commité sur `main` pour être présent dans les worktrees. Sinon, utilise son chemin absolu.
+- `docs/for_KB/` (corpus de la Knowledge Base, 13 documents en anglais) est commité sur `main` : il est présent dans les worktrees.
 
 ## Intégration (humain, après fusion)
 
 1. `terraform plan` puis `apply`, par une seule personne.
 2. Exécuter l'ingestion (WS3) et téléverser le jeu de données dans le bucket (préfixe = `DATASET_VERSION`), y compris `etf_enriched.json`.
-3. **Knowledge Base :** envoyer `docs/for_KB/` vers `s3://<bucket>/kb/<version>/` (fichiers et `.metadata.json`), puis lancer l'ingestion de la KB (`job-kb-sync`). C'est l'étape la plus longue : à lancer en premier.
+3. **Knowledge Base :** lancer `infra/scripts/kb_sync.sh` juste après `apply`. Il envoie `docs/for_KB/` vers `s3://<bucket>/kb/<version>/` (fichiers et `.metadata.json`) et lance l'ingestion. C'est l'étape la plus longue.
 4. Vérifier l'accès à Claude Sonnet 5.5 dans us-east-1 (déjà testé par l'équipe) et **activer Titan Text Embeddings V2** (embeddings de la KB). Le Guardrail est créé par Terraform. Créer les comptes Cognito des personas.
 5. Tests de bout en bout :
    - login, conversation et portefeuille ;
