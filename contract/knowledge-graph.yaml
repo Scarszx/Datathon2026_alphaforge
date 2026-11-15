@@ -1,12 +1,25 @@
 application:
   name: "AlphaForge"
-  version: "0.4.11"
+  version: "0.4.12"
   description: "Banc d'essai agentique et auto-explicatif pour l'investisseur autonome : il cadre l'intention, simule son impact sur le portefeuille et l'audite contre les textes réglementaires canadiens (simulation seulement). Datathon 2026."
-  status: "validé par l'équipe (0.4.0 le 2026-11-14, 0.4.1 le 2026-11-15) ; 0.4.2 et 0.4.3 validées par l'utilisateur le 2026-11-15, à relire par l'équipe ; 0.4.4 à 0.4.7 demandées par l'utilisateur le 2026-11-15 (lots A, B, C et E), à relire par l'équipe ; 0.4.8 demandée par l'utilisateur le 2026-11-15 (saisie vocale), à relire par l'équipe ; 0.4.9 demandée par l'utilisateur le 2026-11-15 (jeu de données aligné sur le script du collègue), à relire par l'équipe ; 0.4.10 demandée par l'utilisateur le 2026-11-15 (saisie vocale, détection de la langue), à relire par l'équipe; 0.4.11 demandée par l'utilisateur le 2026-11-15 (statistiques de marché), à relire par l'équipe"
+  status: "validé par l'équipe (0.4.0 le 2026-11-14, 0.4.1 le 2026-11-15) ; 0.4.2 et 0.4.3 validées par l'utilisateur le 2026-11-15, à relire par l'équipe ; 0.4.4 à 0.4.7 demandées par l'utilisateur le 2026-11-15 (lots A, B, C et E), à relire par l'équipe ; 0.4.8 demandée par l'utilisateur le 2026-11-15 (saisie vocale), à relire par l'équipe ; 0.4.9 demandée par l'utilisateur le 2026-11-15 (jeu de données aligné sur le script du collègue), à relire par l'équipe ; 0.4.10 demandée par l'utilisateur le 2026-11-15 (saisie vocale, détection de la langue), à relire par l'équipe; 0.4.11 demandée par l'utilisateur le 2026-11-15 (statistiques de marché), à relire par l'équipe ; 0.4.12 demandée par l'utilisateur le 2026-11-15 (constructeur de portefeuille), à relire par l'équipe"
   solution_ref: "SOLUTION.md (racine du dépôt) : décisions de produit et de conception détaillées"
   # Règle d'équipe : ce fichier est la référence. Toute modification passe par un accord de l'équipe.
   # Voir aussi : la page de présentation du contrat (même contenu, avec schémas).
   changelog:
+    - version: "0.4.12"
+      date: "2026-11-15"
+      status: "demandé par l'utilisateur le 2026-11-15 (code sur la branche ws/optimizer, pas encore déployé) ; à relire par l'équipe"
+      summary:
+        - "Nouveau mode de mandat « build » : le moteur construit un portefeuille par optimisation moyenne-variance U = w'mu - (A/2) w'Sigma w (script de l'équipe : mu par le CAPM contre ^GSPC, covariance Ledoit-Wolf, poids <= 10 % par titre, <= 25 % par industrie, 35 % pour une industrie préférée). Le résultat est le scénario 1 (idée appliquée) : pas d'operations ni de subjectTicker. Décision rouverte de SOLUTION.md section 18 (« portefeuille optimal »), à la demande de l'utilisateur."
+        - "Rien n'est codé en dur dans les paramètres de l'utilisateur : l'aversion au risque A est déduite du profil de risque 1-5 du mandat (table d'hypothèses d'équipe dans optimizer_config.json), les industries exclues et préférées (avec un poids minimum facultatif) viennent de la conversation ou du profil, et valent vide par défaut (jamais exigées)."
+        - "schema-mandate.preferences : excludedIndustries (noms anglais d'industries du jeu) et preferredIndustries ([{ industry, minWeight en % ou null }]), valides pour le mode build. Le minimum doit être atteignable (plafonds, nombre de titres); sinon propose_mandate renvoie l'erreur."
+        - "schema-scenario : holdings (portefeuille construit : symbole, nom, industrie, poids, preuves EV-nn de poids, bêta et rendement espéré) et parameters (paramètres utilisés, dont A et son origine), facultatifs, présents seulement en mode build."
+        - "Nouvel outil tool-optimize-portfolio (module-engine). Les candidats sont les actions cotées aux États-Unis (même devise) avec une industrie."
+        - "R5 : exception pour le mode build. Les symboles du portefeuille construit sont montrés dans la liste du scénario (jamais dans le récit ni les libellés de preuve) ; le rédacteur et l'orchestrateur ne nomment aucun titre. Mention affichée : simulation construite à partir de vos paramètres, pas une recommandation; rendements espérés = modèle CAPM de la fenêtre observée, pas une prévision."
+      impacts_to_handle:
+        - "backend/agents : engine/optimizer.py, optimizer_config.json, scenarios.py, rules.py (R5), verifier, pipeline, prompts, catalog, toolbox; dépendance quadprog (roue arm64 cp312) dans backend/agents/requirements.txt, à vérifier dans le zip de la Lambda agents."
+        - "frontend : mode build dans MandateCard, liste à puces du portefeuille construit dans SimulationPanel (aucun graphique)."
     - version: "0.4.11"
       date: "2026-11-15"
       status: "demandé par l'utilisateur le 2026-11-15 (code sur la branche ws/market-stats, pas encore déployé) ; à relire par l'équipe"
@@ -775,7 +788,7 @@ data_schemas:
     description: "Contrat de l'analyse, confirmé par l'utilisateur. Chaque champ dit d'où il vient (fieldSources)."
     fields:
       - { name: "portfolioId", type: "string", required: true }
-      - { name: "mode", type: "string", enum: ["add_asset", "rebalance", "diagnose"], required: true, description: "modes A, B, C de SOLUTION.md" }
+      - { name: "mode", type: "string", enum: ["add_asset", "rebalance", "diagnose", "build"], required: true, description: "modes A, B, C de SOLUTION.md; build (0.4.12) : portefeuille construit par optimisation moyenne-variance, sans operations ni subjectTicker" }
       - { name: "objective", type: "string", enum: ["growth", "income", "preservation", "project", "retirement"], required: true }
       - { name: "objectiveDetail", type: "string", description: "ex. achat d'un condo" }
       - { name: "horizonYears", type: "number", required: true }
@@ -783,7 +796,7 @@ data_schemas:
       - { name: "riskCapacity", type: "integer", required: true, description: "1 à 5" }
       - { name: "maxAcceptableLossPct", type: "number", description: "absent = défaut par horizon (hypothèse d'équipe)" }
       - { name: "constraints", type: "array", items_type: "string" }
-      - { name: "preferences", type: "object", description: "{ esg: bool, excludedSectors: [], excludedAssetClasses: [] }" }
+      - { name: "preferences", type: "object", description: "{ esg: bool, excludedSectors: [], excludedAssetClasses: [], excludedIndustries: [], preferredIndustries: [{ industry, minWeight (% ou null) }] } (les deux dernières : mode build, facultatives, vides par défaut)" }
       - { name: "province", type: "string", required: true, enum_ref: "conventions.jurisdictions" }
       - { name: "userLanguage", type: "string", required: true, description: "ISO 639-1; langue d'affichage. Tous les champs texte du mandat sont en anglais (language_policy)." }
       - { name: "operations", type: "array", items_ref: "schema-operation", description: "vide pour diagnose" }
@@ -851,6 +864,8 @@ data_schemas:
       - { name: "proxyNote", type: "string", description: "ex. « Broad U.S. equity is approximated by a fund of the dataset for the calculation only. » Sans symbole (0.4.5)." }
       - { name: "allocation", type: "array", description: "{ label, weight } par catégorie" }
       - { name: "metrics", type: "object", description: "par mesure : identifiant EV-nn (volatility, maxDrawdown, stress2022, stressRates, stressCrypto, topSingleWeight, techWeightLookThrough)" }
+      - { name: "holdings", type: "array", description: "mode build seulement (0.4.12) : { symbol, name, industry, weight (%), evidence: { weight, beta, expectedReturn } } par titre construit, trié par poids" }
+      - { name: "parameters", type: "array", description: "mode build seulement (0.4.12) : paramètres utilisés { key, value, evidence? } (riskAversion avec riskProfile, plafonds, fenêtre, industries exclues et préférées)" }
       - { name: "verdict", type: "string", enum: ["pass", "warn", "fail"], required: true }
 
   - id: "schema-rule-verdict"
@@ -1097,7 +1112,7 @@ modules:
     name: "Moteur de calcul"
     runs_in: "srv-agent-runtime"
     role: "Construit les scénarios 0/1/2 et calcule : rendement, volatilité annualisée, pire baisse, tests de résistance (2022, krach COVID 2020 dérivé de SPY, hausse des taux dérivée de V39079/DFF, krach crypto dérivé de BTC-USD), concentration par titre, secteur, pays et devise (avec composition des FNB), corrélations. Chaque résultat est inscrit au registre (EV-nn)."
-    uses_tools: ["tool-get-prices", "tool-get-macro", "tool-compute-metrics", "tool-market-stats", "tool-get-portfolio", "tool-portfolio-impact", "tool-stress-test", "tool-concentration"]
+    uses_tools: ["tool-get-prices", "tool-get-macro", "tool-compute-metrics", "tool-market-stats", "tool-optimize-portfolio", "tool-get-portfolio", "tool-portfolio-impact", "tool-stress-test", "tool-concentration"]
     rules:
       - "adjclose, conversion en CAD avec report du dernier taux; devise native aussi affichée."
       - "Annualisation √252 (actions, FNB) et √365 (crypto); portefeuilles sur l'intersection des jours ouvrés nord-américains."
@@ -1188,6 +1203,21 @@ tools:
       - "Rendements quotidiens de adjclose dans la devise de cotation, sans conversion ni report de cours. Annualisation 252 (365 pour la crypto)."
       - "beta = cov(titre, marché) / var(marché) et la corrélation portent sur les jours de cotation communs (observations); moins de 30 jours communs : null. La méthode est écrite dans assumptions."
       - "Erreur claire si ^GSPC est absent de la version du jeu (jeux antérieurs à 0.4.9)."
+
+  - id: "tool-optimize-portfolio"
+    name: "optimize_portfolio"
+    description: "Construit un portefeuille par optimisation moyenne-variance (script de l'équipe) à partir du profil de risque et des industries exclues ou préférées de l'utilisateur. N'enregistre rien."
+    used_by: ["module-engine"]
+    params:
+      - { name: "risk_profile", type: "integer", required: true, description: "1 à 5 (R1); l'aversion au risque A en est déduite" }
+      - { name: "excluded_industries", type: "array", items_type: "string", description: "noms anglais d'industries du jeu; absent ou vide = aucune" }
+      - { name: "preferred_industries", type: "array", description: "[{ industry, minWeight en % ou null }]; absent ou vide = aucune" }
+    returns: "{ holdings: [{ symbol, name, industry, weight (%), beta, expected_return (%) }], by_industry, expected_return (%), volatility (%), beta, utility, risk_aversion, period, assumptions[], source } ou { error }"
+    reads: ["storage-dataset: prices/{symbol}.parquet", "storage-dataset: universe.parquet"]
+    behavior:
+      - "Actions cotées aux États-Unis avec une industrie, fenêtre de 5 ans, titres cotés sur au moins 95 % de la fenêtre, jours communs seulement; mu = rf + bêta (rendement du marché - rf) contre ^GSPC; covariance Ledoit-Wolf; programme quadratique résolu exactement."
+      - "Contraintes (optimizer_config.json, hypothèses d'équipe) : somme des poids 1; poids <= 10 % par titre; <= 25 % par industrie (35 % si préférée); plancher des industries préférées; industries exclues à 0; positions sous 0,5 % abandonnées; bonus de 2 % de rendement perçu pour les industries préférées, hors des chiffres affichés."
+      - "Erreur claire si les préférences sont impossibles (minimum inatteignable, industrie à la fois préférée et exclue, industrie inconnue, somme des minimums > 100 %)."
 
   - id: "tool-get-portfolio"
     name: "get_portfolio"
@@ -1316,7 +1346,7 @@ rules_catalog:
     - { id: "R2", check: "pire baisse simulée > effectiveMaxLossPct (défauts : <3 ans 10 %, 3-8 ans 20 %, >8 ans 35 %)", basis: "31-103 art. 13.2-13.3; seuils", nature: "text + team_assumption" }
     - { id: "R3", check: "impact mesuré sur tout le portefeuille", basis: "31-368, partie C", nature: "text" }
     - { id: "R4", check: "comparaison par catégorie d'actifs affichée seulement sur demande ; jamais fail (COMPARISON_NOT_REQUESTED, COMPARISON_SHOWN, COMPARISON_UNAVAILABLE) — 0.4.5", basis: "principe de 31-368, partie C (gamme d'options), sans évaluation de convenance", nature: "text" }
-    - { id: "R5", check: "aucun symbole de titre dans le texte visible sans clic, hors ceux que l'utilisateur a écrits ou détient", basis: "OCRI GN-3200-26-001", nature: "text" }
+    - { id: "R5", check: "aucun symbole de titre dans le texte visible sans clic, hors ceux que l'utilisateur a écrits ou détient (et, en mode build, ceux du portefeuille construit, affichés dans la liste du scénario)", basis: "OCRI GN-3200-26-001", nature: "text" }
     - { id: "R6", check: "titre unique (avec composition des FNB) : WARN > 10 %, FAIL > 20 %", basis: "aucune règle officielle trouvée", nature: "team_assumption" }
     - { id: "R7", check: "crypto : avertissement sourcé; plafond 0 % si refusée, 5 % si profil ≤ 3, 10 % si profil 4-5", basis: "Avis 21-329 et 21-332; plafonds", nature: "text + team_assumption" }
     - { id: "R8", check: "« ESG » seulement si une source le montre (fonds); actions : secteur + controverses non vérifiées", basis: "Avis 81-334", nature: "text" }
