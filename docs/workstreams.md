@@ -29,12 +29,12 @@ Les chantiers déjà terminés en v0.3.0 (✅) restent valables. Leurs compléme
                       ├──► ✅ WS1 infra  + ✅ WS1b infra v0.4 (Analyses, KB, Guardrail, IAM, routes) ─┐
                       ├──► ✅ WS2 db     + ✅ WS2b db v0.4 (repository analyses)                    ─┤
                       ├──►    WS3 data   (inclut publication_date et etf_enriched.json)              ─┼──► intégration (humain)
-                      ├──► ✅ WS4 api    + WS4b api v0.4 (mandats, registre)                         ─┤
+                      ├──► ✅ WS4 api    + ✅ WS4b api v0.4 (mandats, registre)                      ─┤
                       ├──►    WS5 agents (orchestrateur, auditeur, rédacteur, modules, runs)         ─┤
                       └──►    WS6 front  (session en 3 colonnes)                                     ─┘
 ```
 
-WS0b, WS1b et WS2b sont fusionnés dans `main`. **Restent WS3, WS4b, WS5 et WS6, indépendants entre eux : ils peuvent tourner en parallèle.** Lance WS5 en premier, c'est le plus long.
+WS0b, WS1b, WS2b et WS4b sont fusionnés dans `main`. **Restent WS3, WS5 et WS6, indépendants entre eux : ils peuvent tourner en parallèle.** WS5 est le plus long.
 
 ## Propriété des dossiers
 
@@ -48,7 +48,7 @@ WS0b, WS1b et WS2b sont fusionnés dans `main`. **Restent WS3, WS4b, WS5 et WS6,
 | ✅ WS2b db v0.4 | `ws/db-v4` | `backend/common/repositories/analyses.py`, `backend/common/tests/test_repo_analyses.py` | WS0b |
 | WS3 data | `ws/data` | `data/` | contrat (storage) |
 | ✅ WS4 api | `ws/api` | `backend/api/` | WS0, WS2 |
-| WS4b api v0.4 | `ws/api-v4` | `backend/api/` | WS0b, WS2b (fusionné) |
+| ✅ WS4b api v0.4 | `ws/api-v4` | `backend/api/` | WS0b, WS2b (fusionné) |
 | WS5 agents | `ws/agents` | `backend/agents/` | WS0b, WS2b (fusionné), disposition WS3 |
 | WS6 front | `ws/frontend` | `frontend/` | contrat (apis, schémas) |
 
@@ -57,7 +57,6 @@ WS0b, WS1b et WS2b sont fusionnés dans `main`. **Restent WS3, WS4b, WS5 et WS6,
 ```bash
 cd /home/rr-djk/Documents/hackathons/Datathon2026_alphaforge
 git worktree add ../alphaforge-data     -b ws/data
-git worktree add ../alphaforge-api-v4   -b ws/api-v4
 git worktree add ../alphaforge-agents   -b ws/agents
 git worktree add ../alphaforge-frontend -b ws/frontend
 # puis, dans chaque dossier : lancer l'agent et coller « Préambule commun » + le prompt du chantier
@@ -69,9 +68,22 @@ Attention :
 
 ## Intégration (humain, après fusion)
 
-1. `terraform plan` puis `apply`, par une seule personne.
+État au 2026-11-14 :
+- ✅ **Infra déployée** (`terraform apply` fait).
+- ✅ **Knowledge Base chargée** : 13 documents envoyés dans `s3://alphaforge-dataset-058264316309/kb/2026-11-14/` avec leurs `.metadata.json`. Job d'ingestion `DVZ0BNJFGU` en `COMPLETE`, 13 documents indexés, aucun échec. Titan Text Embeddings V2 fonctionne.
+- ⬜ À faire :
+  - tester les faux positifs du Guardrail ;
+  - créer les comptes Cognito des personas ;
+  - envoyer le jeu de données dans `dataset/2026-11-12/` après WS3 ;
+  - envoyer le build du front dans le bucket front après WS6 ;
+  - reconstruire et redéployer les Lambdas avec le code de WS4b et de WS5.
+
+**Points à traiter à l'intégration** (décision d'équipe) :
+- **Avertissements du mandat dans la langue de l'utilisateur.** `POST /mandates` (WS4b) renvoie `warnings` sous forme de phrases en anglais, et ces textes s'affichent sans passer par l'orchestrateur, par exemple au chemin des curseurs. La correction prévue : passer `schema-mandate.warnings` à `{ code, message }` avec des codes stables (ex. `HORIZON_EXCEEDS_PROJECT`), que le front traduit comme les autres libellés fixes. Cela touche le contrat, `backend/api/routes/mandates.py` et le front.
+
+1. `terraform plan` puis `apply`, par une seule personne. ✅ fait ; à refaire après la reconstruction des Lambdas.
 2. Exécuter l'ingestion (WS3) et téléverser le jeu de données dans le bucket (préfixe = `DATASET_VERSION`), y compris `etf_enriched.json`.
-3. **Knowledge Base :** lancer `infra/scripts/kb_sync.sh` juste après `apply`. Il envoie `docs/for_KB/` vers `s3://<bucket>/kb/<version>/` (fichiers et `.metadata.json`) et lance l'ingestion. C'est l'étape la plus longue.
+3. **Knowledge Base :** lancer `infra/scripts/kb_sync.sh` juste après `apply`. Il envoie `docs/for_KB/` vers `s3://<bucket>/kb/<version>/` (fichiers et `.metadata.json`) et lance l'ingestion. ✅ fait ; à relancer seulement si le corpus change.
 4. Modèles : Claude Sonnet 5.5 est déjà testé dans us-east-1. Titan Text Embeddings V2 ne demande **aucune activation** : la page *Model access* de Bedrock est retirée, et les modèles serverless sont activés automatiquement au premier appel. Si l'ingestion de la KB échoue sur les embeddings, faire un appel de test au modèle pour le diagnostiquer. Le Guardrail est créé par Terraform. Créer les comptes Cognito des personas.
 5. Tests de bout en bout :
    - login, conversation et portefeuille ;
@@ -270,7 +282,20 @@ Définition de fini : le script produit le jeu complet à partir du seul jeu fou
 
 Les routes `me`, `conversations`, `messages` (liste), `portfolios` et `agents` sont implémentées et testées.
 
-## WS4b api v0.4
+## ✅ WS4b api v0.4 — terminé
+
+Fusionné dans `main` (`2c349fe`), worktree supprimé. 106 tests dans `backend/api`. Ce qui a été livré :
+- les routes `POST` et `GET /mandates`, sans LLM : R1, plafond de perte par horizon tiré de `backend/api/mandate_defaults.json` (surchargeable par `RULES_CONFIG_PATH`), `changedFields`, avertissements de cohérence ;
+- la suppression des analyses avec la conversation ;
+- les nouveaux champs du profil ;
+- le registre `/v1/agents` régénéré (3 agents, 3 modules, 13 outils).
+
+Les hypothèses sont dans `backend/api/NOTES-api.md`, points 13 et 14. À retenir pour les autres chantiers :
+- **WS5** : la règle R2 utilise `effectiveMaxLossPct`, déjà calculé dans le mandat. **Ne pas recalculer les seuils par horizon** : il n'en existe qu'une copie, `mandate_defaults.json`.
+- **WS6** : les `warnings` du mandat sont aujourd'hui des phrases en anglais. Le passage à `{ code, message }` est prévu à l'intégration (voir la section Intégration).
+
+Prompt d'origine :
+
 
 ```text
 Chantier : compléments de la Lambda API pour le contrat v0.4.0. Dossier attribué : backend/api/ uniquement.
