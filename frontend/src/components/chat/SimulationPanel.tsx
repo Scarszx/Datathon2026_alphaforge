@@ -4,6 +4,7 @@
  * Affichage progressif : tout ce qui existe en status = partial s'affiche déjà ; le reste arrive à done. */
 import { useState } from "react";
 import type { RuleVerdict, Run, Scenario } from "../../api/types";
+import { money } from "../../lib/format";
 import { t, type Lang } from "../../lib/i18n";
 import { levelName } from "../../lib/riskScale";
 import { scenarioRuleSummary } from "../../lib/ruleLabels";
@@ -74,7 +75,7 @@ function BuiltPortfolio({ run, s, lang }: { run: Run; s: Scenario; lang: Lang })
       ? (p.value as (string | { industry: string; minWeight?: number | null })[])
           .map((x) => (typeof x === "string" ? x : x.minWeight ? `${x.industry} (${t("mandate.minWeight", lang)} ${Math.round(x.minWeight * 100)} %)` : x.industry))
           .join(", ")
-      : p.value;
+      : p.key === "amount" ? money(Number(p.value), 0) : p.value;
     return fmt(t(`sim.built.${p.key}`, lang), { value, riskProfile: p.riskProfile != null ? levelName(Number(p.riskProfile), lang) : undefined });
   };
   return (
@@ -103,6 +104,21 @@ function BuiltPortfolio({ run, s, lang }: { run: Run; s: Scenario; lang: Lang })
         </>
       ) : null}
     </>
+  );
+}
+
+/** Adoption (0.4.16) : copie du portefeuille construit dans « main ». Les quantités et prix viennent du moteur : rien n'est calculé ici. */
+function AdoptCard({ s, lang, busy, onAdopt, onLater }: { s: Scenario; lang: Lang; busy?: boolean; onAdopt: () => void; onLater: () => void }) {
+  if (!s.holdings?.length || s.holdings.some((h) => !(h.quantity && h.price))) return null;
+  return (
+    <div className="banner" style={{ background: "var(--ghost)", marginTop: 12 }}>
+      <p className="small"><strong>{t("sim.adopt.title", lang)}</strong></p>
+      <p className="small muted">{t("sim.adopt.text", lang)}</p>
+      <div className="questionnaire-actions" style={{ display: "flex", gap: 8 }}>
+        <button type="button" className="btn" disabled={busy} onClick={onAdopt}>{busy ? t("sim.adopt.busy", lang) : t("sim.adopt.button", lang)}</button>
+        <button type="button" className="btn-ghost" disabled={busy} onClick={onLater}>{t("sim.adopt.later", lang)}</button>
+      </div>
+    </div>
   );
 }
 
@@ -184,7 +200,7 @@ function FixedNotices({ run, lang }: { run: Run; lang: Lang }) {
   );
 }
 
-export default function SimulationPanel({ run, lang, compareCategory, horizonYears, onCompare, onRerun, busy }: {
+export default function SimulationPanel({ run, lang, compareCategory, horizonYears, onCompare, onRerun, onAdopt, onAdoptLater, busy }: {
   run: Run | null;
   lang: Lang;
   /** Horizon du mandat confirmé (fait affiché dans la carte « Points à examiner »). */
@@ -195,6 +211,9 @@ export default function SimulationPanel({ run, lang, compareCategory, horizonYea
   onCompare?: (req: { compareCategory?: import("../../lib/comparisonCategories").ComparisonCategoryId }) => void;
   /** Ancien run (sans rulesVersion) : relance l'analyse sur le même mandat. */
   onRerun?: () => void;
+  /** Mode build : « Adopter ce portefeuille » (0.4.16). Absent = pas de bouton. */
+  onAdopt?: (s: Scenario) => void;
+  onAdoptLater?: () => void;
   busy?: boolean;
 }) {
   const narrative = run?.narrative;
@@ -230,6 +249,10 @@ export default function SimulationPanel({ run, lang, compareCategory, horizonYea
             <div className={`scenario-grid${run.scenarios.length < 3 ? " two" : ""}`}>
               {run.scenarios.map((s) => <ScenarioCard key={s.index} run={run} s={s} lang={lang} />)}
             </div>
+            {onAdopt && (() => {
+              const built = run.scenarios.find((x) => x.index === 1 && x.holdings?.length);
+              return built ? <AdoptCard s={built} lang={lang} busy={busy} onAdopt={() => onAdopt(built)} onLater={() => onAdoptLater?.()} /> : null;
+            })()}
             {run.status === "partial" && <p className="muted small">{t("sim.partialHint", lang)}</p>}
             <FixedNotices run={run} lang={lang} />
             <NoticeCitations run={run} lang={lang} rule="R5" titleKey="sim.notice.fixedR5" />

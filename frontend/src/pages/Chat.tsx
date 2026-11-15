@@ -3,12 +3,13 @@
  *   2. panneau de simulation (scénarios, verdicts, citations, explication)
  * plus le menu latéral d'historique. Le front ne calcule rien : chiffres de /summary et du registre du run. */
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { ApiError, errorText } from "../api/errors";
 import {
   createConversation, createMandate, createRun, getRun, listConversations, listMandates,
-  listMessages, sendMessage,
+  listMessages, listPortfolios, putHoldings, sendMessage,
 } from "../api/endpoints";
-import type { Conversation, Evidence, Mandate, MandateCreateRequest, Message, Run } from "../api/types";
+import type { Conversation, Evidence, Mandate, MandateCreateRequest, Message, Run, Scenario } from "../api/types";
 import AppHeader from "./../components/AppHeader";
 import ConversationColumn from "./../components/chat/ConversationColumn";
 import SimulationPanel from "./../components/chat/SimulationPanel";
@@ -17,7 +18,17 @@ import { LangContext, t, useT } from "./../lib/i18n";
 const POLL_MS = 2000;
 const tmpId = () => `tmp-${Date.now()}`;
 
+/** Premier message de l'onboarding (0.4.16) : envoyé par le front, visible dans la conversation. */
+function onboardingSeed(lang: "fr" | "en", amount?: number): string {
+  const money = amount ? (lang === "en" ? `$${Math.round(amount).toLocaleString("en-CA")}` : `${Math.round(amount).toLocaleString("fr-CA")} $`) : "";
+  if (lang === "en") return `Build me a first fictitious portfolio${money ? ` of ${money} CAD` : ""} from my profile, and explain how it works.`;
+  return `Construis-moi un premier portefeuille fictif${money ? ` de ${money} CA` : ""} à partir de mon profil, et explique-moi comment ça fonctionne.`;
+}
+
 export default function Chat() {
+  const nav = useNavigate();
+  const location = useLocation();
+  const seeded = useRef(false);
   /* --- historique (menu latéral) --- */
   const [sessions, setSessions] = useState<Conversation[]>([]);
   const [q, setQ] = useState("");
@@ -118,6 +129,33 @@ export default function Chat() {
       setBusy(false);
     }
   }, [busy]);
+
+  /* --- onboarding (0.4.16) : arrivée depuis le questionnaire → premier message envoyé une seule fois (StrictMode). */
+  useEffect(() => {
+    const onboarding = (location.state as { onboarding?: { amount?: number } } | null)?.onboarding;
+    if (!onboarding || seeded.current) return;
+    seeded.current = true;
+    nav(location.pathname, { replace: true, state: null });
+    void send(onboardingSeed(lang === "en" ? "en" : "fr", onboarding.amount));
+  }, [location, nav, send, lang]);
+
+  /* --- adoption (0.4.16) : copie le portefeuille construit dans « main » ; quantités et prix viennent du moteur. */
+  const adopt = useCallback(async (s: Scenario) => {
+    if (busy) return;
+    const holdings = (s.holdings ?? []).filter((h) => h.quantity && h.price).map((h) => ({ ticker: h.symbol, quantity: h.quantity!, avgCost: h.price! }));
+    if (!holdings.length) return;
+    setError(""); setBusy(true);
+    try {
+      const main = (await listPortfolios()).items.find((p) => p.portfolioId === "main");
+      if (main?.holdings.length && !window.confirm(t("sim.adopt.replace", lang))) return;
+      await putHoldings("main", holdings);
+      nav("/portefeuille");
+    } catch (e) {
+      setError(errorText(e));
+    } finally {
+      setBusy(false);
+    }
+  }, [busy, lang, nav]);
 
   /* --- confirmation d'un mandat (brouillon modifié ou curseurs) : POST mandates puis POST runs --- */
   const confirmMandate = useCallback(async (m: MandateCreateRequest) => {
@@ -234,6 +272,7 @@ export default function Chat() {
             compareCategory={mandate?.mandate.compareCategory}
             horizonYears={mandate?.mandate.horizonYears}
             onCompare={(req) => void runCompare(req)}
+            onAdopt={(s) => void adopt(s)} onAdoptLater={() => nav("/portefeuille")}
             onRerun={run ? () => void rerunOld(run.mandateVersion) : undefined} />
         </div>
         {loading && <p className="muted small chat-loading">{lang === "en" ? "Loading…" : "Chargement…"}</p>}

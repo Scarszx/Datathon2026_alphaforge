@@ -1,6 +1,6 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import { isComplete, PROVINCES, QUESTIONS, qLabel, qOptions, type ProfileChoices } from "../lib/risk";
-import { colon } from "../lib/format";
+import { colon, money } from "../lib/format";
 import { useT } from "../lib/i18n";
 import { levelName, levelText, retainedLevel, VOLATILITY_ASSUMPTION } from "../lib/riskScale";
 import type { Jurisdiction } from "../api/types";
@@ -10,6 +10,9 @@ import { ESG_ANSWERS, MARKETS, marketName, toggleMarket, type Market } from "../
 
 type Answers = Record<string, number>;
 
+export const AMOUNT_CHOICES = [10_000, 25_000, 50_000, 100_000] as const;
+const MIN_AMOUNT = 1_000, MAX_AMOUNT = 10_000_000;
+
 /**
  * Questionnaire de risque (lib/risk.ts) + province (v0.4.0 : filtre de la Knowledge Base, mentions R9).
  * Avec `showPreferences` (création du portefeuille) : critères ESG et marché géographique, obligatoires
@@ -17,10 +20,10 @@ type Answers = Record<string, number>;
  * N'enregistre rien : `onSubmit` reçoit les réponses complètes, la province choisie et ces choix.
  */
 export default function RiskForm({
-  initial = {}, initialProvince = "", showPreferences = false, submitLabel, busy = false, onSubmit, children,
+  initial = {}, initialProvince = "", showPreferences = false, showAmount = false, submitLabel, busy = false, onSubmit, children,
 }: {
-  initial?: Answers; initialProvince?: string; showPreferences?: boolean; submitLabel: string; busy?: boolean;
-  onSubmit: (a: Answers, province: Jurisdiction, choices: ProfileChoices) => void; children?: ReactNode;
+  initial?: Answers; initialProvince?: string; showPreferences?: boolean; showAmount?: boolean; submitLabel: string; busy?: boolean;
+  onSubmit: (a: Answers, province: Jurisdiction, choices: ProfileChoices, buildAmount?: number) => void; children?: ReactNode;
 }) {
   const { lang, L } = useT();
   const [answers, setAnswers] = useState<Answers>(initial);
@@ -29,6 +32,9 @@ export default function RiskForm({
   const [markets, setMarkets] = useState<Market[]>([]);
   const [industries, setIndustries] = useState<IndustryChoice>(EMPTY_INDUSTRIES);
   const [tried, setTried] = useState(false);
+  const [amountText, setAmountText] = useState(String(AMOUNT_CHOICES[2]));
+  const buildAmount = Number(amountText.replace(/[\s\u00a0,]/g, ""));
+  const badAmount = showAmount && !(Number.isFinite(buildAmount) && buildAmount >= MIN_AMOUNT && buildAmount <= MAX_AMOUNT);
   const missingProvince = !PROVINCES.some((p) => p.code === province);
   const missingEsg = showPreferences && esg === undefined;
   const missingMarket = showPreferences && markets.length === 0;
@@ -43,8 +49,8 @@ export default function RiskForm({
   function submit(e: FormEvent) {
     e.preventDefault();
     setTried(true);
-    if (isComplete(answers) && !missingProvince && !missingEsg && !missingMarket)
-      onSubmit(answers, province as Jurisdiction, { esg: esg === true, markets, industries });
+    if (isComplete(answers) && !missingProvince && !missingEsg && !missingMarket && !badAmount)
+      onSubmit(answers, province as Jurisdiction, { esg: esg === true, markets, industries }, showAmount ? buildAmount : undefined);
   }
 
   return (
@@ -106,6 +112,23 @@ export default function RiskForm({
             <IndustryPicker value={industries} onChange={setIndustries} />
           </fieldset>
         </>
+      )}
+      {showAmount && (
+        <fieldset className={`q amount-question${tried && badAmount ? " missing" : ""}`}>
+          <legend>{QUESTIONS.length + (showPreferences ? 5 : 2)}. {L("Montant fictif de départ (en $ CA)", "Fictitious starting amount (CAD)")}</legend>
+          <div className="opts">
+            {AMOUNT_CHOICES.map((a) => (
+              <label key={a} className={`opt${buildAmount === a ? " on" : ""}`}>
+                <input type="radio" name="buildAmount" checked={buildAmount === a} onChange={() => setAmountText(String(a))} />
+                {money(a, 0)}
+              </label>
+            ))}
+          </div>
+          <div className="field" style={{ marginTop: 8 }}>
+            <input className="input" inputMode="numeric" value={amountText} onChange={(e) => setAmountText(e.target.value)} aria-label={L("Montant fictif de départ", "Fictitious starting amount")} />
+          </div>
+          <p className="muted small" style={{ margin: "6px 0 0" }}>{L("Argent fictif : sert à proposer un premier portefeuille simulé dans le chat. Rien n'est acheté.", "Fictitious money: used to propose a first simulated portfolio in the chat. Nothing is bought.")}</p>
+        </fieldset>
       )}
       {tried && (!isComplete(answers) || missingProvince || missingEsg || missingMarket) && <p className="error" role="alert">{L("Répondez à toutes les questions, y compris la province.", "Answer every question, including the province.")}</p>}
       {children}

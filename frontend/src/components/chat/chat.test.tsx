@@ -1,7 +1,7 @@
 /* Tests des composants de la page /chat : emplacements de preuves, affichage progressif, carte de mandat.
  * Les données simulent exactement les schémas du contrat v0.4.0 (types.ts). Aucun appel réseau. */
 import { cleanup, render, screen, fireEvent } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Mandate, MandateCreateRequest, Run } from "../../api/types";
 import EvidenceText from "./EvidenceText";
 import MandateCard from "./MandateCard";
@@ -276,6 +276,26 @@ describe("Portefeuille construit (mode build)", () => {
     expect(items[3].textContent).toContain("Medical Devices");
     expect(container.querySelector(".alloc-row")).toBeNull();
     expect(screen.getAllByText("Portefeuille construit").length).toBeGreaterThan(0);
+  });
+
+  it("Adopter : bouton seulement si le moteur a fourni quantité et prix pour chaque titre", () => {
+    const sized = (extra: boolean): Run => ({
+      ...BUILT,
+      scenarios: BUILT.scenarios.map((sc) => sc.index !== 1 ? sc : {
+        ...sc, holdings: sc.holdings!.map((h, i) => (extra || i === 0 ? { ...h, quantity: 12.5, price: 80 + i, currency: "USD" } : h)),
+      }),
+    });
+    const onAdopt = vi.fn();
+    const { rerender } = render(<SimulationPanel run={BUILT} lang="fr" onAdopt={onAdopt} />);
+    expect(screen.queryByText("Adopter comme mon portefeuille fictif")).toBeNull(); // pas de quantités : ancien run
+    rerender(<SimulationPanel run={sized(false)} lang="fr" onAdopt={onAdopt} />);
+    expect(screen.queryByText("Adopter comme mon portefeuille fictif")).toBeNull(); // un titre sans quantité
+    rerender(<SimulationPanel run={sized(true)} lang="fr" onAdopt={onAdopt} />);
+    fireEvent.click(screen.getByText("Adopter comme mon portefeuille fictif"));
+    expect(onAdopt).toHaveBeenCalledTimes(1);
+    expect(onAdopt.mock.calls[0][0].holdings[0]).toMatchObject({ symbol: "AAA", quantity: 12.5, price: 80 });
+    rerender(<SimulationPanel run={sized(true)} lang="fr" />);
+    expect(screen.queryByText("Adopter comme mon portefeuille fictif")).toBeNull(); // sans onAdopt : pas de bouton
   });
 
   it("la carte de mandat affiche le mode et les industries, seulement si elles existent", () => {

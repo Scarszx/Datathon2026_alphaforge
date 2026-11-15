@@ -125,6 +125,22 @@ def holding_values_cad(store: DataStore, holdings: list[dict[str, Any]], as_of: 
     return values, warnings
 
 
+def quantity_for_value_cad(store: DataStore, symbol: str, value_cad: float, as_of: pd.Timestamp) -> tuple[float, float, str] | None:
+    """Inverse de holding_values_cad : (quantité, dernier cours, devise de cotation) pour une valeur en CAD, ou None sans cours."""
+    if not store.has_ticker(symbol):
+        return None
+    prices = store.prices(symbol)
+    known = prices[prices.index <= as_of]
+    if known.empty:
+        return None
+    price = float(known["close"].iloc[-1])
+    if price <= 0:
+        return None
+    currency = an.listing_currency(store, symbol)
+    unit_cad = price * an.fx_rate_on(store, as_of) if currency == "USD" else price
+    return value_cad / unit_cad, price, currency
+
+
 def _amount_cad(store: DataStore, amount: float, currency: str | None, as_of: pd.Timestamp) -> float:
     return amount * an.fx_rate_on(store, as_of) if currency == "USD" else amount
 
@@ -382,7 +398,13 @@ def _build_scenario(
     source = store.source_label("prices") + " (Yahoo Finance via yfinance)"
     window = an.window_label(result.window[0], result.window[1])
     as_of = end.date().isoformat()
-    total = sum(positions0.values()) or 100_000.0
+    requested = mandate.get("buildAmount")
+    if requested:
+        total, amount_origin = float(requested), "user"
+    elif sum(positions0.values()):
+        total, amount_origin = sum(positions0.values()), "portfolio"
+    else:
+        total, amount_origin = 100_000.0, "default"
     positions = {h.symbol: h.weight * total for h in result.holdings}
     scenario = ScenarioAnalysis(1, "Constructed portfolio", positions, _weights(positions))
     scenario.description = (
@@ -426,6 +448,14 @@ def _build_scenario(
         {"key": "preferredIndustryCap", "value": pct(cfg["preferredIndustryCap"])},
         {"key": "windowYears", "value": cfg["windowYears"]},
     ]
+    amount_param: dict[str, Any] = {"key": "amount", "value": round(total, 2), "currency": "CAD", "origin": amount_origin}
+    if amount_origin == "default":
+        amount_param["evidence"] = registry.add(
+            kind="assumption", label="Notional amount used for an empty portfolio (team assumption), CAD", value=total, unit="", formatted=f"{total:,.0f} CAD".replace(",", " "),
+            method="Fixed team assumption: the empty portfolio is built on a notional amount.",
+            source=source, window=window, as_of=as_of, currency="CAD", key="buildAmount",
+        )
+    scenario.parameters.append(amount_param)
     if result.excluded_industries:
         scenario.parameters.append({"key": "excludedIndustries", "value": result.excluded_industries})
     if result.preferred_industries:
@@ -447,11 +477,16 @@ def _build_scenario(
             method=f"risk-free rate + beta x (index return - risk-free rate). {BUILD_METHOD}", caveats=caveats,
             key=f"holding:{holding.symbol}:expected", **common,
         )
-        scenario.holdings.append({
+        entry = {
             "symbol": holding.symbol, "name": holding.name, "industry": holding.industry,
             "weight": round(pct(holding.weight), 2),
             "evidence": {"weight": weight_id, "beta": beta_id, "expectedReturn": expected_id},
-        })
+        }
+        sized = quantity_for_value_cad(store, holding.symbol, positions[holding.symbol], end)
+        if sized:
+            quantity, last_price, listing = sized
+            entry.update({"quantity": round(quantity, 4), "price": round(last_price, 4), "currency": listing})
+        scenario.holdings.append(entry)
     scenario.notes.append(
         f"The model was estimated on {result.observations} common trading days over {result.universe_size} stocks "
         f"({window}); candidates are USD-listed equities with an industry in the dataset."

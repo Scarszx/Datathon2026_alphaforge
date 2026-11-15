@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { ApiError, errorText } from "../api/errors";
 import { getSummary, listPortfolios, putHoldings, searchAssets } from "../api/endpoints";
 import type { Asset, Holding, Jurisdiction, Portfolio, PortfolioSummary, Slice, SummaryRange } from "../api/types";
@@ -60,7 +61,8 @@ function Alloc({ title, items, classes = false }: { title: string; items: Slice[
 export default function PortfolioPage() {
   const { lang, L } = useT();
   const { user, saveProfile } = useApp();
-  const [profileReady, setProfileReady] = useState(() => Boolean(user?.investorProfile));
+  const nav = useNavigate();
+  const [profileReady] = useState(() => Boolean(user?.investorProfile));
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
   const [rows, setRows] = useState<Row[]>([]);
   const [range, setRange] = useState<SummaryRange>("1y");
@@ -96,6 +98,7 @@ export default function PortfolioPage() {
     answers: Record<string, number>,
     province: Jurisdiction,
     choices: ProfileChoices,
+    buildAmount?: number,
   ) {
     if (!user) return;
     setOnboardingBusy(true); setOnboardingError("");
@@ -103,7 +106,9 @@ export default function PortfolioPage() {
       await saveProfile(profileFromAnswers(answers, province, choices));
       // Le contrat crée le portefeuille principal au prochain GET /portfolios.
       saveRisk(user.userId, ["main"], answers, province);
-      setProfileReady(true);
+      // Premier portefeuille fictif (0.4.16) : le chat construit et explique une proposition à partir du profil.
+      await listPortfolios(); // crée le portefeuille « main » vide que le chat lira
+      nav("/chat", { replace: true, state: { onboarding: { amount: buildAmount } } });
     } catch (e) {
       setOnboardingError(errorText(e));
     } finally {
@@ -194,6 +199,7 @@ export default function PortfolioPage() {
             </header>
             <RiskForm
               showPreferences
+              showAmount
               busy={onboardingBusy}
               submitLabel={onboardingBusy ? L("Création…", "Creating…") : L("Créer mon portefeuille", "Create my portfolio")}
               onSubmit={createPortfolio}

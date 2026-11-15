@@ -14,7 +14,7 @@ import MessageText from "./MessageText";
 
 const MAX_LEN = 2000; // schema-message-create-request
 
-const MODES = ["add_asset", "rebalance", "diagnose"] as const;
+const MODES = ["add_asset", "rebalance", "diagnose", "build"] as const;
 const OBJECTIVES = ["growth", "income", "preservation", "project", "retirement"] as const;
 
 function DraftEditor({ draft, lang, onConfirm }: { draft: MandateCreateRequest; lang: Lang; onConfirm: (m: MandateCreateRequest) => void }) {
