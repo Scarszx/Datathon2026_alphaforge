@@ -102,7 +102,9 @@ class ModelScripts:
 
     def factory(self, agent_id: str) -> ScriptedModel:
         queue = self.scripts.get(agent_id) or []
-        model = ScriptedModel(queue.pop(0) if queue else [])
+        script = queue.pop(0) if queue else []
+        # Un script peut être un modèle prêt à l'emploi (ex. EchoTranslator).
+        model = script[0] if len(script) == 1 and isinstance(script[0], ScriptedModel) else ScriptedModel(script)
         self.models.setdefault(agent_id, []).append(model)
         return model
 

@@ -62,3 +62,18 @@ def output(name: str, **fields: Any) -> list[dict[str, Any]]:
 
 def call(name: str, **params: Any) -> list[dict[str, Any]]:
     return [{"name": name, "input": params}]
+
+
+class EchoTranslator(ScriptedModel):
+    """Traducteur simulé : renvoie chaque élément reçu préfixé, emplacements conservés."""
+
+    def __init__(self, prefix: str = "FR "):
+        super().__init__([])
+        self.prefix = prefix
+
+    async def stream(self, messages, tool_specs=None, system_prompt=None, **kwargs):
+        text = messages[-1]["content"][0].get("text", "")
+        items = json.loads(text.split("<items>\n", 1)[1].split("\n</items>", 1)[0])
+        self.script = [output("TranslationBatch", items=[self.prefix + item for item in items])]
+        async for chunk in super().stream(messages, tool_specs, system_prompt, **kwargs):
+            yield chunk
