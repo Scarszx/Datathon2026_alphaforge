@@ -109,10 +109,14 @@ def test_scenario_vedette_robert_nvda(store):
 
 
 def test_r6_herite_du_portefeuille_actuel(store):
-    """Écart à signaler : RY.TO (direct + XIU.TO) dépasse déjà 10 % dans le portefeuille vedette."""
+    """R6 hérite de l'état actuel (jeu synthétique des tests : un titre y dépasse encore 10 %).
+
+    Sur le jeu réel 2026-11-14, avec RY 8 000 $ et TD 9 000 $, le portefeuille vedette est sous
+    10 % (scénario 0 en PASS) : R6 donne PASS / WARN / PASS et le scénario 1 reste en FAIL.
+    """
     item, result = _engine(store)
     verdicts = rules.check_rules(store, item, result)
-    assert {_by(verdicts, "R6", i)["status"] for i in (0, 1, 2)} == {"warn"}
+    assert [_by(verdicts, "R6", i)["status"] for i in (0, 1, 2)] == ["warn", "warn", "pass"]
 
 
 def test_horizon_10_ans_change_le_verdict(store):

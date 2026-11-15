@@ -49,7 +49,7 @@ PERSONAS: dict[str, dict] = {
             "constraints": ["diversification minimale"], "preferences": [],
             "excludedAssetClasses": ["crypto"],
         },
-        "amounts": {"XIU.TO": 30000, "RY.TO": 8000, "TD.TO": 10000, "XBB.TO": 30000, "ZST.TO": 15000},
+        "amounts": {"XIU.TO": 30000, "RY.TO": 8000, "TD.TO": 9000, "XBB.TO": 30000, "ZST.TO": 15000},
     },
     "amira": {
         "profile": {
