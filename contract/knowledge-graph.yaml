@@ -773,8 +773,8 @@ databases:
       - name: "Analyses"
         partition_key: "sessionId"
         sort_key: "itemKey"
-        attributes: ["userId", "type", "version", "mandate", "riskProfile", "effectiveMaxLossPct", "warnings", "changedFields", "confirmedAt", "runId", "mandateVersion", "status", "datasetVersion", "scenarios", "verdicts", "evidence", "narrative", "verifier", "jurisdictionNotices", "createdAt", "completedAt"]
-        notes: "itemKey = MANDATE#<version sur 3 chiffres> ou RUN#<runId>. type = mandate | run. Vérifier userId à chaque lecture. Si un run approche 400 Ko, déplacer evidence dans S3."
+        attributes: ["userId", "type", "version", "mandate", "riskProfile", "effectiveMaxLossPct", "warnings", "changedFields", "confirmedAt", "runId", "mandateVersion", "status", "datasetVersion", "userLanguage", "scenarios", "verdicts", "evidence", "narrative", "verifier", "jurisdictionNotices", "explanation", "createdAt", "completedAt"]
+        notes: "itemKey = MANDATE#<version sur 3 chiffres> ou RUN#<runId>. type = mandate | run. Vérifier userId à chaque lecture. Si un run approche 400 Ko, déplacer evidence dans S3. Le repository stocke tous les champs de schema-mandate et schema-run (userId, type et itemKey ne sont jamais renvoyés)."
 
 # ==========================================
 # 5. LE STOCKAGE DES DONNÉES DE MARCHÉ (S3, lecture seule à l'exécution)
