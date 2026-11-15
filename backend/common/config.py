@@ -119,3 +119,27 @@ def rules_config_path() -> str | None:
 def log_level() -> str:
     """Niveau de journalisation, INFO par défaut."""
     return os.environ.get("LOG_LEVEL", "INFO")
+
+
+# --- Observabilité Langfuse / OpenTelemetry (optionnel, fail-open) ---
+
+
+def langfuse_public_key() -> str | None:
+    """Clé publique du projet Langfuse (pk-lf-...), None si non configurée."""
+    return os.environ.get("LANGFUSE_PUBLIC_KEY")
+
+
+def langfuse_secret_key() -> str | None:
+    """Clé secrète Langfuse (sk-lf-...), en local seulement (.env). Sur AWS, utiliser SSM."""
+    return os.environ.get("LANGFUSE_SECRET_KEY")
+
+
+def langfuse_secret_param() -> str | None:
+    """Nom du paramètre SSM SecureString contenant la clé secrète Langfuse (ex. /alphaforge/langfuse/secret-key)."""
+    return os.environ.get("LANGFUSE_SECRET_PARAM")
+
+
+def langfuse_base_url() -> str:
+    """URL de base Langfuse (région US par défaut)."""
+    return os.environ.get("LANGFUSE_BASE_URL", "https://us.cloud.langfuse.com")
+

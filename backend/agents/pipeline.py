@@ -13,7 +13,7 @@ import os
 from datetime import datetime, timezone
 from typing import Any, Callable
 
-from backend.agents import guardrails
+from backend.agents import guardrails, telemetry
 from backend.agents.data.store import DataStore
 from backend.agents.engine.registry import EvidenceRegistry
 from backend.agents.engine.scenarios import attach_allocations, public_scenarios
@@ -93,7 +93,18 @@ def start_run(ctx: RequestContext, mandate_version: int) -> dict[str, Any]:
     if "error" in impact:
         raise ApiError("MANDATE_NOT_FOUND", "Mandat inconnu pour cette conversation.")
     result = ctx.engine_result
-    verdicts = TOOLBOX.call("module-rules", "check_rules", ctx)["verdicts"]
+    with telemetry.trace_span(
+        "module-rules.check_rules",
+        observation_type="evaluator",
+        session_id=ctx.session_id,
+        user_id=ctx.user_id,
+        input_data={"mandateVersion": mandate_version, "riskProfile": mandate_item["riskProfile"]},
+    ) as rules_span:
+        verdicts = TOOLBOX.call("module-rules", "check_rules", ctx)["verdicts"]
+        telemetry.set_span_output(
+            rules_span,
+            [{"rule": v["rule"], "scenario": v.get("scenario"), "status": v["status"], "reasonCode": v["reasonCode"]} for v in verdicts],
+        )
     if mandate["userLanguage"] == "en":
         verdicts = [{**v, "message": v["messageEn"]} for v in verdicts]
     scenarios = public_scenarios(result, scenario_verdicts(verdicts))
@@ -140,7 +151,15 @@ def _translate_run_texts(ctx: RequestContext, sections: list[dict[str, Any]], ve
     return translated_sections, translated_verdicts, message_texts[len(unique_messages):], match
 
 
-def complete_run(store: DataStore, user_id: str, session_id: str, run_id: str, *, kb_client=None) -> dict[str, Any]:
+def complete_run(
+    store: DataStore,
+    user_id: str,
+    session_id: str,
+    run_id: str,
+    *,
+    kb_client=None,
+    trace_context: dict[str, str] | None = None,
+) -> dict[str, Any]:
     run = analyses_repo.get_run(session_id, user_id, run_id)
     if run is None:
         raise ApiError("RUN_NOT_FOUND", "Run inconnu.")
@@ -152,55 +171,81 @@ def complete_run(store: DataStore, user_id: str, session_id: str, run_id: str, *
                          portfolio_id=mandate["portfolioId"], province=mandate["province"], user_language=language,
                          evidence=registry.items, clients={"kb": kb_client} if kb_client else {})
     steps_before = run.get("explanation", {}).get("steps", [])
-    try:
-        verdicts = auditor.audit(ctx, run["verdicts"], registry)
-        narrative: dict[str, Any] | None = None
-        verifier_report = None
+    with telemetry.trace_span(
+        "analysis-complete-run",
+        trace_name="analysis-run",
+        observation_type="chain",
+        session_id=session_id,
+        user_id=user_id,
+        tags=["feature:analysis-run", f"mode:{mandate['mode']}", f"province:{mandate['province']}"],
+        parent_carrier=trace_context,
+        input_data={"runId": run_id, "mandateVersion": run["mandateVersion"], "mode": mandate["mode"], "province": mandate["province"]},
+    ) as span:
         try:
-            record = writer.analysis_record(mandate, run["scenarios"], verdicts, registry.items)
-            sections = writer.write(ctx, record)
-        except base.AgentFailure as failure:
-            log_event("agent.failure", agentId=writer.AGENT_ID, reason=failure.reason, sessionId=session_id)
-            sections = None
-        sections_t, verdicts_t, notices_t, match = _translate_run_texts(
-            ctx, sections or [], verdicts, run.get("jurisdictionNotices", []), language)
-        status = "done"
-        if sections is not None:
-            cleaned, hidden, verifier_report = verify_narrative(sections_t, registry.ids(), mandate)
-            verifier_report["placeholdersMatch"] = verifier_report["placeholdersMatch"] and match
-            shown = " ".join(s["text"] for s in cleaned)
-            check = guardrails.apply(shown, "OUTPUT")
-            if check.blocked:
-                hidden = hidden + [{"section": s["key"], "reason": "guardrail"} for s in cleaned if s["text"]]
-                cleaned = [{**s, "text": ""} for s in cleaned]
-            narrative = {
-                "sections": [{"key": s["key"], "textEn": s["textEn"], "text": s["text"]} for s in cleaned],
-                # Une section dont la traduction a perdu un emplacement est affichée en anglais
-                # (placeholdersMatch = false le signale) ; la langue cible reste userLanguage.
-                "language": language,
-                "hiddenSentences": hidden,
+            verdicts = auditor.audit(ctx, run["verdicts"], registry)
+            narrative: dict[str, Any] | None = None
+            verifier_report = None
+            try:
+                record = writer.analysis_record(mandate, run["scenarios"], verdicts, registry.items)
+                sections = writer.write(ctx, record)
+            except base.AgentFailure as failure:
+                log_event("agent.failure", agentId=writer.AGENT_ID, reason=failure.reason, sessionId=session_id)
+                sections = None
+            sections_t, verdicts_t, notices_t, match = _translate_run_texts(
+                ctx, sections or [], verdicts, run.get("jurisdictionNotices", []), language)
+            status = "done"
+            if sections is not None:
+                with telemetry.trace_span(
+                    "module-verifier.verify_narrative",
+                    observation_type="evaluator",
+                    session_id=session_id,
+                    user_id=user_id,
+                ) as verifier_span:
+                    cleaned, hidden, verifier_report = verify_narrative(sections_t, registry.ids(), mandate)
+                    verifier_report["placeholdersMatch"] = verifier_report["placeholdersMatch"] and match
+                    telemetry.set_span_output(verifier_span, verifier_report)
+                shown = " ".join(s["text"] for s in cleaned)
+                check = guardrails.apply(shown, "OUTPUT")
+                if check.blocked:
+                    hidden = hidden + [{"section": s["key"], "reason": "guardrail"} for s in cleaned if s["text"]]
+                    cleaned = [{**s, "text": ""} for s in cleaned]
+                narrative = {
+                    "sections": [{"key": s["key"], "textEn": s["textEn"], "text": s["text"]} for s in cleaned],
+                    # Une section dont la traduction a perdu un emplacement est affichée en anglais
+                    # (placeholdersMatch = false le signale) ; la langue cible reste userLanguage.
+                    "language": language,
+                    "hiddenSentences": hidden,
+                }
+            else:
+                status = "error"  # fail-open : scénarios, verdicts et citations restent utilisables
+            explanation = run.get("explanation", {})
+            explanation = {
+                **explanation,
+                "steps": steps_before + [
+                    {k: c[k] for k in ("agentId", "tool", "params", "status", "durationMs") if k in c} for c in ctx.tool_calls
+                ],
+                "checks": build_explanation(ctx, [], verdicts_t, [], [])["checks"],
             }
-        else:
-            status = "error"  # fail-open : scénarios, verdicts et citations restent utilisables
-        explanation = run.get("explanation", {})
-        explanation = {
-            **explanation,
-            "steps": steps_before + [
-                {k: c[k] for k in ("agentId", "tool", "params", "status", "durationMs") if k in c} for c in ctx.tool_calls
-            ],
-            "checks": build_explanation(ctx, [], verdicts_t, [], [])["checks"],
-        }
-        fields: dict[str, Any] = {
-            "status": status, "verdicts": verdicts_t, "evidence": registry.public_items(),
-            "jurisdictionNotices": notices_t, "explanation": explanation, "completedAt": _now(),
-        }
-        if narrative is not None:
-            fields["narrative"] = narrative
-            fields["verifier"] = verifier_report
-        return analyses_repo.update_run(session_id, user_id, run_id, fields)
-    except Exception as exc:
-        log_event("run.error", sessionId=session_id, runId=run_id, error=type(exc).__name__)
-        return analyses_repo.update_run(session_id, user_id, run_id, {"status": "error", "completedAt": _now()})
+            fields: dict[str, Any] = {
+                "status": status, "verdicts": verdicts_t, "evidence": registry.public_items(),
+                "jurisdictionNotices": notices_t, "explanation": explanation, "completedAt": _now(),
+            }
+            if narrative is not None:
+                fields["narrative"] = narrative
+                fields["verifier"] = verifier_report
+            telemetry.set_span_output(
+                span,
+                {
+                    "status": status,
+                    "citationsCount": sum(1 for item in registry.items if str(item.get("id", "")).startswith("KB-")),
+                    "verifier": verifier_report,
+                },
+            )
+            return analyses_repo.update_run(session_id, user_id, run_id, fields)
+        except Exception as exc:
+            log_event("run.error", sessionId=session_id, runId=run_id, error=type(exc).__name__)
+            telemetry.set_span_output(span, {"status": "error", "error": type(exc).__name__})
+            return analyses_repo.update_run(session_id, user_id, run_id, {"status": "error", "completedAt": _now()})
 
 
 # --- déclenchement asynchrone ---------------------------------------------
@@ -222,6 +267,15 @@ def default_dispatcher() -> Callable[[dict[str, Any]], None]:
     return None  # type: ignore[return-value]
 
 
-def completion_payload(user_id: str, session_id: str, run_id: str) -> dict[str, Any]:
-    return {"internal": INTERNAL_EVENT, "userId": user_id, "sessionId": session_id, "runId": run_id}
+def completion_payload(
+    user_id: str,
+    session_id: str,
+    run_id: str,
+    *,
+    trace_context: dict[str, str] | None = None,
+) -> dict[str, Any]:
+    payload: dict[str, Any] = {"internal": INTERNAL_EVENT, "userId": user_id, "sessionId": session_id, "runId": run_id}
+    if trace_context:
+        payload["traceContext"] = trace_context
+    return payload
 

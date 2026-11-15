@@ -69,3 +69,21 @@ variable "log_level" {
   type        = string
   default     = "INFO"
 }
+
+variable "langfuse_public_key" {
+  description = "Clé publique du projet Langfuse (identifiant non secret)."
+  type        = string
+  default     = "pk-lf-a2d4308e-ebc7-41b4-b0e5-69afc46d74cd"
+}
+
+variable "langfuse_base_url" {
+  description = "URL de base Langfuse (région US par défaut)."
+  type        = string
+  default     = "https://us.cloud.langfuse.com"
+}
+
+variable "langfuse_secret_param" {
+  description = "Chemin du paramètre SSM SecureString contenant la clé secrète Langfuse (créé hors Terraform via aws ssm put-parameter pour ne jamais figurer dans le tfstate)."
+  type        = string
+  default     = "/alphaforge/langfuse/secret-key"
+}

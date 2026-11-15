@@ -177,6 +177,15 @@ data "aws_iam_policy_document" "agents" {
     resources = ["arn:aws:lambda:${var.aws_region}:${local.account_id}:function:${var.name_prefix}-agents"]
   }
 
+  # Clé secrète Langfuse en SSM Parameter Store (SecureString, créée hors
+  # Terraform pour ne jamais figurer dans terraform.tfstate).
+  statement {
+    sid       = "LangfuseSecretParamRead"
+    effect    = "Allow"
+    actions   = ["ssm:GetParameter"]
+    resources = ["arn:aws:ssm:${var.aws_region}:${local.account_id}:parameter/${trimprefix(var.langfuse_secret_param, "/")}"]
+  }
+
   # Journaux.
   statement {
     sid       = "Logs"

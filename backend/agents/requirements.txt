@@ -2,5 +2,6 @@
 # couche AWS SDK for pandas (retirés du zip par infra/scripts/build_lambdas.sh) :
 # installe-les en local pour les tests (pip install pandas pyarrow).
 strands-agents==1.65.0
+opentelemetry-exporter-otlp-proto-http>=1.25
 boto3>=1.40
 python-ulid>=4
