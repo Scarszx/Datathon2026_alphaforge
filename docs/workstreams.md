@@ -28,13 +28,13 @@ Les chantiers déjà terminés en v0.3.0 (✅) restent valables. Leurs compléme
                       │
                       ├──► ✅ WS1 infra  + ✅ WS1b infra v0.4 (Analyses, KB, Guardrail, IAM, routes) ─┐
                       ├──► ✅ WS2 db     + ✅ WS2b db v0.4 (repository analyses)                    ─┤
-                      ├──►    WS3 data   (jeu élargi ~250 actifs × 10 ans, publication_date, FNB)     ─┼──► intégration (humain)
+                      ├──► ✅ WS3 data   (jeu élargi ~250 actifs × 10 ans, publication_date, FNB)     ─┼──► intégration (humain)
                       ├──► ✅ WS4 api    + ✅ WS4b api v0.4 (mandats, registre)                      ─┤
                       ├──►    WS5 agents (orchestrateur, auditeur, rédacteur, modules, runs)         ─┤
                       └──►    WS6 front  (session en 3 colonnes)                                     ─┘
 ```
 
-WS0b, WS1b, WS2b et WS4b sont fusionnés dans `main`. **Restent WS3, WS5 et WS6, indépendants entre eux : ils peuvent tourner en parallèle.** WS5 est le plus long.
+WS0b, WS1b, WS2b, WS3 et WS4b sont fusionnés dans `main`. **Restent WS5 et WS6, indépendants entre eux : ils peuvent tourner en parallèle.**
 
 ## Propriété des dossiers
 
@@ -46,7 +46,7 @@ WS0b, WS1b, WS2b et WS4b sont fusionnés dans `main`. **Restent WS3, WS5 et WS6,
 | ✅ WS1b infra v0.4 | `ws/infra-v4` | `infra/` | WS0b |
 | ✅ WS2 db | `ws/db` | `backend/common/repositories/`, `backend/common/tests/` | WS0 |
 | ✅ WS2b db v0.4 | `ws/db-v4` | `backend/common/repositories/analyses.py`, `backend/common/tests/test_repo_analyses.py` | WS0b |
-| WS3 data | `ws/data` | `data/` | contrat (storage) |
+| ✅ WS3 data | `ws/data` | `data/` | contrat (storage) |
 | ✅ WS4 api | `ws/api` | `backend/api/` | WS0, WS2 |
 | ✅ WS4b api v0.4 | `ws/api-v4` | `backend/api/` | WS0b, WS2b (fusionné) |
 | WS5 agents | `ws/agents` | `backend/agents/` | WS0b, WS2b (fusionné), disposition WS3 |
@@ -56,7 +56,6 @@ WS0b, WS1b, WS2b et WS4b sont fusionnés dans `main`. **Restent WS3, WS5 et WS6,
 
 ```bash
 cd /home/rr-djk/Documents/hackathons/Datathon2026_alphaforge
-git worktree add ../alphaforge-data     -b ws/data
 git worktree add ../alphaforge-agents   -b ws/agents
 git worktree add ../alphaforge-frontend -b ws/frontend
 # puis, dans chaque dossier : lancer l'agent et coller « Préambule commun » + le prompt du chantier
@@ -74,7 +73,8 @@ Attention :
 - ⬜ À faire :
   - tester les faux positifs du Guardrail ;
   - créer les comptes Cognito des personas ;
-  - envoyer le jeu de données élargi dans `dataset/<version>/` après WS3 (version = date d'extraction), puis mettre à jour la variable Terraform `dataset_version` et régénérer `backend/api/tickers.json` à partir de `universe.parquet` (validation des tickers de WS4) ;
+  - relever les fiches des 15 FNB clés dans `data/ingestion/etf_enriched.source.json`, puis relancer `python -m data.ingestion.build_dataset --mode full --strict-etf` (le cache local rend la relance rapide) ;
+  - envoyer le jeu élargi `data/output/2026-11-14/` dans `dataset/2026-11-14/` (commande dans `data/README.md`), passer la variable Terraform `dataset_version` à `2026-11-14`, et régénérer `backend/api/tickers.json` à partir de `universe.parquet` (validation des tickers de WS4) ;
   - envoyer le build du front dans le bucket front après WS6 ;
   - reconstruire et redéployer les Lambdas avec le code de WS4b et de WS5.
 
@@ -244,7 +244,22 @@ Définition de fini : tous les tests passent sans compte AWS.
 
 ---
 
-## WS3 data (jeu de données)
+## ✅ WS3 data (jeu de données) — terminé
+
+Fusionné dans `main` (`817f1d7`), worktree supprimé. 13 tests hors ligne (`data/tests`). Le jeu produit, `data/output/2026-11-14/` (non commité, ignoré par git), a été copié dans le dépôt principal avant la suppression du worktree. Ses chiffres :
+- 243 candidats, **241 retenus**, 2 écartés : MEG.TO (pas de données) et ARX.TO (une seule ligne, sans doute un problème de yfinance) ;
+- du 2016-11-12 au 2026-11-13, 591 035 lignes de prix, sans doublon ni `adj_close` nul ou manquant ;
+- 25 actifs à historique court, conservés sans remplissage (ex. ZEQT.TO depuis 2022-01-24) ;
+- `publication_date` des séries mensuelles fixée au 28 du mois suivant.
+
+Les hypothèses sont dans `data/NOTES-data.md`. À retenir pour les autres chantiers :
+- **WS5 : le taux USD/CAD ne commence que le 2017-01-03** (début de la série `FXUSDCAD` de la Banque du Canada), alors que les prix commencent le 2016-11-12. Le moteur ne convertit en CAD qu'à partir du 2017-01-03 ; les mesures dans la devise d'origine peuvent utiliser toute la fenêtre. Ne pas combler le trou.
+- **WS5** : les colonnes Parquet sont en snake_case (`return_1y`, `volatility_1y`, `max_drawdown_1y`, `sector_source`, `first_date`, `last_date`, `publication_date`, `anomaly_note`) ; les clés de `manifest.json` et `etf_enriched.json` sont en camelCase.
+- **WS5** : `etf_enriched.json` marque les FNB sans fiche avec `"compositionAvailable": false`. La composition se lit alors par catégorie (SOLUTION.md section 10).
+- **Intégration** : les fiches des 15 FNB restent à relever, et `fxCoverageStart` est à ajouter au manifeste lors de la relance (voir la section Intégration).
+
+Prompt d'origine :
+
 
 ```text
 Chantier : ingestion du jeu de données de marché. Dossier attribué : data/ uniquement.
