@@ -115,3 +115,13 @@ def test_format_selon_la_langue():
     assert format_number(15.24, "%", "fr") == "15,2 %"
     assert format_number(15.24, "%", "en") == "15.2%"
     assert format_number(15000, "CAD", "fr") == "15 000 $"
+
+
+def test_hausse_isolee_ne_forme_pas_un_cycle(store, monkeypatch):
+    """Cas réel du jeu de départ : une hausse isolée en fin de série après un cycle de baisses."""
+    days = pd.to_datetime(["2022-01-03", "2022-03-02", "2022-04-13", "2022-06-01", "2024-06-05", "2026-10-29"])
+    rates = [0.25, 0.50, 1.00, 1.50, 1.25, 1.50]
+    macro = pd.DataFrame({"date": days, "series_id": "V39079", "value": rates})
+    monkeypatch.setattr(store, "macro", lambda: macro)
+    period = derive_period(store, "rate_hikes")
+    assert (period.start, period.end) == (pd.Timestamp("2022-03-02"), pd.Timestamp("2022-06-01"))

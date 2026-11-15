@@ -19,6 +19,7 @@ from backend.agents.data.store import DataStore
 from backend.agents.engine.analytics import max_drawdown, native_series
 
 PERIOD_IDS = ("y2022", "covid_2020", "rate_hikes", "crypto_crash")
+MIN_HIKES = 2  # un cycle de hausse compte au moins deux relèvements consécutifs
 
 LABELS = {
     "y2022": "Stress period: calendar year 2022",
@@ -82,24 +83,26 @@ def derive_period(store: DataStore, period_id: str) -> StressPeriod:
             changes = changes[changes != 0]
             if changes.empty:
                 continue
-            # Dernier cycle de hausse : suite maximale de relèvements sans baisse.
-            run_start = run_end = None
-            current_start = current_end = None
+            # Dernier cycle de hausse : suite d'au moins MIN_HIKES relèvements sans baisse
+            # entre eux. Une hausse isolée (début de cycle en cours) ne forme pas une période.
+            runs: list[list[pd.Timestamp]] = []
+            current: list[pd.Timestamp] = []
             for day, delta in changes.items():
                 if delta > 0:
-                    current_start = current_start or day
-                    current_end = day
+                    current.append(day)
                 else:
-                    if current_start is not None:
-                        run_start, run_end = current_start, current_end
-                    current_start = current_end = None
-            if current_start is not None:
-                run_start, run_end = current_start, current_end
-            if run_start is None:
+                    if current:
+                        runs.append(current)
+                    current = []
+            if current:
+                runs.append(current)
+            cycles = [r for r in runs if len(r) >= MIN_HIKES]
+            if not cycles:
                 continue
+            run_start, run_end = cycles[-1][0], cycles[-1][-1]
             return StressPeriod(
                 period_id, True, run_start, run_end,
-                method=f"First to last increase of the latest hiking cycle in {series_id}.",
+                method=f"First to last increase of the latest hiking cycle (at least {MIN_HIKES} consecutive increases) in {series_id}.",
                 source=store.source_label("macro/macro.parquet"),
             )
         return StressPeriod(period_id, False, note="No policy rate hiking cycle found (V39079 or DFF).")
