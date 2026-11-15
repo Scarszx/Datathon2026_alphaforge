@@ -90,11 +90,13 @@ Pour une version de production en mode démo : `npx vite build --mode demo`.
 | `/` | Accueil (présentation du prototype) + **questionnaire public** | Non |
 | `/login` | Connexion | Non |
 | `/inscription` | Création de compte + **questionnaire d'inscription** | Non |
+| `/chat` | **Session en 3 colonnes** : portefeuille + mandat avec curseurs « et si », conversation (mandat proposé à confirmer), panneau de simulation (scénarios, verdicts R1-R10, citations, explication, vérificateur) | Oui |
 | `/portefeuille` | Résumé du portefeuille, édition des positions, autocomplétion de ticker | Oui |
 | `/marches` | Taux, devises et actifs (via l'API : `/market/search`, `/portfolios/{id}/summary`) | Oui |
 | `/profil` | Profil investisseur + réponses au questionnaire d'inscription, consultables et modifiables | Oui |
 
-L'assistant (bouton flottant) est présent sur toutes les pages connectées.
+La session (`/chat`) remplace l'assistant flottant des versions précédentes. Les écarts et hypothèses
+du chantier sont consignés dans `frontend/NOTES-frontend.md`.
 
 ## Les deux questionnaires
 

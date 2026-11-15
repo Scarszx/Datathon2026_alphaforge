@@ -10,6 +10,9 @@ section « Front (SPA) ».
 npm install
 npm run dev:demo     # mode démo, sans Cognito ni API
 npm run build        # fichiers statiques dans dist/ (déploiement S3 + CloudFront)
+npm test             # tests de composants (Vitest)
 ```
 
 Pages : `/login`, `/chat` (session en 3 colonnes), `/portefeuille`, plus `/marches` et `/profil` (via l'API).
+
+Écarts du chantier, hypothèses du mode démo et points à trancher à l'intégration : `NOTES-frontend.md`.
