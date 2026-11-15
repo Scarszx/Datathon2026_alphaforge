@@ -9,6 +9,7 @@
 # Python
 .venv/
 __pycache__/
+.pytest_cache/
 
 # Paquets construits (zips des Lambdas, etc.)
 build/
