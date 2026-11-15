@@ -5,7 +5,7 @@ Hypothèses et écarts trouvés en mettant l'infra au niveau du contrat v0.4.0.
 ## Décisions prises avec l'équipe
 
 - **Magasin de vecteurs : S3 Vectors.** Il répond à l'open_question du contrat. La justification est dans `infra/README.md`.
-- **Pas d'auto-invocation asynchrone de la Lambda agents.** La complétion d'un run (partial → done) reste ouverte jusqu'à WS5. Aucun droit `lambda:InvokeFunction` sur elle-même, et le timeout reste à 30 s. Si l'asynchrone est retenu, il faudra ajouter dans `iam.tf` un statement sur l'ARN construit à partir du nom de la fonction (pour éviter un cycle), et porter le timeout de la Lambda agents à environ 180 s. L'API Gateway coupe toujours à 30 s.
+- **Complétion asynchrone d'un run (décision WS5, à appliquer).** Le statement `SelfInvokeCompleteRun` (`iam.tf`) autorise `lambda:InvokeFunction` sur l'ARN construit de la Lambda agents (pas de cycle), et son timeout passe à 180 s (`lambda.tf`). L'API Gateway coupe toujours à 30 s : seules les invocations internes (`InvocationType=Event`) profitent des 180 s. **À appliquer par un `terraform plan` puis `apply` de l'équipe** (non lancé).
 
 ## Écarts et points à suivre
 

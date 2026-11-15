@@ -167,6 +167,16 @@ data "aws_iam_policy_document" "agents" {
     resources = [aws_bedrock_guardrail.this.guardrail_arn]
   }
 
+  # Complétion d'un run (partial -> done) : la Lambda s'invoque elle-même en
+  # asynchrone (InvocationType=Event, décision WS5). ARN construit à partir du
+  # nom pour éviter un cycle rôle <-> fonction.
+  statement {
+    sid       = "SelfInvokeCompleteRun"
+    effect    = "Allow"
+    actions   = ["lambda:InvokeFunction"]
+    resources = ["arn:aws:lambda:${var.aws_region}:${local.account_id}:function:${var.name_prefix}-agents"]
+  }
+
   # Journaux.
   statement {
     sid       = "Logs"
