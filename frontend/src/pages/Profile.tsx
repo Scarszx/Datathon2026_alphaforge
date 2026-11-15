@@ -7,6 +7,8 @@ import { listPortfolios } from "../api/endpoints";
 import RiskForm, { RiskResult } from "../components/RiskForm";
 import { PROVINCES, PROVINCE_LABELS, loadLatestRisk, loadRisk, QUESTIONS, saveRisk, SCORE_MAX, syncRisk, type PortfolioRisk } from "../lib/risk";
 import { useApp } from "../lib/store";
+import IndustryPicker from "../components/IndustryPicker";
+import { industryPrefs, splitPreferences } from "../lib/industries";
 
 const RISK: { value: RiskLevel; label: string }[] = [
   { value: "low", label: "Faible" },
@@ -105,7 +107,9 @@ export default function Profile() {
   const [hMax, setHMax] = useState(p?.horizonMaxYears != null ? String(p.horizonMaxYears) : "");
   const [objective, setObjective] = useState(p?.objective ?? "");
   const [constraints, setConstraints] = useState((p?.constraints ?? []).join("\n"));
-  const [preferences, setPreferences] = useState((p?.preferences ?? []).join("\n"));
+  const initialPrefs = splitPreferences(p?.preferences);
+  const [industries, setIndustries] = useState<string[]>(initialPrefs.industries);
+  const [preferences, setPreferences] = useState(initialPrefs.others.join("\n"));
   const [excluded, setExcluded] = useState((p?.excludedAssetClasses ?? []).join("\n"));
   const [err, setErr] = useState("");
   const [saved, setSaved] = useState(false);
@@ -128,7 +132,7 @@ export default function Profile() {
       ...(cap !== undefined ? { riskCapacity: cap } : {}),
       ...(province ? { province } : {}),
       horizonMinYears: min, ...(max !== undefined ? { horizonMaxYears: max } : {}),
-      objective: objective.trim(), constraints: lines(constraints), preferences: lines(preferences), excludedAssetClasses: lines(excluded),
+      objective: objective.trim(), constraints: lines(constraints), preferences: [...lines(preferences), ...industryPrefs(industries)], excludedAssetClasses: lines(excluded),
     };
     setErr(""); setBusy(true);
     try { await saveProfile(body); setSaved(true); } catch (x) { setErr(errorText(x)); } finally { setBusy(false); }
@@ -173,6 +177,7 @@ export default function Profile() {
           <div className="field"><label htmlFor="obj">Objectif</label><input id="obj" placeholder="ex. croissance à long terme" value={objective} onChange={(e) => setObjective(e.target.value)} /></div>
           <div className="field"><label htmlFor="con">Contraintes (une par ligne)</label><textarea id="con" rows={3} placeholder="ex. diversification minimale" value={constraints} onChange={(e) => setConstraints(e.target.value)} /></div>
           <div className="field"><label htmlFor="pre">Préférences (une par ligne)</label><textarea id="pre" rows={3} placeholder="ex. ESG" value={preferences} onChange={(e) => setPreferences(e.target.value)} /></div>
+          <div className="field"><label>Industries qui vous intéressent (plusieurs choix possibles)</label><IndustryPicker value={industries} onChange={setIndustries} /></div>
           <div className="field"><label htmlFor="exc">Classes d'actifs exclues (une par ligne)</label><textarea id="exc" rows={2} placeholder="ex. crypto" value={excluded} onChange={(e) => setExcluded(e.target.value)} /></div>
           {err && <p className="error" role="alert">{err}</p>}
           <div><button className="btn" disabled={busy}>{busy ? "Enregistrement…" : "Enregistrer"}</button></div>
