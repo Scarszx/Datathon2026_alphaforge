@@ -31,6 +31,61 @@ from backend.common.validation import parse_json_body, session_id
 MAX_CONTENT = 2000
 ISO_RE = re.compile(r"^[a-z]{2}$")
 
+# Gabarits de repli du refus : utilisés pour une donnée personnelle (le texte n'est jamais transmis à un
+# modèle), quand l'orchestrateur échoue ou quand le filtre de sortie retient son refus.
+TOPIC_KEYS = {
+    "Trade execution orders": "orders",
+    "Guaranteed or promised returns": "returns",
+    "Personalized investment recommendation": "recommendation",
+}
+SIMULATE_FR = " Vous pouvez plutôt me demander de simuler une idée : indiquez les titres et les montants à tester."
+SIMULATE_EN = " You can ask me to simulate an idea instead: name the securities and amounts you want to test."
+REFUSAL_TEMPLATES = {
+    "fr": {
+        "pii": "Votre message semble contenir une donnée personnelle (numéro de compte, NAS ou autre). Retirez-la et reformulez votre demande.",
+        "orders": "Cet outil ne passe aucun ordre : c'est une simulation éducative." + SIMULATE_FR,
+        "returns": "Cet outil ne promet ni ne garantit aucun rendement : le passé ne prédit pas l'avenir." + SIMULATE_FR,
+        "recommendation": "Cet outil ne dit pas quoi acheter, vendre ou conserver : il simule l'effet des changements que vous nommez." + SIMULATE_FR,
+        "generic": "Cette demande sort de ce que peut faire cette simulation éducative." + SIMULATE_FR,
+    },
+    "en": {
+        "pii": "Your message seems to contain personal information (account number, SIN or similar). Remove it and rephrase your request.",
+        "orders": "This tool places no orders: it is an educational simulation." + SIMULATE_EN,
+        "returns": "This tool does not promise or guarantee any return: the past does not predict the future." + SIMULATE_EN,
+        "recommendation": "This tool does not say what to buy, sell or hold: it simulates the effect of the changes you name." + SIMULATE_EN,
+        "generic": "This request is outside what this educational simulation can do." + SIMULATE_EN,
+    },
+}
+
+
+def refusal_message(
+    user_id: str, session: str, store: DataStore, check: guardrails.GuardrailResult, content: str, language: str, span: Any, stage: str,
+) -> str:
+    """Texte du refus affiché dans l'encart : rédigé par l'orchestrateur à partir du sujet bloqué,
+    avec repli sur un gabarit. Une donnée personnelle ne quitte jamais le code (aucun appel de modèle)."""
+    lang = language.lower() if ISO_RE.match(language.lower()) else "en"
+    info = {"blocked": True, "stage": stage, "byPii": check.blocked_by_pii, "byTopic": check.blocked_by_topic, "topics": list(check.blocked_topics)}
+    templates = REFUSAL_TEMPLATES.get(lang, REFUSAL_TEMPLATES["en"])
+    topics = list(check.blocked_topics)
+    if check.blocked_by_pii:
+        telemetry.set_span_output(span, {**info, "refusal": "template"})
+        return templates["pii"]
+    key = next((TOPIC_KEYS[t] for t in topics if t in TOPIC_KEYS), "generic")
+    fallback = templates[key]
+    if not topics:
+        telemetry.set_span_output(span, {**info, "refusal": "template"})
+        return fallback
+    ctx = RequestContext(user_id=user_id, session_id=session, store=store, user_language=lang)
+    try:
+        text = orchestrator.explain_refusal(ctx, topics, content, lang)
+    except (AgentFailure, AssertionError):
+        text = ""
+    if text and not guardrails.apply(text, "OUTPUT").blocked:
+        telemetry.set_span_output(span, {**info, "refusal": "llm"})
+        return text
+    telemetry.set_span_output(span, {**info, "refusal": "template"})
+    return fallback
+
 
 def _validate_content(body: dict[str, Any]) -> str:
     unknown = sorted(set(body) - {"content"})
@@ -85,16 +140,10 @@ def post_message(event: dict[str, Any], user_id: str, store: DataStore) -> dict[
     ) as span:
         check = guardrails.apply(content, "INPUT")
         if check.blocked and (check.blocked_by_pii or not check.blocked_by_topic):
-            telemetry.set_span_output(
-                span,
-                {
-                    "blocked": True,
-                    "stage": "input_original",
-                    "byPii": check.blocked_by_pii,
-                    "byTopic": check.blocked_by_topic,
-                },
+            raise ApiError(
+                "GUARDRAIL_BLOCKED",
+                refusal_message(user_id, session, store, check, content, conversation.get("userLanguage") or "en", span, "input_original"),
             )
-            raise ApiError("GUARDRAIL_BLOCKED", check.text)
 
         session_context, mandate, run = _session_context(user_id, session, conversation)
         user_message_id = new_message_id()
@@ -118,28 +167,10 @@ def post_message(event: dict[str, Any], user_id: str, store: DataStore) -> dict[
 
         language = turn.user_language.lower() if ISO_RE.match(turn.user_language.lower()) else ctx.user_language
         if language == "en" and check.blocked:
-            telemetry.set_span_output(
-                span,
-                {
-                    "blocked": True,
-                    "stage": "input_original",
-                    "byPii": check.blocked_by_pii,
-                    "byTopic": check.blocked_by_topic,
-                },
-            )
-            raise ApiError("GUARDRAIL_BLOCKED", check.text)
+            raise ApiError("GUARDRAIL_BLOCKED", refusal_message(user_id, session, store, check, content, language, span, "input_original"))
         translated = guardrails.apply(turn.english_request, "INPUT")
         if translated.blocked:
-            telemetry.set_span_output(
-                span,
-                {
-                    "blocked": True,
-                    "stage": "input_translated",
-                    "byPii": translated.blocked_by_pii,
-                    "byTopic": translated.blocked_by_topic,
-                },
-            )
-            raise ApiError("GUARDRAIL_BLOCKED", translated.text)
+            raise ApiError("GUARDRAIL_BLOCKED", refusal_message(user_id, session, store, translated, content, language, span, "input_translated"))
         reply = guardrails.apply(turn.reply, "OUTPUT").text
 
         draft = ctx.captured.get("mandateDraft")

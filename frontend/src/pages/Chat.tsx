@@ -36,6 +36,7 @@ export default function Chat() {
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [refusal, setRefusal] = useState<{ id: number; sent: string; message: string } | null>(null);
 
   /* --- historique : liste des sessions --- */
   useEffect(() => {
@@ -53,7 +54,7 @@ export default function Chat() {
   /* --- ouverture d'une session : messages, mandat, portefeuille, dernier run --- */
   const openSession = useCallback(async (sessionId: string | null) => {
     setActiveId(sessionId); activeRef.current = sessionId;
-    setMessages([]); setMandate(null); setRun(null); setRunId(null); setError("");
+    setMessages([]); setMandate(null); setRun(null); setRunId(null); setError(""); setRefusal(null);
     if (!sessionId) return;
     setLoading(true);
     try {
@@ -89,7 +90,7 @@ export default function Chat() {
   /* --- envoi d'un message (cadrage, suivi, « et si » en texte libre) --- */
   const send = useCallback(async (text: string) => {
     if (!text.trim() || busy) return;
-    setError(""); setBusy(true);
+    setError(""); setRefusal(null); setBusy(true);
     let sid = activeRef.current;
     const optimistic: Message = { messageId: tmpId(), sessionId: sid ?? "", role: "user", content: text, status: "done", createdAt: new Date().toISOString() };
     try {
@@ -110,7 +111,9 @@ export default function Chat() {
       setSessions((l) => l.map((c) => (c.sessionId === sid ? { ...c, updatedAt: r.assistantMessage.createdAt } : c)));
     } catch (e) {
       if (activeRef.current === sid) setMessages((m) => m.filter((x) => x.messageId !== optimistic.messageId));
-      setError(errorText(e));
+      // Refus de Guardrail : encart sous le champ (rien n'est enregistré), texte remis dans le champ pour être reformulé.
+      if (e instanceof ApiError && e.code === "GUARDRAIL_BLOCKED") setRefusal({ id: Date.now(), sent: text, message: errorText(e) });
+      else setError(errorText(e));
     } finally {
       setBusy(false);
     }
@@ -224,7 +227,7 @@ export default function Chat() {
         </aside>
 
         <div className="chat-grid">
-          <ConversationColumn messages={messages} evidence={evidence} busy={busy} lang={lang}
+          <ConversationColumn messages={messages} evidence={evidence} busy={busy} lang={lang} refusal={refusal} onDismissRefusal={() => setRefusal(null)}
             onSend={(text) => void send(text)} onQuickReply={(text) => void send(text)}
             onConfirmDraft={(m) => void confirmMandate(m)} />
           <SimulationPanel run={run} lang={lang} busy={busy}

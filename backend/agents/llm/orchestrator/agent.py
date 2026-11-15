@@ -8,7 +8,7 @@ from typing import Any
 from backend.agents import models
 from backend.agents.llm.base import AgentFailure, run_agent
 from backend.agents.llm.orchestrator import prompts
-from backend.agents.llm.orchestrator.schemas import OrchestratorTurn, TranslationBatch
+from backend.agents.llm.orchestrator.schemas import OrchestratorTurn, Refusal, TranslationBatch
 from backend.agents.tools.context import RequestContext
 from backend.agents.verifier.verifier import placeholders
 
@@ -45,6 +45,16 @@ def converse(ctx: RequestContext, session_context: dict[str, Any], user_message:
     output = run_agent(AGENT_ID, prompts.SYSTEM_PROMPT, prompt, ctx, OrchestratorTurn, messages=history)
     assert isinstance(output, OrchestratorTurn)
     return output
+
+
+def explain_refusal(ctx: RequestContext, topics: list[str], user_message: str, language: str) -> str:
+    """Refus expliqué d'une demande bloquée par le Guardrail ; lève AgentFailure en cas d'échec."""
+    output = run_agent(
+        AGENT_ID, prompts.REFUSAL_SYSTEM_PROMPT, prompts.refusal_prompt(topics, user_message, language),
+        ctx, Refusal, with_tools=False, spec=models.TRANSLATION_SPEC,
+    )
+    assert isinstance(output, Refusal)
+    return output.reply.strip()
 
 
 def translate(ctx: RequestContext, texts: list[str], target_language: str) -> list[str]:

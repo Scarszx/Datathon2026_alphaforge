@@ -182,6 +182,50 @@ def test_message_bloque_n_entre_pas_dans_l_historique(robert_session, store, scr
     assert "agent-orchestrator" not in scripts.models  # PII / regex refusé avant tout appel de modèle
 
 
+def test_refus_pii_gabarit_sans_modele_dans_la_langue_de_la_conversation(robert_session, store, scripts, guard):
+    guard.pii_word = "12345-678-1234567"
+    conversations.set_user_language(USER, robert_session, "fr")
+    response = _send(store, robert_session, "Mon compte bancaire est 12345-678-1234567")
+    assert response["statusCode"] == 422
+    assert "donnée personnelle" in body_of(response)["error"]["message"]
+    assert "agent-orchestrator" not in scripts.models
+
+
+def _tour(language, english):
+    return output("OrchestratorTurn", user_language=language, english_request=english, reply="...", quick_replies=[])
+
+
+def test_refus_sujet_redige_par_l_orchestrateur(robert_session, store, scripts, guard):
+    guard.blocked_word = "100 NVDA"
+    conversations.set_user_language(USER, robert_session, "fr")
+    scripts.add("agent-orchestrator", _tour("fr", "Buy 100 NVDA for me"))
+    scripts.add("agent-orchestrator", output("Refusal", reply="Cet outil ne passe aucun ordre. Voulez-vous simuler l'ajout de NVDA ?"))
+    response = _send(store, robert_session, "Achète 100 NVDA pour moi")
+    assert response["statusCode"] == 422 and body_of(response)["error"]["code"] == "GUARDRAIL_BLOCKED"
+    assert body_of(response)["error"]["message"] == "Cet outil ne passe aucun ordre. Voulez-vous simuler l'ajout de NVDA ?"
+    assert messages.list_messages(robert_session)["items"] == []
+
+
+def test_refus_sujet_gabarit_si_orchestrateur_en_echec(robert_session, store, scripts, guard):
+    guard.blocked_word = "100 NVDA"
+    conversations.set_user_language(USER, robert_session, "fr")
+    scripts.add("agent-orchestrator", _tour("fr", "Buy 100 NVDA for me"))
+    scripts.add("agent-orchestrator", [])  # aucune sortie structurée : AgentFailure
+    response = _send(store, robert_session, "Achète 100 NVDA pour moi")
+    assert response["statusCode"] == 422
+    assert "Cette demande sort de ce que peut faire" in body_of(response)["error"]["message"]  # sujet « Orders » du faux Guardrail : repli générique
+    assert messages.list_messages(robert_session)["items"] == []
+
+
+def test_refus_sujet_gabarit_si_refus_retenu_par_le_filtre_de_sortie(robert_session, store, scripts, guard):
+    guard.blocked_word = "Buy 100 shares"
+    scripts.add("agent-orchestrator", _tour("en", "Simulate 100 shares of NVDA"))
+    scripts.add("agent-orchestrator", output("Refusal", reply="Sorry, I will not Buy 100 shares for you."))
+    response = _send(store, robert_session, "Buy 100 shares of NVDA for me")
+    assert response["statusCode"] == 422
+    assert "outside what this educational simulation can do" in body_of(response)["error"]["message"]
+
+
 def test_blocage_sujet_non_anglais_retenu_seulement_si_confirme_sur_english_request(robert_session, store, scripts, guard):
     guard.blocked_word = "Et si j'ajoute"
     scripts.add("agent-orchestrator", output("OrchestratorTurn", user_language="fr",

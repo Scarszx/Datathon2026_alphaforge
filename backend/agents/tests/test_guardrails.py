@@ -50,3 +50,14 @@ def test_blocage_conserve(monkeypatch):
     res = guardrails.apply("Buy 100 shares for me.", "INPUT", client=rec)
     assert res.blocked and res.blocked_by_topic and not res.blocked_by_pii
     assert res.text == "Refus."
+
+
+def test_sujets_bloques_extraits(monkeypatch):
+    _configure(monkeypatch)
+    rec = Recorder({"action": "GUARDRAIL_INTERVENED", "outputs": [{"text": "Refus."}],
+                    "assessments": [{"topicPolicy": {"topics": [
+                        {"name": "Trade execution orders", "action": "BLOCKED"},
+                        {"name": "Guaranteed or promised returns", "action": "NONE"},
+                        {"name": "Trade execution orders", "action": "BLOCKED"}]}}]})
+    res = guardrails.apply("Buy 100 shares for me.", "INPUT", client=rec)
+    assert res.blocked_topics == ("Trade execution orders",)

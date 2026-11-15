@@ -34,6 +34,7 @@ class GuardrailResult:
     checked: bool  # False si le Guardrail n'a pas pu s'exécuter (fail-open)
     blocked_by_pii: bool = False
     blocked_by_topic: bool = False
+    blocked_topics: tuple[str, ...] = ()  # noms des sujets bloqués (jamais le texte)
 
 
 def _client():
@@ -59,6 +60,17 @@ def _policy_blocked(assessments: Any, policy_key: str) -> bool:
     if not isinstance(assessments, list):
         return False
     return any(_has_blocked_action(a.get(policy_key)) for a in assessments if isinstance(a, dict))
+
+
+def _blocked_topic_names(assessments: Any) -> tuple[str, ...]:
+    names: list[str] = []
+    if isinstance(assessments, list):
+        for a in assessments:
+            topics = (a.get("topicPolicy") or {}).get("topics") if isinstance(a, dict) else None
+            for t in topics or []:
+                if isinstance(t, dict) and t.get("action") == "BLOCKED" and t.get("name") and t["name"] not in names:
+                    names.append(str(t["name"]))
+    return tuple(names)
 
 
 def apply(text: str, source: str, client=None) -> GuardrailResult:
@@ -94,17 +106,19 @@ def apply(text: str, source: str, client=None) -> GuardrailResult:
         if _has_blocked_action(assessments):
             by_pii = _policy_blocked(assessments, "sensitiveInformationPolicy")
             by_topic = _policy_blocked(assessments, "topicPolicy")
-            log_event("guardrail.blocked", source=source, byPii=by_pii, byTopic=by_topic)
+            topics = _blocked_topic_names(assessments)
+            log_event("guardrail.blocked", source=source, byPii=by_pii, byTopic=by_topic, topics=list(topics))
             res = GuardrailResult(
                 True,
                 replacement or "This request is outside what this simulation can do.",
                 True,
                 blocked_by_pii=by_pii,
                 blocked_by_topic=by_topic,
+                blocked_topics=topics,
             )
             telemetry.set_span_output(
                 span,
-                {"blocked": res.blocked, "checked": res.checked, "byPii": by_pii, "byTopic": by_topic},
+                {"blocked": res.blocked, "checked": res.checked, "byPii": by_pii, "byTopic": by_topic, "topics": list(topics)},
             )
             return res
         res = GuardrailResult(False, replacement or text, True)
