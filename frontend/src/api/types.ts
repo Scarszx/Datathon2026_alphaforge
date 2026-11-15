@@ -76,6 +76,9 @@ export type Message = {
   mandateDraft?: MandateCreateRequest;
   runId?: string;
 };
+/* v0.4.8 : saisie vocale (api-speech-session) */
+export type SpeechSession = { url: string; languageCode: "fr-CA" | "en-US"; sampleRate: number; expiresIn: number };
+
 export type MessageCreateResponse = { userMessage: Message; assistantMessage: Message };
 
 export type Holding = { ticker: string; quantity: number; avgCost: number };
