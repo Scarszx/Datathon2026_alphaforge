@@ -19,8 +19,8 @@ corpus_dir="$repo_root/docs/for_KB"
 # shellcheck source=/dev/null
 source "$repo_root/scripts/aws-env.sh"
 identity="$(aws sts get-caller-identity --query Arn --output text)"
-if [[ "$identity" != *WSParticipantRole* ]]; then
-    echo "Identité inattendue : $identity (WSParticipantRole attendu). Arrêt." >&2
+if [[ "$identity" != *:058264316309:* ]]; then
+    echo "Identité inattendue : $identity (compte 058264316309 attendu). Arrêt." >&2
     exit 1
 fi
 

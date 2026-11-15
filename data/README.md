@@ -45,10 +45,10 @@ La sortie est écrite dans `data/output/<version>/` où `<version>` vaut la date
 
 ## 2. Téléversement vers S3 et intégration (commandes documentées, non exécutées par le script)
 
-Une fois le jeu généré dans `data/output/<version>/`, un humain disposant des identifiants du compte de l'événement (`.aws-local/`, rôle `WSParticipantRole`) peut téléverser le jeu vers le bucket S3 privé (`storage-dataset`) :
+Une fois le jeu généré dans `data/output/<version>/`, un humain disposant des identifiants du compte de l'événement (`.aws-local/`, compte `058264316309`) peut téléverser le jeu vers le bucket S3 privé (`storage-dataset`) :
 
 ```bash
-# 1. Charger les identifiants du compte AWS de l'événement et vérifier WSParticipantRole
+# 1. Charger les identifiants du compte AWS de l'événement et vérifier le compte 058264316309
 source scripts/aws-env.sh && \
 aws s3 sync "data/output/<version>/" "s3://<bucket>/dataset/<version>/" \
     --region us-east-1 \

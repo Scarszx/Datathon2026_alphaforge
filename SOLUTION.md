@@ -11,7 +11,7 @@
 > - **Décision technique ferme : les agents sont construits avec le SDK Strands Agents (Python) et les modèles d'Amazon Bedrock.** Pas d'autre framework d'agents (LangChain, LlamaIndex…), pas d'appel direct à un autre fournisseur de modèles.
 > - **Décision ferme : région AWS `us-east-1` et Claude Sonnet 5.5 pour les 3 agents** (accès testé par l'équipe). Le contrat v0.4.0 est **validé par l'équipe**.
 > - **Décision ferme : tout le système interne est en anglais** (prompts, descriptions d'outils, échanges entre agents, requêtes et corpus de la KB). Seuls les textes affichés à l'utilisateur sont dans sa langue. L'orchestrateur traduit à l'entrée et à la sortie. Voir section 7.0.
-> - Les commandes AWS et Terraform suivent `AGENTS.md` : `source scripts/aws-env.sh && ...`, le compte doit contenir `WSParticipantRole`, et aucun `terraform apply` ni aucune création de ressource sans demande explicite.
+> - Les commandes AWS et Terraform suivent `AGENTS.md` : `source scripts/aws-env.sh && ...`, le compte doit être `058264316309`, et aucun `terraform apply` ni aucune création de ressource sans demande explicite.
 
 ---
 

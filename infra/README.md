@@ -7,7 +7,7 @@ Décrit toute l'infrastructure du contrat v0.4.0 (`contract/knowledge-graph.yaml
 - Terraform >= 1.5
 - Python 3.12 avec `pip3` (pour `build_lambdas.sh`)
 - Identifiants du compte d'événement, depuis le dépôt ou un worktree :
-  `source scripts/aws-env.sh` (vérifier que l'identité contient `WSParticipantRole`)
+  `source scripts/aws-env.sh` (vérifier que le compte est `058264316309`)
 - Accès réseau au registre Terraform pour `terraform init`
 
 ## Ordre des commandes

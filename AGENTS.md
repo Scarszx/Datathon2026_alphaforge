@@ -21,8 +21,8 @@ Lis ensuite `SOLUTION.md`. Il explique la solution retenue et les raisons de cha
 Le projet utilise le compte AWS de l'événement, jamais un compte personnel. Ses identifiants sont dans `.aws-local/` (ignoré par git).
 
 - Charge-les dans la même commande que tout appel `aws` ou `terraform` : `source scripts/aws-env.sh && aws ...`. Une variable chargée dans une commande précédente ne survit pas forcément à la suivante.
-- Le script affiche le compte actif : il doit contenir `WSParticipantRole`. Sinon, ou si `.aws-local/` est absent, arrête-toi et demande, au lieu d'utiliser un autre profil.
-- Si les identifiants ont expiré (`ExpiredToken`), demande à un humain de lancer `scripts/aws-refresh-creds.sh`.
+- Le script affiche l'identité active : elle doit se trouver dans le compte `058264316309` (utilisateur IAM `alphaforge-dev`, clé d'accès durable). Sinon, ou si `.aws-local/` est absent, arrête-toi et demande, au lieu d'utiliser un autre profil.
+- Cette clé n'expire pas avant la suppression du compte. Si elle est refusée (`InvalidClientTokenId`, `AccessDenied`), demande à un humain : ne cherche pas d'autres identifiants.
 - N'écris jamais d'identifiants ailleurs que dans `.aws-local/`, et jamais dans un fichier suivi par git.
 - Ne lance pas `terraform apply` et ne crée, ne modifie ni ne supprime de ressource AWS sans demande explicite.
 
