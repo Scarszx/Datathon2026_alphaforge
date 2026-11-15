@@ -1,4 +1,4 @@
-# AlphaForge AI
+# Grow
 
 **Tester une idée d'investissement sans conseiller, et comprendre exactement ce qui soutient la réponse.** · Datathon PolyFinances 2026 · Simulation pédagogique : aucune transaction, aucun conseil financier personnalisé.
 

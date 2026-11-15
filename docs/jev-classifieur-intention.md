@@ -90,7 +90,7 @@ Une réponse peut aussi être de type `refusal` (pas de valeur) : les autres ré
 - La recette officielle « Guardrails for LLMs » (docs.typesafe.ai/cookbooks/llm_guardrails) filtre les entrées et les sorties avec une batterie de Noul plus un Score de gravité, et des politiques « strict » (relecture ≥ 0,35, action ≥ 0,70) et « permissive » (≥ 0,70 et ≥ 0,85). Elle **ne publie ni précision, ni latence, ni coût** et n'explique pas la dérivation des seuils.
 - Motifs utiles : **« Noul d'abord »** (un contrôle bon marché avant une étape coûteuse) et **« Noul compagnon »** (détecter quand aucune option du Choice ne convient). Ajouter une option `other` à tout Choice.
 
-## Esquisse d'intégration dans AlphaForge
+## Esquisse d'intégration dans Grow
 
 - **Où** : en remplacement du contrôle **par sujets** du point ② (`english_request`), dans `backend/agents/routes/messages.py`. Le Guardrail Bedrock resterait pour les renseignements bancaires (PII) et pour les sorties (③ et ④). Cela garde AWS dans le dispositif, ce qui compte pour la condition d'admissibilité et la grille (« Intégration AWS »).
 - **Ce qui change pour le point ①** : le texte d'origine ne serait plus bloqué par sujet, seulement par PII. L'orchestrateur lirait donc un message non filtré par sujet ; ses outils sont en lecture seule (profil, portefeuille, recherche d'actifs, validation de brouillon), le risque est faible mais à noter.

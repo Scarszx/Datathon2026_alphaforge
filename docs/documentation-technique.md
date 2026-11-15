@@ -1,4 +1,4 @@
-# AlphaForge AI : documentation technique
+# Grow : documentation technique
 
 Datathon PolyFinances 2026. Document de synthèse : méthodes et justification, données, explicabilité avec un exemple relié aux traces, validations, limites et améliorations. L'état décrit est celui du dépôt au 15 novembre 2026 (contrat 0.4.1). Pour reproduire le projet : [`README.md`](../README.md).
 
@@ -8,7 +8,7 @@ Datathon PolyFinances 2026. Document de synthèse : méthodes et justification, 
 
 **Ce que fait l'outil.** Il cadre l'intention, mesure l'impact sur tout le portefeuille, audite le résultat contre des règles écrites en code et des textes réglementaires cités, puis explique chaque chiffre et chaque verdict. Il ne recommande aucun titre, ne passe aucun ordre et ne promet aucun rendement.
 
-**Positionnement réglementaire.** Banque Nationale Courtage direct exécute des ordres sans conseil. Pour ces comptes, l'OCRI dispense le courtier de l'obligation de convenance et interdit de recommander un titre précis. Sa note d'orientation GN-3200-26-001 (12 mars 2026) élargit les outils d'aide à la décision permis, à condition qu'ils restent factuels et neutres. AlphaForge se place dans cet esprit, sans prétendre être conforme : c'est une simulation pédagogique. Les alternatives sont donc décrites par catégorie d'actifs (« obligations canadiennes court terme »), jamais par titre.
+**Positionnement réglementaire.** Banque Nationale Courtage direct exécute des ordres sans conseil. Pour ces comptes, l'OCRI dispense le courtier de l'obligation de convenance et interdit de recommander un titre précis. Sa note d'orientation GN-3200-26-001 (12 mars 2026) élargit les outils d'aide à la décision permis, à condition qu'ils restent factuels et neutres. Grow se place dans cet esprit, sans prétendre être conforme : c'est une simulation pédagogique. Les alternatives sont donc décrites par catégorie d'actifs (« obligations canadiennes court terme »), jamais par titre.
 
 **Les trois personas de l'énoncé** testent trois tensions : Amira (risque élevé, mais pas « tout est acceptable »), Mateo (autre chose que le rendement et le risque : l'ESG), Robert (remettre en question une demande incohérente avec son profil). Voir la section 6.
 
