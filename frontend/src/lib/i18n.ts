@@ -11,6 +11,8 @@ export const FR: Record<string, string> = {
   "app.kbExcerpt": "Extrait original (anglais)",
   "app.teamAssumption": "Hypothèse d'équipe",
   "app.unresolved": "Preuve introuvable dans le registre — aucun chiffre affiché.",
+  "app.showMore": "Voir plus",
+  "app.showLess": "Voir moins",
   "nav.aria": "Navigation principale",
   "nav.session": "Session",
   "nav.portfolio": "Portefeuille",
@@ -117,6 +119,18 @@ export const FR: Record<string, string> = {
   "sim.rules": "Règles R1 à R10",
   "sim.rule.threshold": "Seuil",
   "sim.rule.citations": "Citations",
+  "sim.rules.run": "Toute l'analyse",
+  /* Noms courts des règles, affichés sur la ligne repliée (le motif complet est derrière « Voir plus »). */
+  "rule.name.R1": "Profil de risque",
+  "rule.name.R2": "Perte maximale",
+  "rule.name.R3": "Impact sur le portefeuille",
+  "rule.name.R4": "Comparaison par catégorie",
+  "rule.name.R5": "Titres nommés",
+  "rule.name.R6": "Concentration",
+  "rule.name.R7": "Crypto-actifs",
+  "rule.name.R8": "Critères ESG",
+  "rule.name.R9": "Mentions de la province",
+  "rule.name.R10": "Données macroéconomiques",
   "sim.narrative": "Explication",
   "sim.section.data_used": "Données utilisées",
   "sim.section.why": "Ce qui a déclenché les règles",
@@ -263,6 +277,8 @@ export const EN: Record<string, string> = {
   "app.kbExcerpt": "Original excerpt (English)",
   "app.teamAssumption": "Team assumption",
   "app.unresolved": "Evidence not found in the registry — no number displayed.",
+  "app.showMore": "Show more",
+  "app.showLess": "Show less",
   "nav.aria": "Main navigation",
   "nav.session": "Session",
   "nav.portfolio": "Portfolio",
@@ -369,6 +385,17 @@ export const EN: Record<string, string> = {
   "sim.rules": "Rules R1 to R10",
   "sim.rule.threshold": "Threshold",
   "sim.rule.citations": "Citations",
+  "sim.rules.run": "Whole analysis",
+  "rule.name.R1": "Risk profile",
+  "rule.name.R2": "Maximum loss",
+  "rule.name.R3": "Portfolio impact",
+  "rule.name.R4": "Comparison by category",
+  "rule.name.R5": "Named securities",
+  "rule.name.R6": "Concentration",
+  "rule.name.R7": "Crypto assets",
+  "rule.name.R8": "ESG criteria",
+  "rule.name.R9": "Province notices",
+  "rule.name.R10": "Macroeconomic data",
   "sim.narrative": "Explanation",
   "sim.section.data_used": "Data used",
   "sim.section.why": "What triggered the rules",
@@ -517,6 +544,12 @@ export const LangContext = createContext<Lang>("fr");
 /** t("mandate.objective.growth", lang) → libellé traduit ; clé absente → la clé elle-même (jamais un chiffre inventé). */
 export function t(key: string, lang: Lang): string {
   return DICTS[lang]?.[key] ?? FR[key] ?? key;
+}
+
+/** Nom court d'une règle (R1 à R10) ; règle inconnue → chaîne vide (aucun nom inventé). */
+export function ruleName(rule: string, lang: Lang): string {
+  const key = `rule.name.${rule}`;
+  return DICTS[lang]?.[key] ?? FR[key] ?? "";
 }
 
 /** Avertissement du mandat dans la langue d'affichage : libellé du code avec ses paramètres ;

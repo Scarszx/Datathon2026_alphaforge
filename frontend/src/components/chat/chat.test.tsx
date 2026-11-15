@@ -122,6 +122,8 @@ describe("SimulationPanel (affichage progressif partial → done)", () => {
       ],
     };
     render(<SimulationPanel run={oldRun} lang="fr" />);
+    // Les citations sont dans le détail de chaque règle (« Voir plus ») : tout déplier avant de compter.
+    for (const more of screen.getAllByRole("button", { name: "Voir plus" })) fireEvent.click(more);
     expect(screen.getAllByRole("button", { name: "KB-01" }).length).toBe(1); // seulement sous la règle déclenchée
   });
 

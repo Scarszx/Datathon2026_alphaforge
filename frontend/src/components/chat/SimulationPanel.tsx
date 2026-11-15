@@ -6,8 +6,9 @@ import { useState } from "react";
 import type { RuleVerdict, Run, Scenario } from "../../api/types";
 import { t, type Lang } from "../../lib/i18n";
 import { levelName } from "../../lib/riskScale";
-import { ruleBadgeClass, ruleLabel, scenarioRuleSummary } from "../../lib/ruleLabels";
+import { scenarioRuleSummary } from "../../lib/ruleLabels";
 import Provenance from "./Provenance";
+import RuleItem from "./RuleItem";
 import SummaryCards from "./SummaryCards";
 import EvidenceText, { EvidenceBadge } from "./EvidenceText";
 import CompareCategory, { CompareCategoryButton } from "./CompareCategory";
@@ -63,8 +64,6 @@ function ScenarioCard({ run, s, lang }: { run: Run; s: Scenario; lang: Lang }) {
   );
 }
 
-/** Règles R1-R10 : libellé par motif (lot A), badge neutre pour « non déclenchée »,
- *  citations seulement pour une règle déclenchée (lot A : les anciens runs en contiennent sur des pass). */
 /** Mode build : portefeuille construit en liste à puces (pas de graphique), chaque chiffre relié à sa preuve EV-nn. */
 function BuiltPortfolio({ run, s, lang }: { run: Run; s: Scenario; lang: Lang }) {
   const ev = (id?: string) => run.evidence.find((e) => e.id === id);
@@ -107,6 +106,9 @@ function BuiltPortfolio({ run, s, lang }: { run: Run; s: Scenario; lang: Lang })
   );
 }
 
+/** Règles R1-R10 par scénario, une ligne par règle : nom et libellé du motif (lot A), badge neutre pour
+ *  « non déclenchée ». « Voir plus » déroule le motif, le seuil et les citations ; citations seulement pour
+ *  une règle déclenchée (lot A : les anciens runs en contiennent sur des pass). */
 function RuleTable({ run, lang }: { run: Run; lang: Lang }) {
   const byScenario = new Map<number, RuleVerdict[]>();
   for (const v of run.verdicts) {
@@ -116,34 +118,38 @@ function RuleTable({ run, lang }: { run: Run; lang: Lang }) {
   // Les citations sous une règle non déclenchée se liraient comme un accord (GN-3200-26-001, 2.1.1).
   const citationsOf = (v: RuleVerdict): string[] =>
     v.status === "warn" || v.status === "fail" ? (v.citations ?? []) : [];
+  const groupTitle = (sc: number) => sc < 0
+    ? t("sim.rules.run", lang)
+    : t(sc === 1 && run.scenarios.find((x) => x.index === 1)?.holdings?.length ? "sim.scenario.built" : SCENARIO_LABEL_KEY[sc] ?? "", lang);
   return (
     <>
-      <h3 className="section-title">{t("sim.rules", lang)}</h3>
+      <h3 className="section-title" style={{ margin: "16px 0 10px" }}>{t("sim.rules", lang)}</h3>
       {[...byScenario.entries()].map(([sc, list]) => (
-        <div key={sc} style={{ marginBottom: 12 }}>
-          {sc >= 0 && <div className="muted small">{t(sc === 1 && run.scenarios.find((x) => x.index === 1)?.holdings?.length ? "sim.scenario.built" : SCENARIO_LABEL_KEY[sc] ?? "", lang)}</div>}
-          <table className="tbl">
-            <thead><tr><th>{t("sim.rules", lang)}</th><th /></tr></thead>
-            <tbody>
-              {list.map((v, i) => (
-                <tr key={i}>
-                  <td className="small">
-                    <strong>{v.rule}</strong> <span className={ruleBadgeClass(v.reasonCode, v.status)}>{ruleLabel(v.reasonCode, v.status, lang)}</span>
-                    <br />
-                    {v.message ?? v.messageEn ?? ""}
-                    {v.threshold && (
-                      <span className="muted small"> · {t("sim.rule.threshold", lang)} : {v.threshold.value}
-                        {v.threshold.nature === "team_assumption" ? ` (${t("app.teamAssumption", lang)})` : ""}
-                      </span>
-                    )}
-                  </td>
-                  <td style={{ textAlign: "right" }}>
-                    {citationsOf(v).map((c) => <EvidenceBadge key={c} ev={run.evidence.find((e) => e.id === c)} lang={lang} />)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div key={sc} className="rule-group">
+          <div className="rule-group-title">{groupTitle(sc)}</div>
+          <ul className="rule-list">
+            {list.map((v, i) => {
+              const message = v.message ?? v.messageEn ?? "";
+              const cites = citationsOf(v);
+              const details = message || v.threshold || cites.length ? (
+                <>
+                  {message && <p>{message}</p>}
+                  {v.threshold && (
+                    <p className="muted">{t("sim.rule.threshold", lang)} : {v.threshold.value}
+                      {v.threshold.nature === "team_assumption" ? ` (${t("app.teamAssumption", lang)})` : ""}
+                    </p>
+                  )}
+                  {cites.length > 0 && (
+                    <p className="rule-cites">
+                      <span className="muted">{t("sim.rule.citations", lang)} :</span>
+                      {cites.map((c) => <EvidenceBadge key={c} ev={run.evidence.find((e) => e.id === c)} lang={lang} />)}
+                    </p>
+                  )}
+                </>
+              ) : null;
+              return <RuleItem key={i} rule={v.rule} reasonCode={v.reasonCode} status={v.status} lang={lang}>{details}</RuleItem>;
+            })}
+          </ul>
         </div>
       ))}
     </>

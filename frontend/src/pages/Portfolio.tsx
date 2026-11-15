@@ -10,8 +10,7 @@ import { assetClassName } from "../lib/assetClasses";
 import { t as tr, useT } from "../lib/i18n";
 import RiskForm from "../components/RiskForm";
 import { amount, colon, localeDateTime, money, pct, plainPct, shortDate, signedAmount, toSeconds } from "../lib/format";
-import { profileFromAnswers, saveRisk } from "../lib/risk";
-import type { IndustryChoice } from "../lib/industries";
+import { profileFromAnswers, saveRisk, type ProfileChoices } from "../lib/risk";
 import { useApp } from "../lib/store";
 import { TickerLabel } from "../components/TickerLogo";
 
@@ -96,12 +95,12 @@ export default function PortfolioPage() {
   async function createPortfolio(
     answers: Record<string, number>,
     province: Jurisdiction,
-    industries: IndustryChoice,
+    choices: ProfileChoices,
   ) {
     if (!user) return;
     setOnboardingBusy(true); setOnboardingError("");
     try {
-      await saveProfile(profileFromAnswers(answers, province, industries));
+      await saveProfile(profileFromAnswers(answers, province, choices));
       // Le contrat crée le portefeuille principal au prochain GET /portfolios.
       saveRisk(user.userId, ["main"], answers, province);
       setProfileReady(true);
@@ -194,7 +193,7 @@ export default function PortfolioPage() {
               </p>
             </header>
             <RiskForm
-              showIndustries
+              showPreferences
               busy={onboardingBusy}
               submitLabel={onboardingBusy ? L("Création…", "Creating…") : L("Créer mon portefeuille", "Create my portfolio")}
               onSubmit={createPortfolio}
@@ -240,8 +239,8 @@ export default function PortfolioPage() {
               {chart
                 ? <Chart key={range} values={chart.values} timestamps={chart.timestamps} axisLabel={(ts) => shortDate(ts, range === "1y" || range === "5y")} format={(v) => amount(v, cur)} />
                 : <div className="chart-empty"><p>{L("Pas assez de points pour tracer la performance.", "Not enough points to plot performance.")}</p></div>}
-              <p className="muted small chart-note">{tr("chart.adjusted", lang)}</p>
             </section>
+            <p className="muted small chart-note">{tr("chart.adjusted", lang)}</p>
             <section className="stats">
               <div className="stat"><div className="stat-label">{L("Valeur investie (coût)", "Amount invested (cost)")}</div><div className="stat-value filled">{amount(summary.totals.cost, cur, 0)}</div></div>
               <div className="stat"><div className="stat-label">{L("Gain / perte", "Gain / loss")}</div><div className={`stat-value filled ${summary.totals.pnl >= 0 ? "up" : "down"}`}>{signedAmount(summary.totals.pnl, cur)}</div><div className="stat-sub">{pct(summary.totals.pnlPct)}</div></div>

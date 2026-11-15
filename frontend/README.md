@@ -85,6 +85,13 @@ Fichiers : `src/lib/risk.ts`, `src/components/RiskForm.tsx`.
 
 **Score** = somme des points, de 5 (minimum) à 25 (maximum).
 
+Questions hors score : province (obligatoire), puis, à la création du portefeuille seulement, critères ESG
+(oui ou non, obligatoire), marché géographique (Canada, États-Unis ou les deux, obligatoire) et industries
+(facultatif). Ces trois dernières vont dans `preferences` du profil, sans nouveau champ de contrat :
+« ESG » (seulement si oui), « Marché géographique : Canada », « Marché géographique : États-Unis »,
+« Industrie : … », « Industrie à éviter : … » (`src/lib/esgMarket.ts`, `src/lib/industries.ts`).
+Elles se modifient ensuite dans « Modifier mon profil ».
+
 **Premier calcul** :
 
 ```

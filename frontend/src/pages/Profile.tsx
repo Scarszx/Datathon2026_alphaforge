@@ -14,6 +14,7 @@ import { assetClassName } from "../lib/assetClasses";
 import { t, useT } from "../lib/i18n";
 import IndustryPicker from "../components/IndustryPicker";
 import { industryName, industryPrefs, splitPreferences, type IndustryChoice } from "../lib/industries";
+import { ESG_ANSWERS, MARKETS, esgMarketPrefs, marketName, splitEsgMarket, toggleMarket, type Market } from "../lib/esgMarket";
 import { useApp } from "../lib/store";
 import { cad, localeDateTime, pct, plainPct, todayLong } from "../lib/format";
 
@@ -188,8 +189,11 @@ export default function Profile() {
   const [objective, setObjective] = useState(p?.objective ?? "");
   const [constraints, setConstraints] = useState((p?.constraints ?? []).join("\n"));
   const initialPrefs = splitPreferences(p?.preferences);
+  const initialEsgMarket = splitEsgMarket(initialPrefs.others);
   const [industries, setIndustries] = useState<IndustryChoice>({ liked: initialPrefs.liked, avoided: initialPrefs.avoided });
-  const [preferences, setPreferences] = useState(initialPrefs.others.join("\n"));
+  const [esg, setEsg] = useState(initialEsgMarket.esg);
+  const [markets, setMarkets] = useState<Market[]>(initialEsgMarket.markets);
+  const [preferences, setPreferences] = useState(initialEsgMarket.others.join("\n"));
   const [excluded, setExcluded] = useState<string[]>(p?.excludedAssetClasses ?? []);
   const [err, setErr] = useState("");
   const [saved, setSaved] = useState(false);
@@ -209,13 +213,15 @@ export default function Profile() {
       riskTolerance: tol, riskCapacity: cap, // v0.4.6 : une seule échelle 1 à 5 ; riskLevel n'est plus envoyé
       ...(province ? { province } : {}),
       horizonMinYears: min, ...(max !== undefined ? { horizonMaxYears: max } : {}),
-      objective: objective.trim(), constraints: lines(constraints), preferences: [...lines(preferences), ...industryPrefs(industries)], excludedAssetClasses: excluded,
+      objective: objective.trim(), constraints: lines(constraints),
+      preferences: [...lines(preferences), ...esgMarketPrefs({ esg, markets }), ...industryPrefs(industries)], excludedAssetClasses: excluded,
     };
     setErr(""); setBusy(true);
     try { await saveProfile(body); setSaved(true); setEditing(false); } catch (x) { setErr(errorText(x)); } finally { setBusy(false); }
   }
   const retained = p?.riskTolerance != null && p?.riskCapacity != null ? retainedLevel(p.riskTolerance, p.riskCapacity) : null;
   const prefs = splitPreferences(p?.preferences);
+  const esgMarket = splitEsgMarket(prefs.others);
   const name = (user?.displayName ?? user?.username ?? "").split(" ")[0];
   const today = todayLong();
   return (
@@ -287,9 +293,16 @@ export default function Profile() {
               <Chips items={p.constraints ?? []} empty={L("Aucune contrainte.", "No constraints.")} />
               <div className="muted small" style={{ marginTop: 12 }}>{L("Classes d'actifs exclues", "Excluded asset classes")}</div>
               <Chips items={(p.excludedAssetClasses ?? []).map((c) => assetClassName(c, lang))} tone="avoid" empty={L("Aucune exclusion.", "No exclusions.")} />
-              {prefs.others.length > 0 && (<><div className="muted small" style={{ marginTop: 12 }}>{L("Autres préférences", "Other preferences")}</div><Chips items={prefs.others} empty="" /></>)}
+              {esgMarket.others.length > 0 && (<><div className="muted small" style={{ marginTop: 12 }}>{L("Autres préférences", "Other preferences")}</div><Chips items={esgMarket.others} empty="" /></>)}
             </div>
 
+            <div className="dcard">
+              <div className="dcard-head"><div><div className="dcard-title">🌎 {L("ESG et marché géographique", "ESG and geographic market")}</div><div className="muted small">{L("Vos préférences d'investissement", "Your investment preferences")}</div></div></div>
+              <div className="muted small">{L("Critères ESG", "ESG criteria")}</div>
+              <div className="dcard-value sm">{esgMarket.esg ? L("Pris en compte (règle R8)", "Taken into account (rule R8)") : L("Non pris en compte", "Not taken into account")}</div>
+              <div className="muted small" style={{ marginTop: 14 }}>{L("Marché géographique", "Geographic market")}</div>
+              <Chips items={esgMarket.markets.map((m) => marketName(m, lang))} empty={L("Aucun marché choisi. Ajoutez-en dans « Modifier mon profil ».", "No market chosen. Add some in “Edit my profile”.")} />
+            </div>
             <div className="dcard span-half">
               <div className="dcard-head"><div><div className="dcard-title">👍 {L("Ce que j'aime", "What I like")}</div><div className="muted small">{L("Industries qui vous intéressent", "Industries that interest you")}</div></div></div>
               <Chips items={prefs.liked.map((x) => industryName(x, lang))} tone="like" empty={L("Aucune industrie choisie. Ajoutez-en dans « Modifier mon profil ».", "No industry chosen. Add some in “Edit my profile”.")} />
@@ -327,10 +340,28 @@ export default function Profile() {
                 <div className="field"><label htmlFor="hmax">{L("Horizon maximum (facultatif)", "Maximum horizon (optional)")}</label><input id="hmax" inputMode="numeric" value={hMax} onChange={(e) => setHMax(e.target.value)} /></div>
               </div>
               <div className="field"><label htmlFor="obj">{L("Objectif", "Objective")}</label><input id="obj" placeholder={L("ex. croissance à long terme", "e.g. long-term growth")} value={objective} onChange={(e) => setObjective(e.target.value)} /></div>
+              <div className="row2">
+                <div className="field"><label id="esg-label">{L("Critères ESG dans vos simulations", "ESG criteria in your simulations")}</label>
+                  <div className="opts" role="radiogroup" aria-labelledby="esg-label">
+                    {ESG_ANSWERS.map((o) => (
+                      <label key={o.label} className={`opt${esg === o.value ? " on" : ""}`}>
+                        <input type="radio" name="profile-esg" checked={esg === o.value} onChange={() => setEsg(o.value)} />{lang === "en" ? o.en : o.label}
+                      </label>
+                    ))}
+                  </div></div>
+                <div className="field"><label id="market-label">{L("Marché géographique (plusieurs choix possibles)", "Geographic market (several choices possible)")}</label>
+                  <div className="opts" role="group" aria-labelledby="market-label">
+                    {MARKETS.map((m) => (
+                      <label key={m} className={`opt${markets.includes(m) ? " on" : ""}`}>
+                        <input type="checkbox" checked={markets.includes(m)} onChange={() => setMarkets(toggleMarket(markets, m))} />{marketName(m, lang)}
+                      </label>
+                    ))}
+                  </div></div>
+              </div>
               <div className="field"><label>{L("Industries", "Industries")}</label><IndustryPicker value={industries} onChange={setIndustries} /></div>
               <div className="field"><label>{L("Classes d'actifs exclues (plusieurs choix possibles)", "Excluded asset classes (several choices possible)")}</label><AssetClassPicker value={excluded} onChange={setExcluded} /></div>
               <div className="field"><label htmlFor="con">{L("Contraintes (une par ligne)", "Constraints (one per line)")}</label><textarea id="con" rows={3} placeholder={L("ex. diversification minimale", "e.g. minimum diversification")} value={constraints} onChange={(e) => setConstraints(e.target.value)} /></div>
-              <div className="field"><label htmlFor="pre">{L("Autres préférences (une par ligne)", "Other preferences (one per line)")}</label><textarea id="pre" rows={2} placeholder={L("ex. ESG", "e.g. ESG")} value={preferences} onChange={(e) => setPreferences(e.target.value)} /></div>
+              <div className="field"><label htmlFor="pre">{L("Autres préférences (une par ligne)", "Other preferences (one per line)")}</label><textarea id="pre" rows={2} placeholder={L("ex. éviter la spéculation", "e.g. avoid speculation")} value={preferences} onChange={(e) => setPreferences(e.target.value)} /></div>
               {err && <p className="error" role="alert">{err}</p>}
               <div><button className="btn" disabled={busy}>{busy ? L("Enregistrement…", "Saving…") : L("Enregistrer", "Save")}</button></div>
             </form>
