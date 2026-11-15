@@ -1,5 +1,5 @@
 variable "aws_region" {
-  description = "Région AWS du déploiement (contrat : A_CONFIRMER ; le compte d'atelier est ici)."
+  description = "Région AWS du déploiement (contrat v0.4.0 : us-east-1, toutes les ressources y restent)."
   type        = string
   default     = "us-east-1"
 }
@@ -22,16 +22,34 @@ variable "model_orchestrator" {
   default     = "global.anthropic.claude-sonnet-5-5"
 }
 
-variable "model_analyst" {
-  description = "Profil d'inférence Bedrock de l'analyste (agent-analyst)."
+variable "model_auditor" {
+  description = "Profil d'inférence Bedrock de l'auditeur (agent-auditor, section agents du contrat v0.4.0)."
   type        = string
   default     = "global.anthropic.claude-sonnet-5-5"
 }
 
-variable "model_governance" {
-  description = "Profil d'inférence Bedrock de la gouvernance (agent-governance)."
+variable "model_writer" {
+  description = "Profil d'inférence Bedrock du rédacteur (agent-writer, section agents du contrat v0.4.0)."
   type        = string
   default     = "global.anthropic.claude-sonnet-5-5"
+}
+
+variable "kb_corpus_version" {
+  description = "Version du corpus réglementaire téléversé sous s3://<bucket>/kb/<version>/ (storage-kb-corpus). La source de données de la Knowledge Base n'indexe que ce préfixe."
+  type        = string
+  default     = "2026-11-14"
+}
+
+variable "embedding_model_id" {
+  description = "Modèle d'embeddings Bedrock de la Knowledge Base (disponible en us-east-1). Doit produire des vecteurs de var.embedding_dimensions dimensions."
+  type        = string
+  default     = "amazon.titan-embed-text-v2:0"
+}
+
+variable "embedding_dimensions" {
+  description = "Dimension des vecteurs (Titan Text Embeddings V2 : 256, 512 ou 1024). Identique pour le modèle et l'index S3 Vectors."
+  type        = number
+  default     = 1024
 }
 
 variable "cors_origins" {

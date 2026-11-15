@@ -14,7 +14,7 @@ output "cognito_user_pool_client_id" {
 }
 
 output "table_names" {
-  description = "Noms des tables DynamoDB (identiques à local.table_names)."
+  description = "Noms des tables DynamoDB, dont Analyses (identiques à local.table_names)."
   value       = local.table_names
 }
 
@@ -31,4 +31,34 @@ output "front_bucket" {
 output "front_url" {
   description = "URL publique du front (origine à ajouter au CORS si nécessaire)."
   value       = "https://${aws_cloudfront_distribution.front.domain_name}"
+}
+
+output "analyses_table" {
+  description = "Nom de la table Analyses (mandats et runs, variable ANALYSES_TABLE)."
+  value       = aws_dynamodb_table.analyses.name
+}
+
+output "kb_id" {
+  description = "Identifiant de la Knowledge Base réglementaire (variable KB_ID de la Lambda agents)."
+  value       = aws_bedrockagent_knowledge_base.regulation.id
+}
+
+output "kb_data_source_id" {
+  description = "Identifiant de la source de données S3 de la KB (pour start-ingestion-job, voir infra/scripts/kb_sync.sh)."
+  value       = aws_bedrockagent_data_source.corpus.data_source_id
+}
+
+output "kb_corpus_prefix" {
+  description = "Préfixe S3 du corpus indexé (kb/<version>/) dans le bucket dataset_bucket."
+  value       = local.kb_prefix
+}
+
+output "guardrail_id" {
+  description = "Identifiant du Guardrail Bedrock (variable GUARDRAIL_ID)."
+  value       = aws_bedrock_guardrail.this.guardrail_id
+}
+
+output "guardrail_version" {
+  description = "Version publiée du Guardrail (variable GUARDRAIL_VERSION)."
+  value       = aws_bedrock_guardrail_version.this.version
 }

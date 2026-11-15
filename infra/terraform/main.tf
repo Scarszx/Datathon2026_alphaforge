@@ -44,18 +44,20 @@ locals {
     conversations = "Conversations"
     messages      = "Messages"
     portfolios    = "Portfolios"
+    analyses      = "Analyses"
   }
 
   # Suffixe par compte : les noms de bucket sont globalement uniques.
   dataset_bucket = "${var.name_prefix}-dataset-${local.account_id}"
   front_bucket   = "${var.name_prefix}-front-${local.account_id}"
 
-  # Modèles Bedrock (section agents du contrat, model : A_CHOISIR).
+  # Modèles Bedrock des 3 agents LLM du contrat v0.4.0 (orchestrateur,
+  # auditeur, rédacteur ; Claude Sonnet 5.5 par défaut).
   # L'invocation bedrock-runtime exige un profil d'inférence : l'ID nu
   # (anthropic.claude-sonnet-5-5) est refusé en on-demand throughput.
   # Défaut : profil global (prix liste). Alternative : us.anthropic.claude-sonnet-5-5
   # (+10 %, routage limité aux régions US/Canada).
-  model_ids = distinct([var.model_orchestrator, var.model_analyst, var.model_governance])
+  model_ids = distinct([var.model_orchestrator, var.model_auditor, var.model_writer])
 
   # Modèle de fondation derrière chaque profil (préfixe de routage retiré).
   # Région "*" : le routage global peut viser n'importe quelle région du catalogue.
@@ -71,4 +73,10 @@ locals {
   cognito_issuer = "https://cognito-idp.${var.aws_region}.amazonaws.com/${aws_cognito_user_pool.pool.id}"
 
   dataset_prefix_arn = "arn:aws:s3:::${local.dataset_bucket}/dataset/*"
+
+  # storage-kb-corpus : même bucket que le jeu de données, préfixe kb/<version>/.
+  kb_prefix = "kb/${var.kb_corpus_version}/"
+
+  # Modèle d'embeddings de la KB (modèle de fondation, pas de profil d'inférence).
+  embedding_model_arn = "arn:aws:bedrock:${var.aws_region}::foundation-model/${var.embedding_model_id}"
 }
