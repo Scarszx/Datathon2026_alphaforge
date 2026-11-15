@@ -32,6 +32,20 @@ def test_r1(band, assets, expected):
     assert verdict["status"] == expected and verdict["threshold"] == {"value": 1, "nature": "text"}
 
 
+def test_r1_cite_la_volatilite_du_titre_qui_cause_le_verdict():
+    """Le FAIL vient du titre ajouté (bande 5), pas du portefeuille (bande 1) : la preuve citée doit être celle du titre."""
+    scenario = _scenario(portfolio_band=1, idea_assets=[{"ticker": "NVDA", "band": 5, "evidence": "EV-40"}], evidence={"volatility": "EV-16"})
+    verdict = rules.r1(_item(), scenario)
+    assert verdict["status"] == "fail" and verdict["reasonCode"] == "IDEA_EXCEEDS_RISK_PROFILE"
+    assert verdict["evidence"] == ["EV-40", "EV-16"]
+
+
+def test_r1_cite_le_portefeuille_quand_c_est_lui_qui_depasse():
+    scenario = _scenario(portfolio_band=3, idea_assets=[{"ticker": "XBB.TO", "band": 1, "evidence": "EV-41"}], evidence={"volatility": "EV-16"})
+    verdict = rules.r1(_item(), scenario)
+    assert verdict["reasonCode"] == "PORTFOLIO_EXCEEDS_RISK_PROFILE" and verdict["evidence"] == ["EV-16"]
+
+
 def test_r1_scenario_actuel_plafonne_a_warn():
     assert rules.r1(_item(), _scenario(0, portfolio_band=5))["status"] == "warn"
 

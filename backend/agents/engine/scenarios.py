@@ -368,8 +368,12 @@ def run_engine(
 
     subject = mandate.get("subjectTicker")
     idea_tickers = {a["ticker"] for s in scenarios for a in s.idea_assets}
+    asset_evidence: dict[str, dict[str, str]] = {}
     for ticker in sorted(idea_tickers | ({subject} if subject else set())):
-        _record_asset_metrics(store, registry, ticker, start, end)
+        asset_evidence[ticker] = _record_asset_metrics(store, registry, ticker, start, end)
+    for scenario in scenarios:
+        for asset in scenario.idea_assets:
+            asset["evidence"] = asset_evidence.get(asset["ticker"], {}).get("volatility")
 
     sources = [
         {"id": "prices_daily", "dataset": store.source_label("prices"), "asOf": end.date().isoformat(),
@@ -397,24 +401,26 @@ def _idea_assets(store: DataStore, operations: list[dict[str, Any]], start: pd.T
     return assets
 
 
-def _record_asset_metrics(store: DataStore, registry: EvidenceRegistry, ticker: str, start: pd.Timestamp, end: pd.Timestamp) -> None:
+def _record_asset_metrics(store: DataStore, registry: EvidenceRegistry, ticker: str, start: pd.Timestamp, end: pd.Timestamp) -> dict[str, str]:
+    """Inscrit la volatilité et la pire baisse d'un titre ; renvoie leurs identifiants EV-nn."""
     metrics = an.asset_metrics(store, ticker, start, end)
     if not metrics:
-        return
+        return {}
     currency = an.listing_currency(store, ticker)
     window = an.window_label(metrics["start"], metrics["end"])
     source = store.source_label(f"prices/{ticker}.parquet")
     root = "sqrt(365)" if metrics["periods"] == 365 else "sqrt(252)"
-    registry.add(
+    volatility_id = registry.add(
         kind="metric", label=f"Annualized volatility of {ticker} (listing currency)", value=metrics["volatility"],
         method=f"Standard deviation of daily returns x {root}, native calendar, adj_close.", window=window,
         currency=currency, source=source, caveats=PAST_CAVEATS, key=f"asset:{ticker}:volatility",
     )
-    registry.add(
+    drawdown_id = registry.add(
         kind="metric", label=f"Maximum drawdown of {ticker} (listing currency)", value=metrics["maxDrawdown"],
         method="Largest peak-to-trough decline of adj_close over the window, native calendar.", window=window,
         currency=currency, source=source, caveats=PAST_CAVEATS, key=f"asset:{ticker}:maxDrawdown",
     )
+    return {"volatility": volatility_id, "maxDrawdown": drawdown_id}
 
 
 def public_scenarios(result: EngineResult, verdicts_by_scenario: dict[int, str]) -> list[dict[str, Any]]:

@@ -84,6 +84,11 @@ def r1(mandate_item: dict[str, Any], scenario: ScenarioAnalysis) -> dict[str, An
     excess_assets = max((a["band"] - profile for a in scenario.idea_assets if a["band"]), default=0)
     excess = max(excess_portfolio, excess_assets)
     evidence = _ev(scenario, "volatility")
+    if scenario.index and excess_assets > 0 and excess_assets >= excess_portfolio:
+        # Le verdict vient de la volatilité du titre de l'idée, pas de celle du portefeuille :
+        # on cite d'abord la preuve du titre (celle qui fonde le verdict), puis celle du portefeuille.
+        driving = [a["evidence"] for a in scenario.idea_assets if a["band"] and a["band"] - profile == excess_assets and a.get("evidence")]
+        evidence = driving + evidence
     if scenario.index == 0:
         status = "warn" if excess >= 2 else "pass"
     else:
