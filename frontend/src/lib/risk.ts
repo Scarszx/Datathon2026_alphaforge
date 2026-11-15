@@ -7,17 +7,25 @@
 import { EMPTY_INDUSTRIES, industryPrefs, type IndustryChoice } from "./industries";
 import type { InvestorProfile, Jurisdiction } from "../api/types";
 
-export type Question = { id: string; label: string; options: string[] }; // options[i] vaut i + 1 point
+export type Question = { id: string; label: string; options: string[]; labelEn: string; optionsEn: string[] }; // options[i] vaut i + 1 point
+type Lang = "fr" | "en";
+/** Libellé et options d'une question dans la langue d'affichage (la valeur enregistrée reste l'index). */
+export const qLabel = (q: Question, lang: Lang) => (lang === "en" ? q.labelEn : q.label);
+export const qOptions = (q: Question, lang: Lang) => (lang === "en" ? q.optionsEn : q.options);
 
 export const QUESTIONS: Question[] = [
   { id: "horizon", label: "Horizon d'investissement",
-    options: ["Moins de 2 ans", "2 à 5 ans", "5 à 10 ans", "10 à 20 ans", "Plus de 20 ans"] },
+    options: ["Moins de 2 ans", "2 à 5 ans", "5 à 10 ans", "10 à 20 ans", "Plus de 20 ans"],
+    labelEn: "Investment horizon", optionsEn: ["Less than 2 years", "2 to 5 years", "5 to 10 years", "10 to 20 years", "More than 20 years"] },
   { id: "maxLoss", label: "Perte maximale acceptable sur un an",
-    options: ["5 %", "10 %", "20 %", "30 %", "40 % ou plus"] },
+    options: ["5 %", "10 %", "20 %", "30 %", "40 % ou plus"],
+    labelEn: "Maximum acceptable loss over one year", optionsEn: ["5%", "10%", "20%", "30%", "40% or more"] },
   { id: "reaction", label: "Si votre portefeuille perd 20 %, que faites-vous ?",
-    options: ["Je vends tout", "Je vends une partie", "J'attends sans rien changer", "Je conserve et je rééquilibre", "J'investis davantage"] },
+    options: ["Je vends tout", "Je vends une partie", "J'attends sans rien changer", "Je conserve et je rééquilibre", "J'investis davantage"],
+    labelEn: "If your portfolio loses 20%, what do you do?", optionsEn: ["I sell everything", "I sell part of it", "I wait and change nothing", "I hold and rebalance", "I invest more"] },
   { id: "goal", label: "Objectif financier principal",
-    options: ["Préserver mon capital", "Obtenir un revenu stable", "Croissance modérée", "Croissance à long terme", "Maximiser la croissance"] },
+    options: ["Préserver mon capital", "Obtenir un revenu stable", "Croissance modérée", "Croissance à long terme", "Maximiser la croissance"],
+    labelEn: "Main financial goal", optionsEn: ["Preserve my capital", "Earn a steady income", "Moderate growth", "Long-term growth", "Maximise growth"] },
   { id: "capacity", label: "Capacité financière à absorber une perte",
     options: [
       "Très faible : mes dépenses essentielles seraient touchées",
@@ -25,6 +33,14 @@ export const QUESTIONS: Question[] = [
       "Moyenne : je pourrais absorber une perte limitée",
       "Élevée : peu d'impact sur mes projets",
       "Très élevée : aucun impact significatif sur mes finances",
+    ],
+    labelEn: "Financial capacity to absorb a loss",
+    optionsEn: [
+      "Very low: my essential expenses would be affected",
+      "Low: I would have to change my plans",
+      "Medium: I could absorb a limited loss",
+      "High: little impact on my plans",
+      "Very high: no significant impact on my finances",
     ] },
 ];
 
@@ -32,13 +48,16 @@ export const SCORE_MIN = QUESTIONS.length;     // 5
 export const SCORE_MAX = QUESTIONS.length * 5; // 25
 
 /* Provinces reconnues par le contrat (conventions.jurisdictions), sans CA (textes nationaux, pas une province). */
-export const PROVINCES: { code: Jurisdiction; label: string }[] = [
-  { code: "QC", label: "Québec" }, { code: "ON", label: "Ontario" }, { code: "BC", label: "Colombie-Britannique" },
-  { code: "AB", label: "Alberta" }, { code: "SK", label: "Saskatchewan" }, { code: "MB", label: "Manitoba" },
-  { code: "NB", label: "Nouveau-Brunswick" }, { code: "NS", label: "Nouvelle-Écosse" },
-  { code: "PE", label: "Île-du-Prince-Édouard" }, { code: "NL", label: "Terre-Neuve-et-Labrador" },
-  { code: "YT", label: "Yukon" }, { code: "NT", label: "Territoires du Nord-Ouest" }, { code: "NU", label: "Nunavut" },
+export const PROVINCES: { code: Jurisdiction; label: string; en: string }[] = [
+  { code: "QC", label: "Québec", en: "Quebec" }, { code: "ON", label: "Ontario", en: "Ontario" }, { code: "BC", label: "Colombie-Britannique", en: "British Columbia" },
+  { code: "AB", label: "Alberta", en: "Alberta" }, { code: "SK", label: "Saskatchewan", en: "Saskatchewan" }, { code: "MB", label: "Manitoba", en: "Manitoba" },
+  { code: "NB", label: "Nouveau-Brunswick", en: "New Brunswick" }, { code: "NS", label: "Nouvelle-Écosse", en: "Nova Scotia" },
+  { code: "PE", label: "Île-du-Prince-Édouard", en: "Prince Edward Island" }, { code: "NL", label: "Terre-Neuve-et-Labrador", en: "Newfoundland and Labrador" },
+  { code: "YT", label: "Yukon", en: "Yukon" }, { code: "NT", label: "Territoires du Nord-Ouest", en: "Northwest Territories" }, { code: "NU", label: "Nunavut", en: "Nunavut" },
 ];
+
+/** Nom d'une province dans la langue d'affichage. */
+export const provinceName = (code: Jurisdiction, lang: Lang) => PROVINCES.find((p) => p.code === code)?.[lang === "en" ? "en" : "label"] ?? code;
 
 export const PROVINCE_LABELS: Record<Jurisdiction, string> =
   Object.fromEntries(PROVINCES.map((p) => [p.code, p.label])) as Record<Jurisdiction, string>;

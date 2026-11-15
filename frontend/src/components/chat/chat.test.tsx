@@ -223,7 +223,7 @@ describe("MandateCard (carte de mandat)", () => {
     render(<MandateCard mandate={DRAFT} confirmed={CONFIRMED} lang="fr" />);
     expect(screen.getByText(/Version 2/)).toBeTruthy();
     expect(screen.getAllByText(/20 %/).length).toBeGreaterThan(0);             // effectiveMaxLossPct
-    expect(screen.getByText(/Profil retenu \(R1\) : 3/)).toBeTruthy();
+    expect(screen.getByText(/Profil retenu \(R1\) : Équilibré/)).toBeTruthy();
     // Traduit selon le code, avec les paramètres du serveur ; jamais le message anglais quand le code est connu.
     expect(screen.getByText(/La perte maximale acceptée \(30 %\) dépasse le défaut d'équipe \(20 %\)/)).toBeTruthy();
     expect(screen.queryByText(/Maximum acceptable loss/)).toBeNull();
@@ -270,7 +270,7 @@ describe("Portefeuille construit (mode build)", () => {
     expect(items[0].textContent).toContain("1,21");
     expect(items[0].textContent).toContain("9,8 %");
     expect(items[2].textContent).toContain("A = 4");
-    expect(items[2].textContent).toContain("profil de risque 3");
+    expect(items[2].textContent).toContain("votre profil : Équilibré");
     expect(items[3].textContent).toContain("Medical Devices");
     expect(container.querySelector(".alloc-row")).toBeNull();
     expect(screen.getAllByText("Portefeuille construit").length).toBeGreaterThan(0);

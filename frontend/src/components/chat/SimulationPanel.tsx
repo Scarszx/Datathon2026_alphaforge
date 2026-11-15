@@ -5,6 +5,7 @@
 import { useState } from "react";
 import type { RuleVerdict, Run, Scenario } from "../../api/types";
 import { t, type Lang } from "../../lib/i18n";
+import { levelName } from "../../lib/riskScale";
 import { ruleBadgeClass, ruleLabel, scenarioRuleSummary } from "../../lib/ruleLabels";
 import Provenance from "./Provenance";
 import SummaryCards from "./SummaryCards";
@@ -75,7 +76,7 @@ function BuiltPortfolio({ run, s, lang }: { run: Run; s: Scenario; lang: Lang })
           .map((x) => (typeof x === "string" ? x : x.minWeight ? `${x.industry} (${t("mandate.minWeight", lang)} ${Math.round(x.minWeight * 100)} %)` : x.industry))
           .join(", ")
       : p.value;
-    return fmt(t(`sim.built.${p.key}`, lang), { value, riskProfile: p.riskProfile });
+    return fmt(t(`sim.built.${p.key}`, lang), { value, riskProfile: p.riskProfile != null ? levelName(Number(p.riskProfile), lang) : undefined });
   };
   return (
     <>
