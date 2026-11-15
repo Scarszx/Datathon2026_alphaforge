@@ -40,6 +40,12 @@ variable "kb_corpus_version" {
   default     = "2026-11-14"
 }
 
+variable "kb_citable_corpus_version" {
+  description = "Version du corpus par section (métadonnée citable) réellement ingérée dans la Knowledge Base, ex. 2026-11-15. Vide tant que l'ancien corpus est en place : le code n'applique alors ni le filtre citable strict ni les citations fixées de R5 et R9. À renseigner dans le même apply que kb_corpus_version, après l'ingestion."
+  type        = string
+  default     = ""
+}
+
 variable "embedding_model_id" {
   description = "Modèle d'embeddings Bedrock de la Knowledge Base (disponible en us-east-1). Doit produire des vecteurs de var.embedding_dimensions dimensions."
   type        = string

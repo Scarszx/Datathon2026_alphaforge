@@ -30,6 +30,7 @@ locals {
     MODEL_AUDITOR         = var.model_auditor
     MODEL_WRITER          = var.model_writer
     KB_ID                 = aws_bedrockagent_knowledge_base.regulation.id
+    KB_CORPUS_VERSION     = var.kb_citable_corpus_version
     GUARDRAIL_ID          = aws_bedrock_guardrail.this.guardrail_id
     GUARDRAIL_VERSION     = aws_bedrock_guardrail_version.this.version
     LANGFUSE_PUBLIC_KEY   = var.langfuse_public_key

@@ -103,6 +103,51 @@
       "must_contain": [
         "has not yet been proclaimed into force"
       ]
+    },
+    "QC_AMF_financial-planner-title": {
+      "drop_line_regex": [
+        "^Source: https?://",
+        "^Retrieved \\d{4}-"
+      ]
+    },
+    "QC_NBDB_tips-better-investment-decisions": {
+      "drop_line_regex": [
+        "^Source: https?://",
+        "^Retrieved \\d{4}-"
+      ]
+    }
+  },
+  "fixed_citations": {
+    "_comment": "Sections que le code attache lui-même (E2) : R5 (outil d'aide à la décision) et R9 (titres protégés de la province). Elles ne dépendent pas du scénario ; elles s'affichent à côté des mentions, jamais sous une règle non déclenchée. Une section est choisie par section ou, sans numérotation, par ordre.",
+    "R5": [
+      {
+        "doc_id": "CA_CIRO_GN-3200-26-001",
+        "section": "2.1.1"
+      },
+      {
+        "doc_id": "CA_CIRO_GN-3200-26-001",
+        "section": "3.3"
+      }
+    ],
+    "R9": {
+      "QC": [
+        {
+          "doc_id": "QC_AMF_financial-planner-title",
+          "order": 1
+        }
+      ],
+      "ON": [
+        {
+          "doc_id": "ON_FSRA_rule-2020-001",
+          "order": 1
+        }
+      ],
+      "SK": [
+        {
+          "doc_id": "SK_FCAA_FPFA-proposed-regulations-notice",
+          "order": 1
+        }
+      ]
     }
   }
 }
