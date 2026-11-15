@@ -6,6 +6,77 @@
 
 ---
 
+## Installation et démarrage rapide
+
+### Démo locale sans AWS
+
+Prérequis : **Node.js 18 ou plus récent**.
+
+```bash
+cd frontend
+npm install
+npm run dev:demo
+```
+
+Ouvrir <http://localhost:5173>, puis se connecter avec `demo` / `demo1234`.
+Ce mode simule le backend dans le navigateur avec des prix fictifs : il permet
+de parcourir l'interface, mais ne reproduit pas les calculs ni les services AWS.
+
+### Dépendances principales
+
+| Composant | Dépendances |
+|---|---|
+| Frontend | React 18, React Router, Vite, TypeScript, Vitest |
+| Backend et ingestion | Python 3.12, pandas, PyArrow, NumPy, yfinance, PyYAML |
+| Agents | Strands Agents SDK, boto3, OpenTelemetry, quadprog |
+| Tests | pytest, moto, SciPy et scikit-learn |
+| Infrastructure | Terraform >= 1.5, fournisseur AWS 6.x |
+| Services cloud | Amazon Cognito, API Gateway, Lambda, DynamoDB, S3, CloudFront, Bedrock et CloudWatch |
+
+Les versions et dépendances complètes sont définies dans
+[`requirements-dev.txt`](requirements-dev.txt), les fichiers
+`requirements.txt` des sous-projets et
+[`frontend/package.json`](frontend/package.json).
+
+### Sources de données
+
+| Source | Utilisation |
+|---|---|
+| Yahoo Finance via `yfinance` | Prix ajustés, dividendes, fractionnements et métadonnées des actifs |
+| Banque du Canada — API Valet | Taux USD/CAD, taux directeurs, obligations et IPC canadien |
+| FRED | Taux, obligations, IPC et chômage américains |
+| Fiches publiques des émetteurs de FNB | Composition, secteurs, pays, principales positions et frais |
+| Corpus réglementaire de [`docs/for_KB/`](docs/for_KB/) | Textes de l'ACVM, de l'OCRI, de l'AMF, de la FSRA et de la FCAA |
+
+Les traitements, versions, conditions d'utilisation et limites sont détaillés
+dans [`data/README.md`](data/README.md).
+
+### Configuration
+
+- **Frontend :** créer `frontend/.env` à partir de `frontend/.env.example`,
+  avec `VITE_API_BASE_URL`, `VITE_COGNITO_REGION` et
+  `VITE_COGNITO_CLIENT_ID`.
+- **Infrastructure :** copier
+  `infra/terraform/terraform.tfvars.example` vers
+  `infra/terraform/terraform.tfvars`, puis renseigner au minimum
+  `dataset_version` et `pandas_layer_arn`.
+- **AWS local :** utiliser `.aws-local/` et charger les identifiants avec
+  `source scripts/aws-env.sh`. Les secrets et fichiers `.env` ne doivent
+  jamais être commités.
+
+Pour reproduire le déploiement complet, suivre la section
+[`Reproduire le projet complet`](#reproduire-le-projet-complet).
+
+## Architecture AWS
+
+![Architecture AWS AlphaForge](docs/alphaforge-infra.png)
+
+Le schéma présente le frontend hébergé sur S3/CloudFront, l'API Gateway,
+les Lambdas, DynamoDB, le jeu de données, Bedrock, la Knowledge Base,
+les Guardrails et CloudWatch.
+
+---
+
 ## En bref
 
 Sur une plateforme de courtage autonome, l'investisseur voit ce qu'il possède, mais il est seul au moment de tester une idée. AlphaForge lui ouvre une session de simulation :
