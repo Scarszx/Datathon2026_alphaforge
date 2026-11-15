@@ -110,7 +110,7 @@ CASES: dict[str, dict] = {
         "expect": {"profile": 3},
         "then": {"message": "Refais-le sans banques ni assurance, avec une tolérance de 4 et une capacité de 4.",
                  "followups": ["Oui, propose le mandat."],
-                 "expect": {"profile": 4, "version": 2}},
+                 "expect": {"profile": 4, "version": 2, "excluded_any": ["Banks - Diversified", "Banks - Regional", "Insurance - Life", "Insurance - Diversified"]}},
     },
     "robert-regression-add-nvda": {
         "persona": "robert", "mode": "add_asset",
@@ -252,9 +252,11 @@ def check_draft(spec: dict, draft: dict | None, check) -> bool:
             check(f"minimum {minimum}% in {industry}", preferred.get(industry) == minimum, str(preferred))
         for industry in expect.get("preferred", []):
             check(f"preferred industry {industry}", industry in preferred, str(preferred))
+        if expect.get("excluded_any"):
+            check("at least one expected excluded industry", bool(set(expect["excluded_any"]) & excluded), str(sorted(excluded)))
         if expect.get("preferred_any"):
             check("at least one expected preferred industry", bool(set(expect["preferred_any"]) & set(preferred)), str(preferred))
-        if not any(expect.get(k) for k in ("excluded", "minimums", "preferred", "preferred_any", "no_esg_claim")):
+        if not any(expect.get(k) for k in ("excluded", "excluded_any", "minimums", "preferred", "preferred_any", "no_esg_claim")):
             check("no invented exclusion", not excluded, str(sorted(excluded)))
         check("excluded and preferred do not overlap", not (excluded & set(preferred)), str(excluded & set(preferred)))
     return True
