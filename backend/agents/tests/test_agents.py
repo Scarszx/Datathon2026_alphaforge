@@ -115,12 +115,11 @@ VERDICTS = [
 ]
 
 
-def test_auditeur_cite_seulement_les_passages_renvoyes(ctx, scripts):
+def test_auditeur_cite_seulement_les_passages_des_candidats(ctx, scripts):
     ctx.clients["kb"] = FakeKb([_kb_result()])
     registry = EvidenceRegistry("fr", [{"id": "EV-01", "kind": "metric", "label": "v", "source": "s"}])
     ctx.evidence = registry.items
     scripts.add("agent-auditor",
-                call("search_regulation", query="risk profile lower of tolerance and capacity", subjects=["profil_risque"]),
                 output("AuditReport", items=[
                     {"key": "R1:fail", "passage_refs": ["P1", "P99"], "message_en": "The idea implies a higher risk profile than the retained one."},
                     {"key": "R6:warn", "passage_refs": [], "message_en": "Concentration above 10% is a team assumption."},
@@ -129,58 +128,85 @@ def test_auditeur_cite_seulement_les_passages_renvoyes(ctx, scripts):
     enriched = auditor.audit(ctx, VERDICTS, registry)
     r1_fail, r1_pass, r6 = enriched
     assert r1_fail["citations"] == ["KB-01"] and r1_fail["messageEn"].startswith("The idea implies")
-    kb = registry.get("KB-01")
-    assert kb["kind"] == "regulation" and kb["jurisdiction"] == "CA" and "lower of risk tolerance" in kb["excerpt"]
+    kb_item = registry.get("KB-01")
+    assert kb_item["kind"] == "regulation" and kb_item["jurisdiction"] == "CA" and "lower of risk tolerance" in kb_item["excerpt"]
     assert r1_pass["citations"] == [] and r1_pass["messageEn"] == "Default R1 pass."
     assert r6["messageEn"] == "Default R6."  # un chiffre dans le motif : phrase par défaut
     assert [i["id"] for i in registry.items if i["kind"] == "regulation"] == ["KB-01"]
+    assert scripts.models["agent-auditor"][0].calls[0]["tools"] == ["AuditReport"]  # le modèle ne cherche plus
 
 
-def test_plafond_d_appels_d_outils_de_l_auditeur(ctx, scripts):
+def test_le_code_lance_une_recherche_par_sujet_de_la_regle(ctx, scripts):
+    """R1 : profil_risque et convenance, une recherche chacun, phrase = titre de la règle + motif calculé."""
+    from backend.agents.rules.rules import RULE_SUBJECTS, RULE_TOPICS
+
     ctx.clients["kb"] = FakeKb([_kb_result()])
-    searches = [call("search_regulation", query=f"query {i}", subjects=["profil_risque"]) for i in range(17)]
-    scripts.add("agent-auditor", *searches, output("AuditReport", items=[]))
+    scripts.add("agent-auditor", output("AuditReport", items=[]))
     auditor.audit(ctx, VERDICTS, EvidenceRegistry("en"))
-    assert len([c for c in ctx.tool_calls if c["tool"] == "search_regulation"]) == 16
-    assert len(ctx.clients["kb"].calls) == 16
+    searches = [c for c in ctx.tool_calls if c["tool"] == "search_regulation"]
+    by_subject = {tuple(c["params"]["subjects"]): c["params"]["query"] for c in searches}
+    # R1 (fail + pass) et R6 (warn) : 2 + 1 recherches, un sujet chacune, exactement ceux de la règle.
+    assert sorted(by_subject) == [("convenance",), ("profil_risque",)]
+    assert len(searches) == len(RULE_SUBJECTS["R1"]) + len(RULE_SUBJECTS["R6"]) == 3
+    r1_query = next(c["params"]["query"] for c in searches if c["params"]["subjects"] == ["profil_risque"])
+    assert r1_query.startswith(RULE_TOPICS["R1"]) and "Default R1." in r1_query  # motif du verdict le plus grave
+    r6_query = next(c["params"]["query"] for c in searches if c["params"]["query"].startswith(RULE_TOPICS["R6"]))
+    assert "Default R6." in r6_query
+    for kb_call in ctx.clients["kb"].calls:
+        flt = kb_call["retrievalConfiguration"]["vectorSearchConfiguration"]["filter"]
+        assert flt["andAll"][1]["listContains"]["key"] == "sujets"  # un seul sujet par recherche, jamais orAll
+
+
+def test_r5_une_recherche_par_sujet_et_cinq_extraits_differents(ctx, scripts):
+    verdicts = [{"rule": "R5", "scenario": 1, "status": "pass", "reasonCode": "NO_SECURITY_RECOMMENDED", "evidence": [],
+                 "citations": [], "messageEn": "No security is recommended."}]
+    results = [_kb_result(f"Passage number {i} about order execution only services.") for i in range(3)]
+    ctx.clients["kb"] = FakeKb(results + results)  # chaque sujet renvoie les mêmes passages
+    scripts.add("agent-auditor", output("AuditReport", items=[{"key": "R5:pass", "passage_refs": ["P1"], "message_en": "Regulators agree."}]))
+    enriched = auditor.audit(ctx, verdicts, EvidenceRegistry("en"))
+    searches = [c for c in ctx.tool_calls if c["tool"] == "search_regulation"]
+    assert sorted(c["params"]["subjects"][0] for c in searches) == ["aide_decision", "oeo", "recommandation"]
+    prompt = scripts.models["agent-auditor"][0].calls[0]["messages"][-1]["content"][0]["text"]
+    group = json.loads(prompt.split("<verdict_groups>\n", 1)[1].split("\n</verdict_groups>", 1)[0])[0]
+    excerpts = [p["excerpt"] for p in group["passages"]]
+    assert len(excerpts) == len(set(excerpts)) == 3  # 3 sujets × les mêmes 3 passages : jamais deux fois le même extrait
+    # Un pass garde sa phrase : le modèle ne peut pas écrire « Regulators agree » à côté de l'extrait.
+    assert enriched[0]["messageEn"] == "No security is recommended." and len(enriched[0]["citations"]) == 1
+
+
+def test_un_passage_sans_juridiction_ou_hors_mandat_est_jete(ctx, scripts):
+    ctx.clients["kb"] = FakeKb([_kb_result(juris="ON"), {**_kb_result(), "metadata": {"date_version": "2025"}}])
+    scripts.add("agent-auditor", output("AuditReport", items=[]))
+    verdicts = [VERDICTS[0]]
+    # Province QC : le passage ON et le passage sans juridiction sont écartés ; rien ne reste, aucun modèle appelé.
+    assert auditor.audit(ctx, verdicts, EvidenceRegistry("en")) == verdicts
+    assert "agent-auditor" not in scripts.models
+    assert ctx.passages == {}
+
+
+def test_auditeur_sans_passage_candidat_ne_cite_rien(ctx, scripts):
+    ctx.clients["kb"] = FakeKb([_kb_result()])
+    scripts.add("agent-auditor", output("AuditReport", items=[{"key": "R1:fail", "passage_refs": [], "message_en": "No passage grounds this."}]))
+    registry = EvidenceRegistry("en")
+    enriched = auditor.audit(ctx, [VERDICTS[0]], registry)
+    assert enriched[0]["citations"] == [] and not [i for i in registry.items if i["kind"] == "regulation"]
+
+
+def test_plafond_de_recherches_de_l_auditeur(ctx, scripts):
+    ctx.clients["kb"] = FakeKb([_kb_result()])
+    every_rule = [
+        {"rule": r, "scenario": 1, "status": "fail", "reasonCode": "X", "evidence": [], "citations": [], "messageEn": f"Default {r}."}
+        for r in ("R1", "R2", "R3", "R4", "R5", "R6", "R7", "R8", "R9")
+    ]
+    scripts.add("agent-auditor", output("AuditReport", items=[]))
+    auditor.audit(ctx, every_rule, EvidenceRegistry("en"))
+    assert len([c for c in ctx.tool_calls if c["tool"] == "search_regulation"]) == 15 <= 16
 
 
 def test_auditeur_en_echec_garde_les_verdicts(ctx, scripts):
+    ctx.clients["kb"] = FakeKb([_kb_result()])
     scripts.add("agent-auditor", "no output", "no output", "no output")
     assert auditor.audit(ctx, VERDICTS, EvidenceRegistry("en")) == VERDICTS
-
-
-def test_auditeur_passe_toujours_subjects_par_regle(ctx, scripts):
-    from backend.agents.rules.rules import RULE_SUBJECTS, RULE_TOPICS
-
-    assert RULE_SUBJECTS == {
-        "R1": ["profil_risque", "convenance"],
-        "R2": ["kyc", "convenance"],
-        "R3": ["profil_risque", "convenance"],
-        "R4": ["profil_risque", "convenance"],
-        "R5": ["oeo", "aide_decision", "recommandation"],
-        "R6": ["convenance"],
-        "R7": ["crypto"],
-        "R8": ["esg"],
-        "R9": ["titres_proteges"],
-        "R10": [],
-    }
-    ctx.clients["kb"] = FakeKb([_kb_result()])
-    # Même si le modèle omet subjects, l'outil déduit les sujets de la règle à partir de la requête.
-    scripts.add(
-        "agent-auditor",
-        call("search_regulation", query=RULE_TOPICS["R2"]),
-        call("search_regulation", query=RULE_TOPICS["R5"]),
-        call("search_regulation", query=RULE_TOPICS["R9"]),
-        output("AuditReport", items=[]),
-    )
-    auditor.audit(ctx, VERDICTS, EvidenceRegistry("en"))
-    search_calls = [c for c in ctx.tool_calls if c["tool"] == "search_regulation"]
-    assert [c["params"]["subjects"] for c in search_calls] == [
-        ["kyc", "convenance"],
-        ["oeo", "aide_decision", "recommandation"],
-        ["titres_proteges"],
-    ]
 
 
 def test_redacteur_quatre_sections(ctx, scripts):

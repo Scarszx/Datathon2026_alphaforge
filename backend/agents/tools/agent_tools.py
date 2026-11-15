@@ -94,6 +94,8 @@ def read_evidence(tool_context: ToolContext, evidence_id: str | None = None) -> 
     "verdicts" of the rules R1 to R10 (rule, scenario, status pass | warn | fail, reasonCode, messageEn, threshold
     nature, evidence ids, citation ids): use them to say which rule failed and why.
     Never state a figure that is not in this registry.
+    The summary does not contain the text of regulatory citations: to quote KB-03, call this tool with
+    evidence_id="KB-03" and copy its "excerpt" verbatim (never translate or paraphrase it).
 
     Args:
         evidence_id: Optional item to read in full, such as EV-07 (calculation) or KB-03 (regulatory citation).

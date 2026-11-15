@@ -186,6 +186,26 @@ def test_extrait_coupe_a_une_fin_de_phrase():
     assert kb.excerpt_of(no_dot, 1200).endswith("…")
 
 
+def test_extrait_ne_coupe_ni_apres_une_abreviation_ni_sur_un_point_virgule():
+    """« s. », « art. », « No. » ne terminent pas une phrase ; « ; » et « : » non plus."""
+    text = ("Under s. 13.3 the registered firm must take reasonable steps. "
+            "See art. 4 and No. 7; the rest follows: " * 6)
+    flat = " ".join(text.split())
+    for limit in range(120, 330, 7):
+        cut = kb.excerpt_of(text, limit)
+        assert flat.startswith(cut.removesuffix(" …")), limit  # toujours un préfixe exact du texte de la base
+        if not cut.endswith("…"):
+            assert cut.endswith("reasonable steps."), (limit, cut[-30:])  # seule vraie fin de phrase du texte
+
+
+def test_passage_sans_juridiction_est_jete(ctx, aws):
+    result = _kb_result()
+    result["metadata"].pop("juridiction")
+    ctx.clients["kb"] = FakeKb([result, _kb_result(juris="ON"), _kb_result(juris="QC")])
+    passages = catalog.search_regulation(ctx, "x", ["convenance"])["passages"]  # province du contexte : QC
+    assert [p["jurisdiction"] for p in passages] == ["QC"]
+
+
 def test_read_evidence_expose_les_verdicts(ctx):
     ctx.evidence = [{"id": "EV-01", "kind": "metric", "label": "Vol", "formatted": "8,1 %"}]
     ctx.verdicts = [{"rule": "R4", "status": "fail", "reasonCode": "ALTERNATIVE_MISSING", "messageEn": "No alternative.",

@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 
 class AuditItem(BaseModel):
     key: str = Field(description="The verdict group key exactly as received, for example R2:fail.")
-    passage_refs: list[str] = Field(default_factory=list, description="Refs of supporting passages returned by search_regulation (P1, P2...); empty if none supports the verdict.")
+    passage_refs: list[str] = Field(default_factory=list, description="Refs (P1, P2...) of the candidate passages of this group that state the rule's regulatory principle; empty if none does.")
     message_en: str = Field(description="One English sentence explaining the verdict, without figures.")
 
 

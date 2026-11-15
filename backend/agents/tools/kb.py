@@ -41,13 +41,40 @@ MAX_PASSAGES = 5
 MAX_EXCERPT_CHARS = 1200  # médiane des passages de la base : ~1400 caractères ; 700 coupait 29 passages sur 31 en pleine phrase
 
 
+# Abréviations des textes de loi et des avis : un point qui les suit n'est pas une fin de phrase.
+_ABBREVIATIONS = {
+    "s", "ss", "sec", "secs", "art", "arts", "no", "nos", "para", "paras", "subs", "ch", "cl", "pt", "pp", "p",
+    "c", "cf", "vs", "v", "inc", "ltd", "corp", "co", "dr", "mr", "mrs", "ms", "st", "fig", "ex", "eg", "ie", "etc",
+    "al", "approx", "ref", "reg", "regs", "sch", "div", "vol", "ed", "eds", "rev", "max", "min",
+}
+_SENTENCE_END = re.compile(r"""([.!?])(["')\]”’]*)(?=\s+["'(\[“‘]*[A-Z0-9]|\s*$)""")
+
+
+def _is_sentence_end(head: str, match: re.Match[str]) -> bool:
+    """Vrai si le point à cette position termine une phrase (et non « s. », « art. », « No. »…)."""
+    if match.group(1) != ".":
+        return True
+    word = re.search(r"([A-Za-z]+)$", head[: match.start()])
+    if word is None:
+        return True
+    if word.group(1).lower() in _ABBREVIATIONS:
+        return False
+    if len(word.group(1)) == 1 and word.group(1).isupper():  # initiale (« J. Smith »)
+        return False
+    return True
+
+
 def excerpt_of(text: str, limit: int = MAX_EXCERPT_CHARS) -> str:
-    """Texte brut de la base, coupé à la dernière fin de phrase avant la limite (jamais résumé ni traduit)."""
+    """Texte brut de la base, coupé à la dernière vraie fin de phrase avant la limite (jamais résumé ni traduit).
+
+    Les « ; » et « : » ne terminent pas une phrase, et un point après « s. », « art. » ou « No. » non plus :
+    couper là donnerait un extrait qui s'arrête au milieu d'un article.
+    """
     flat = " ".join(text.split())
     if len(flat) <= limit:
         return flat
     head = flat[:limit]
-    ends = [m.end() for m in re.finditer(r"[.!?;:](?=\s)|[.!?;:]\"?$", head)]
+    ends = [m.end() for m in _SENTENCE_END.finditer(head) if _is_sentence_end(head, m)]
     if ends and ends[-1] >= limit * 0.4:
         return head[: ends[-1]].rstrip()
     return head.rsplit(" ", 1)[0].rstrip() + " …"
@@ -111,8 +138,14 @@ def retrieve(query: str, jurisdictions: list[str], subjects: list[str] | None = 
             },
         )
         passages = []
-        for result in response.get("retrievalResults", [])[:MAX_PASSAGES]:
+        for result in response.get("retrievalResults", []):
             metadata = result.get("metadata") or {}
+            # Le filtre du mandat est refait ici : un passage sans juridiction dans ses métadonnées,
+            # ou hors de {CA, province}, est jeté (défense en profondeur, jamais cité).
+            if metadata.get("juridiction") not in jurisdictions:
+                continue
+            if len(passages) >= MAX_PASSAGES:
+                break
             uri = (result.get("location") or {}).get("s3Location", {}).get("uri") or metadata.get("x-amz-bedrock-kb-source-uri")
             page = metadata.get("x-amz-bedrock-kb-document-page-number")
             # Extrait fidèle (registre, jamais traduit) ; la version neutralisée est celle montrée au modèle.

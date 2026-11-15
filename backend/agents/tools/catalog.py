@@ -12,6 +12,7 @@ from __future__ import annotations
 import difflib
 import json
 import re
+import threading
 import unicodedata
 from datetime import date
 from typing import Any
@@ -399,6 +400,9 @@ def check_rules(ctx: RequestContext) -> dict[str, Any]:
 # --- agent-auditor --------------------------------------------------------
 
 
+_PASSAGES_LOCK = threading.Lock()
+
+
 def search_regulation(ctx: RequestContext, query: str, subjects: list[str] | None = None) -> dict[str, Any]:
     if not isinstance(query, str) or not query.strip():
         return _error("query must be a non-empty English sentence.")
@@ -408,14 +412,15 @@ def search_regulation(ctx: RequestContext, query: str, subjects: list[str] | Non
         return _error(f"subjects must be a list among: {', '.join(kb.KNOWN_SUBJECTS)}.")
     passages = kb.retrieve(query.strip()[:500], ctx.jurisdictions, subjects, client=ctx.clients.get("kb"))
     shown = []
-    for passage in passages:
-        ref = f"P{len(ctx.passages) + 1}"
-        ctx.passages[ref] = passage
-        shown.append({
-            "ref": ref, "document": passage["document"], "section": passage["section"],
-            "jurisdiction": passage["jurisdiction"], "version": passage["version"], "score": passage["score"],
-            "excerpt": kb.neutralize(passage["excerpt"]),
-        })
+    with _PASSAGES_LOCK:  # l'auditeur lance ses recherches en parallèle : les références P1, P2… restent uniques
+        for passage in passages:
+            ref = f"P{len(ctx.passages) + 1}"
+            ctx.passages[ref] = passage
+            shown.append({
+                "ref": ref, "document": passage["document"], "section": passage["section"],
+                "jurisdiction": passage["jurisdiction"], "version": passage["version"], "score": passage["score"],
+                "excerpt": kb.neutralize(passage["excerpt"]),
+            })
     return {"passages": shown}
 
 
