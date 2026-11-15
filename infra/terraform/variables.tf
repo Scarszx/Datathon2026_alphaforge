@@ -59,9 +59,9 @@ variable "embedding_dimensions" {
 }
 
 variable "cors_origins" {
-  description = "Origines autorisées par l'API Gateway (le front local en développement). L'URL CloudFront du front est ajoutée automatiquement."
+  description = "Origines autorisées par l'API Gateway (développement local sur Vite). L'URL CloudFront du front est ajoutée automatiquement."
   type        = list(string)
-  default     = ["http://localhost:3000"]
+  default     = ["http://localhost:5173", "http://localhost:4173"]
 }
 
 variable "pandas_layer_arn" {

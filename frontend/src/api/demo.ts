@@ -5,7 +5,7 @@
  */
 import { ApiError } from "./errors";
 import type {
-  AgentsRegistry, Asset, Conversation, Evidence, Explanation, Holding, InvestorProfile, Mandate,
+  AgentsRegistry, Asset, AssetDetail, Conversation, Evidence, Explanation, Holding, InvestorProfile, Mandate,
   MandateCreateRequest, MandateMode, Message, Narrative, Portfolio, PortfolioSummary, Run,
   Slice, SummaryRange, User, VerifierReport,
 } from "./types";
@@ -80,7 +80,8 @@ export function demoSignUp(username: string, password: string, email: string, di
   if (password.length < 8) throw new ApiError("VALIDATION_ERROR", "Mot de passe refusé : au moins 8 caractères.", 400);
   const userId = id("u");
   db.users[k] = { userId, username: username.trim(), displayName, email, password, investorProfile: null };
-  db.portfolios[userId] = [starter("Principal")];
+  // Le portefeuille principal est créé au premier GET /portfolios, après le questionnaire investisseur.
+  db.portfolios[userId] = [];
   db.conversations[userId] = [];
   save(db);
 }
@@ -102,6 +103,20 @@ const ASSETS: DemoAsset[] = [
   { ticker: "NVDA", name: "NVIDIA", assetClass: "equity", market: "NASDAQ", currency: "USD", sector: "Technologie", price: 142.8, vol: 0.5, drift: 0.25 },
   { ticker: "CASH", name: "Encaisse (CAD)", assetClass: "cash", currency: "CAD", sector: "Encaisse", price: 1, vol: 0, drift: 0 },
 ];
+/* Descriptions fictives courtes du mode démo (pas de données de marché). */
+const DESCRIPTIONS: Record<string, string> = {
+  RY: "Banque Royale du Canada est la plus grande banque canadienne par capitalisation. Elle offre des services bancaires aux particuliers et aux entreprises, de la gestion de patrimoine, de l'assurance et des services de marchés des capitaux.",
+  TD: "La Banque Toronto-Dominion offre des services bancaires aux particuliers, aux entreprises et aux grandes sociétés au Canada et aux États-Unis, où elle compte un vaste réseau de succursales.",
+  ENB: "Enbridge exploite un réseau de pipelines de pétrole et de gaz naturel en Amérique du Nord, des services de distribution de gaz et des actifs d'énergie renouvelable.",
+  SHOP: "Shopify fournit une plateforme de commerce en ligne qui permet à des marchands de créer une boutique, d'encaisser des paiements et de gérer leurs ventes et leur expédition.",
+  AAPL: "Apple conçoit et vend des iPhone, des Mac, des iPad et des accessoires, ainsi que des services numériques comme l'App Store, iCloud et Apple Music.",
+  MSFT: "Microsoft développe des logiciels, des services infonuagiques (Azure), des outils de productivité (Microsoft 365), des jeux vidéo et du matériel.",
+  NVDA: "NVIDIA conçoit des processeurs graphiques et des puces d'accélération utilisés dans les jeux, les centres de données et l'intelligence artificielle.",
+  XIC: "FNB qui reproduit un indice large du marché boursier canadien, avec des frais de gestion réduits.",
+  VFV: "FNB qui reproduit l'indice S&P 500, soit les grandes sociétés américaines cotées en bourse.",
+  ZAG: "FNB d'obligations canadiennes de qualité qui vise à reproduire un indice obligataire diversifié.",
+  XEF: "FNB d'actions de sociétés de pays développés hors Amérique du Nord (Europe, Australasie, Extrême-Orient).",
+};
 const USDCAD = 1.37;
 const fx = (c?: string) => (c === "USD" ? USDCAD : 1);
 const asset = (t: string) => ASSETS.find((a) => a.ticker === t.toUpperCase());
@@ -558,7 +573,12 @@ export async function demoRequest(path: string, o: Opts, token: string): Promise
   if (seg[0] === "me" && seg[1] === "profile" && m === "PUT") { u.investorProfile = o.body; return done(me()); }
 
   if (seg[0] === "portfolios") {
-    if (seg.length === 1 && m === "GET") return { items: portfolios };
+    if (seg.length === 1 && m === "GET") {
+      if (!portfolios.length) {
+        portfolios.push({ portfolioId: "main", name: "Principal", baseCurrency: "CAD", updatedAt: now(), holdings: [] });
+      }
+      return done({ items: portfolios });
+    }
     const p = findP(seg[1]);
     if (seg[2] === "holdings" && m === "PUT") {
       const hs: Holding[] = o.body?.holdings ?? [];
@@ -576,6 +596,30 @@ export async function demoRequest(path: string, o: Opts, token: string): Promise
     return { items: ASSETS.filter((a) => a.ticker.toLowerCase().startsWith(q) || a.name.toLowerCase().includes(q)).slice(0, 8).map(({ price, vol, drift, ...a }) => a) };
   }
 
+  if (seg[0] === "market" && seg[1] === "assets" && seg[2]) {
+    const a = asset(decodeURIComponent(seg[2]));
+    if (!a || a.assetClass === "cash") throw new ApiError("ASSET_NOT_FOUND", `${seg[2]} n'existe pas dans l'univers d'actifs (démo).`, 404);
+    const range = (o.query?.range as SummaryRange) ?? "1y";
+    const year = history(a, 252);
+    const vals = history(a, RANGE_DAYS[range]);
+    const step = Math.max(1, Math.ceil(vals.length / 120));
+    const DAY = 86400000 * (365 / 252);
+    const points = vals.map((v, i) => ({ date: new Date(Date.now() - (vals.length - 1 - i) * DAY).toISOString().slice(0, 10), close: v }))
+      .filter((_, i) => (vals.length - 1 - i) % step === 0);
+    const rets = year.slice(1).map((v, i) => v / year[i] - 1);
+    const mean = rets.reduce((s, r) => s + r, 0) / rets.length;
+    const vol = Math.sqrt(rets.reduce((s, r) => s + (r - mean) ** 2, 0) / (rets.length - 1)) * Math.sqrt(252) * 100;
+    let peak = year[0], dd = 0;
+    for (const v of year) { peak = Math.max(peak, v); dd = Math.min(dd, v / peak - 1); }
+    const last = vals[vals.length - 1];
+    return {
+      ticker: a.ticker, name: a.name, assetClass: a.assetClass, market: a.market, currency: a.currency, sector: a.sector,
+      description: DESCRIPTIONS[a.ticker], asOf: points[points.length - 1].date, price: last,
+      dayChangePct: (last / (vals[vals.length - 2] ?? last) - 1) * 100,
+      range, rangeChangePct: (last / vals[0] - 1) * 100, points,
+      stats: { high52w: Math.max(...year), low52w: Math.min(...year), volatility: vol, maxDrawdown: dd * 100, historyStart: "2016-01-04" },
+    } satisfies AssetDetail;
+  }
   if (seg[0] === "conversations") {
     if (seg.length === 1 && m === "GET") return { items: [...convs].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)), nextCursor: null };
     if (seg.length === 1 && m === "POST") {

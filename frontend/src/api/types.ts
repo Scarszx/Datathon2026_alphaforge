@@ -106,6 +106,15 @@ export type PortfolioSummary = {
 
 export type Asset = { ticker: string; name: string; assetClass: string; market?: string; currency?: string; sector?: string };
 
+export type AssetDetail = {
+  ticker: string; name: string; assetClass: string; market?: string | null; currency?: string | null;
+  sector?: string | null; industry?: string | null; country?: string | null;
+  description?: string; website?: string;
+  asOf: string; price: number; dayChangePct: number | null;
+  range: SummaryRange; rangeChangePct: number | null; points: { date: string; close: number }[];
+  stats: { high52w: number | null; low52w: number | null; volatility: number | null; maxDrawdown: number | null; historyStart: string };
+  source?: string;
+};
 export type AgentInfo = { id: string; name: string; role: string; allowedTools: string[]; delegatesTo?: string[]; limits?: Record<string, number> };
 export type ModuleInfo = { id: string; name: string; role: string };
 export type ToolInfo = { id: string; description: string; reads?: string[] };

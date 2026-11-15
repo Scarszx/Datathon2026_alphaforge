@@ -14,7 +14,7 @@ export default function Login() {
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
 
-  if (status === "authed") return <Navigate to="/portefeuille" replace />;
+  if (status === "authed") return <Navigate to="/accueil" replace />;
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -22,7 +22,7 @@ export default function Login() {
     setBusy(true); setErr("");
     try {
       await login(username, pw);
-      nav("/portefeuille", { replace: true });
+      nav("/accueil", { replace: true });
     } catch (x) {
       setErr(errorText(x));
     } finally {

@@ -17,5 +17,6 @@ pandas_layer_arn = null
 # date de récupération de docs/for_KB/). kb_sync.sh lit ce préfixe dans les outputs.
 kb_corpus_version = "2026-11-14"
 
-cors_origins = ["http://localhost:3000"]
+# Origines du serveur Vite : développement (5173) et aperçu du build (4173).
+cors_origins = ["http://localhost:5173", "http://localhost:4173"]
 log_level    = "INFO"

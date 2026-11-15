@@ -271,6 +271,17 @@ def test_recherche_d_actifs(aws, store):
     assert body_of(app.handle_request(event("GET /v1/market/search", query={}), store=store))["error"]["code"] == "VALIDATION_ERROR"
 
 
+def test_fiche_d_actif(aws, store):
+    route = "GET /v1/market/assets/{ticker}"
+    body = body_of(app.handle_request(event(route, path={"ticker": "RY.TO"}, query={"range": "6m"}), store=store))
+    assert body["ticker"] == "RY.TO" and body["currency"] == "CAD" and body["range"] == "6m"
+    assert 2 <= len(body["points"]) <= 120 and body["points"][-1]["close"] == body["price"]
+    assert body["stats"]["low52w"] <= body["price"] <= body["stats"]["high52w"]
+    assert "description" not in body  # profiles.json absent du jeu de test
+    assert body_of(app.handle_request(event(route, path={"ticker": "ZZZ"}), store=store))["error"]["code"] == "ASSET_NOT_FOUND"
+    assert body_of(app.handle_request(event(route, path={"ticker": "RY.TO"}, query={"range": "3y"}), store=store))["error"]["code"] == "VALIDATION_ERROR"
+
+
 def test_handler_route_inconnue_et_identite(aws, store):
     assert body_of(app.handle_request(event("GET /v1/nope"), store=store))["error"]["code"] == "VALIDATION_ERROR"
     assert body_of(app.handle_request(event("GET /v1/market/search", query={"q": "x"}, claims=None), store=store))["error"]["code"] == "UNAUTHORIZED"

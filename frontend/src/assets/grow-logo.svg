@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 620 180" role="img" aria-labelledby="title desc">
+  <title id="title">Grow</title>
+  <desc id="desc">Feuille verte lumineuse suivie du mot Grow en vert forêt.</desc>
+  <defs>
+    <linearGradient id="leaf" x1="22" y1="18" x2="166" y2="154" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#36E33A"/>
+      <stop offset="0.52" stop-color="#18C52F"/>
+      <stop offset="1" stop-color="#079B2B"/>
+    </linearGradient>
+    <linearGradient id="vein" x1="32" y1="146" x2="157" y2="49" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#58EC62"/>
+      <stop offset="1" stop-color="#A4FA8F"/>
+    </linearGradient>
+    <linearGradient id="word" x1="195" y1="31" x2="600" y2="151" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#003E2A"/>
+      <stop offset="1" stop-color="#00553A"/>
+    </linearGradient>
+  </defs>
+  <path fill="url(#leaf)" d="M14 151C14 67 67 18 154 18h24v34c0 67-45 100-119 100H14v-1Z"/>
+  <path fill="url(#vein)" d="M34 151c20-54 59-87 127-105-51 25-87 58-106 105H34Z"/>
+  <text x="194" y="145" fill="url(#word)" font-family="Inter, Arial, Helvetica, sans-serif" font-size="142" font-weight="800" letter-spacing="-8">Grow</text>
+</svg>

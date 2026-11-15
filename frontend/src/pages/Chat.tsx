@@ -1,18 +1,16 @@
-/* Page /chat : session en 3 colonnes du contrat (srv-frontend) :
- *   1. portefeuille + mandat avec curseurs « et si »
- *   2. conversation (quickReplies, carte de mandat proposé)
- *   3. panneau de simulation (scénarios, verdicts, citations, explication)
+/* Page /chat : session en 2 colonnes du contrat (srv-frontend) :
+ *   1. conversation (quickReplies, carte de mandat proposé)
+ *   2. panneau de simulation (scénarios, verdicts, citations, explication)
  * plus le menu latéral d'historique. Le front ne calcule rien : chiffres de /summary et du registre du run. */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, errorText } from "../api/errors";
 import {
   createConversation, createMandate, createRun, getRun, listConversations, listMandates,
-  listMessages, listPortfolios, getSummary, sendMessage,
+  listMessages, sendMessage,
 } from "../api/endpoints";
-import type { Conversation, Evidence, Mandate, MandateCreateRequest, Message, PortfolioSummary, Run } from "../api/types";
+import type { Conversation, Evidence, Mandate, MandateCreateRequest, Message, Run } from "../api/types";
 import AppHeader from "./../components/AppHeader";
 import ConversationColumn from "./../components/chat/ConversationColumn";
-import MandateColumn from "./../components/chat/MandateColumn";
 import SimulationPanel from "./../components/chat/SimulationPanel";
 import { LangContext, langOf, t, type Lang } from "./../lib/i18n";
 
@@ -30,10 +28,10 @@ export default function Chat() {
   /* --- données de la session --- */
   const [messages, setMessages] = useState<Message[]>([]);
   const [mandate, setMandate] = useState<Mandate | null>(null);
-  const [summary, setSummary] = useState<PortfolioSummary | null>(null);
   const [run, setRun] = useState<Run | null>(null);
   const [runId, setRunId] = useState<string | null>(null);
   const [lang, setLang] = useState<Lang>(langOf(navigator.language));
+  const [mobilePanel, setMobilePanel] = useState<"history" | "conversation" | "simulation">("conversation");
 
   const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -73,12 +71,6 @@ export default function Chat() {
       if (conv?.userLanguage) setLang(langOf(conv.userLanguage));
 
       await refreshMandate(sessionId);
-
-      try {
-        const { items } = await listPortfolios();
-        const main = items.find((p) => p.portfolioId === "main") ?? items[0];
-        if (main) getSummary(main.portfolioId, "1y").then(setSummary).catch(() => setSummary(null));
-      } catch { /* portefeuille indisponible : la colonne reste vide */ }
 
       const lastRunId = [...all].reverse().find((m) => m.role === "assistant" && m.runId)?.runId;
       if (lastRunId) {
@@ -202,16 +194,33 @@ export default function Chat() {
   return (
     <LangContext.Provider value={lang}>
       <AppHeader />
-      <main className="chat-page">
+      <main className={`chat-page mobile-${mobilePanel}`}>
+        <nav className="chat-mobile-tabs" aria-label={lang === "fr" ? "Panneaux de la session" : "Session panels"}>
+          {([
+            ["history", t("chat.history", lang)],
+            ["conversation", "Conversation"],
+            ["simulation", t("sim.title", lang)],
+          ] as const).map(([panel, label]) => (
+            <button
+              key={panel}
+              type="button"
+              className={mobilePanel === panel ? "on" : undefined}
+              aria-pressed={mobilePanel === panel}
+              onClick={() => setMobilePanel(panel)}
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
         <aside className="af-side chat-rail">
-          <button type="button" className="af-new" onClick={() => void openSession(null)}>+ {t("chat.new", lang)}</button>
+          <button type="button" className="af-new" onClick={() => { void openSession(null); setMobilePanel("conversation"); }}>+ {t("chat.new", lang)}</button>
           <input className="af-search" placeholder={t("chat.search", lang)} aria-label={t("chat.search", lang)} value={q} onChange={(e) => setQ(e.target.value)} />
           <div className="af-lists">
             <h3 className="af-label">{t("chat.history", lang)}</h3>
             <ul className="af-list">
               {filtered.map((c) => (
                 <li key={c.sessionId} className={`af-row${c.sessionId === activeId ? " sel" : ""}`}>
-                  <button type="button" className="af-conv" onClick={() => void openSession(c.sessionId)}>
+                  <button type="button" className="af-conv" onClick={() => { void openSession(c.sessionId); setMobilePanel("conversation"); }}>
                     <strong>{c.title || t("chat.untitled", lang)}</strong>
                     <span>{new Date(c.updatedAt).toLocaleDateString()}</span>
                   </button>
@@ -223,8 +232,6 @@ export default function Chat() {
         </aside>
 
         <div className="chat-grid">
-          <MandateColumn summary={summary} mandate={mandate} busy={busy} lang={lang}
-            onWhatIf={(m) => void confirmMandate(m)} />
           <ConversationColumn messages={messages} evidence={evidence} busy={busy} lang={lang}
             onSend={(text) => void send(text)} onQuickReply={(text) => void send(text)}
             onConfirmDraft={(m) => void confirmMandate(m)} />
