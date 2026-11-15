@@ -29,6 +29,12 @@ def test_search_assets(ctx):
     assert "error" in catalog.search_assets(ctx, "  ")
 
 
+def test_search_assets_exclut_les_indices(ctx):
+    assert ctx.store.has_ticker("^GSPC") and not ctx.store.is_investable("^GSPC")
+    assert "^GSPC" not in {i["ticker"] for i in catalog.search_assets(ctx, "synthetic")["items"]}
+    assert not catalog.search_assets(ctx, "gspc").get("items")
+
+
 def test_search_assets_plusieurs_noms_en_un_appel(ctx):
     result = catalog.search_assets(ctx, "nvda, bond, zzzunknown")
     assert {"NVDA", "XBB.TO"} <= {i["ticker"] for i in result["items"]}
@@ -99,6 +105,8 @@ def test_propose_mandate_force_le_contexte(ctx):
     ({"mode": "add_asset", "objective": "project", "horizonYears": 3, "riskTolerance": 9, "riskCapacity": 1}, "entre 1 et 5"),
     ({"mode": "add_asset", "objective": "project", "horizonYears": 3, "riskTolerance": 3, "riskCapacity": 1,
       "operations": [{"action": "add", "ticker": "ZZZ", "amount": 1}]}, "Unknown ticker"),
+    ({"mode": "add_asset", "objective": "project", "horizonYears": 3, "riskTolerance": 3, "riskCapacity": 1,
+      "operations": [{"action": "add", "ticker": "^GSPC", "amount": 1}]}, "Unknown ticker"),  # indice : non investissable
     ({"mode": "add_asset", "objective": "project", "horizonYears": 3, "riskTolerance": 3, "riskCapacity": 1}, "operations"),
     ({"mode": "diagnose", "objective": "growth", "horizonYears": 3, "riskTolerance": 3, "riskCapacity": 1}, "subjectTicker"),
 ])

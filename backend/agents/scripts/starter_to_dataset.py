@@ -23,18 +23,20 @@ def convert(starter: Path, out: Path) -> None:
     (out / "prices").mkdir(parents=True, exist_ok=True)
     (out / "fx").mkdir(exist_ok=True)
     (out / "macro").mkdir(exist_ok=True)
-    universe = pd.read_csv(starter / "assets_universe.csv")
+    universe = pd.read_csv(starter / "assets_universe.csv").rename(columns={"ticker": "symbol"})
     universe.to_parquet(out / "universe.parquet", index=False)
-    prices = pd.read_csv(starter / "prices_daily.csv", parse_dates=["date"])
-    for ticker, rows in prices.groupby("ticker"):
-        rows.drop(columns=["ticker"]).to_parquet(out / "prices" / f"{ticker}.parquet", index=False)
+    prices = pd.read_csv(starter / "prices_daily.csv", parse_dates=["date"]).rename(
+        columns={"ticker": "symbol", "adj_close": "adjclose"}
+    )
+    for ticker, rows in prices.groupby("symbol"):
+        rows.drop(columns=["symbol"]).to_parquet(out / "prices" / f"{ticker}.parquet", index=False)
     pd.read_csv(starter / "fx_usdcad_daily.csv", parse_dates=["date"]).to_parquet(out / "fx" / "usdcad.parquet", index=False)
     pd.read_csv(starter / "macro_rates.csv", parse_dates=["date"]).to_parquet(out / "macro" / "macro.parquet", index=False)
-    pd.read_csv(starter / "corporate_actions.csv").to_parquet(out / "corporate_actions.parquet", index=False)
+    pd.read_csv(starter / "corporate_actions.csv").rename(columns={"ticker": "symbol"}).to_parquet(out / "corporate_actions.parquet", index=False)
     (out / "manifest.json").write_text(json.dumps({
         "version": "starter-2026-11-13", "source": "alphaforge_starter (organizers), converted by WS5 for local tests",
         "periodStart": str(prices["date"].min().date()), "periodEnd": str(prices["date"].max().date()),
-        "tickers": sorted(universe["ticker"]),
+        "tickers": sorted(universe["symbol"]),
     }, indent=2), encoding="utf-8")
 
 

@@ -2,7 +2,7 @@
 
 Tout est exprimé dans baseCurrency, avec le taux USD/CAD du jeu de données
 (dernier taux connu reporté). Valeur au dernier cours (close), performance et
-risque sur adj_close, quantités actuelles conservées sur la période
+risque sur adjclose, quantités actuelles conservées sur la période
 (simulation de détention, pas l'historique réel des transactions).
 """
 
@@ -114,7 +114,7 @@ def build_summary(store: DataStore, portfolio: dict[str, Any], range_key: str) -
         "explanation": {
             "sources": [
                 {"id": "prices_daily", "dataset": store.source_label("prices"), "asOf": as_of.date().isoformat(),
-                 "note": "close for value, adj_close for performance and risk, listing currency"},
+                 "note": "close for value, adjclose for performance and risk, listing currency"},
                 {"id": "fx_usdcad", "dataset": store.source_label("fx/usdcad.parquet"), "note": "last known USD/CAD rate carried forward"},
             ],
             "assumptions": [

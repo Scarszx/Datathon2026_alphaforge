@@ -51,11 +51,11 @@ def add_macro_publication_date(macro_df: pd.DataFrame) -> pd.DataFrame:
 
 
 def compute_1y_indicators(prices_df: pd.DataFrame) -> dict[str, float | None]:
-    """Calcule return_1y, volatility_1y (√252 sur adj_close) et max_drawdown_1y sur 1 an."""
-    if prices_df is None or prices_df.empty or "adj_close" not in prices_df.columns:
+    """Calcule return_1y, volatility_1y (√252 sur adjclose) et max_drawdown_1y sur 1 an."""
+    if prices_df is None or prices_df.empty or "adjclose" not in prices_df.columns:
         return {"return_1y": None, "volatility_1y": None, "max_drawdown_1y": None}
 
-    df = prices_df.dropna(subset=["adj_close"]).copy()
+    df = prices_df.dropna(subset=["adjclose"]).copy()
     if len(df) < 2:
         return {"return_1y": None, "volatility_1y": None, "max_drawdown_1y": None}
 
@@ -67,7 +67,7 @@ def compute_1y_indicators(prices_df: pd.DataFrame) -> dict[str, float | None]:
     if len(window_df) < 2:
         window_df = df
 
-    adj = window_df["adj_close"].astype(float)
+    adj = window_df["adjclose"].astype(float)
     if (adj <= 0).any() or len(adj) < 2:
         return {"return_1y": None, "volatility_1y": None, "max_drawdown_1y": None}
 

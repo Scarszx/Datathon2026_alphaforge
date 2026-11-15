@@ -4,7 +4,7 @@ Usage :
     # Mode hors ligne (à partir du jeu fourni alphaforge_starter ou d'une fixture) :
     .venv/bin/python -m data.ingestion.build_dataset --mode offline
 
-    # Mode complet (environ 250 actifs sur 10 ans via yfinance, Valet BoC et FRED) :
+    # Mode complet (nos actifs + top 400 du S&P 500 + ^GSPC depuis 2015 via yfinance, Valet BoC et FRED) :
     .venv/bin/python -m data.ingestion.build_dataset --mode full
 """
 
@@ -22,7 +22,8 @@ import pandas as pd
 from data.ingestion.fetcher import (
     download_fx_and_macro,
     download_prices_in_batches,
-    fetch_yfinance_sectors,
+    fetch_sp500_top,
+    fetch_yfinance_info,
 )
 from data.ingestion.metrics import (
     MONTHLY_MACRO_SERIES,
@@ -50,9 +51,38 @@ DEFAULT_UNIVERSE_YAML = DATA_DIR / "ingestion" / "universe.yaml"
 DEFAULT_ETF_SOURCE_JSON = DATA_DIR / "ingestion" / "etf_enriched.source.json"
 DEFAULT_OUTPUT_DIR = DATA_DIR / "output"
 
-DEFAULT_FULL_START = "2016-11-12"
+DEFAULT_FULL_START = "2015-01-01"
+SP500_TOP_N = 400
+INDEX_SYMBOLS = ("^GSPC",)
+INDEX_NAMES = {"^GSPC": "S&P 500"}
 DEFAULT_OFFLINE_START = "2021-11-12"
 DEFAULT_END = "2026-11-13"
+
+
+def _country_fallback(symbol: str) -> str:
+    return "Canada" if symbol.upper().endswith(".TO") else "United States"
+
+
+def _merge_candidates(base: list[dict[str, str]], sp500_top: list[str]) -> list[dict[str, str]]:
+    """Nos candidats d'abord, puis les titres du S&P 500 absents, puis les indices (sans doublon)."""
+    seen = {c["symbol"] for c in base}
+    merged = list(base)
+
+    def add(symbol: str, asset_class: str, name: str) -> None:
+        if symbol in seen:
+            return
+        seen.add(symbol)
+        market, currency = deduce_market_and_currency(symbol)
+        merged.append({
+            "symbol": symbol, "name": name, "asset_class": asset_class, "market": market,
+            "currency": currency, "sector": "Unknown", "category": "sp500_top" if asset_class == "equity" else "index",
+        })
+
+    for symbol in sp500_top:
+        add(symbol, "equity", symbol)
+    for symbol in INDEX_SYMBOLS:
+        add(symbol, "index", INDEX_NAMES.get(symbol, symbol))
+    return merged
 
 
 def _load_offline_inputs(
@@ -60,8 +90,10 @@ def _load_offline_inputs(
 ) -> tuple[list[dict[str, str]], dict[str, pd.DataFrame], pd.DataFrame, pd.DataFrame, pd.DataFrame]:
     """Charge les fichiers CSV du jeu de départ (ou d'un dossier fixture)."""
     u_df = pd.read_csv(starter_dir / "assets_universe.csv")
-    p_df = pd.read_csv(starter_dir / "prices_daily.csv")
-    a_df = pd.read_csv(starter_dir / "corporate_actions.csv")
+    p_df = pd.read_csv(starter_dir / "prices_daily.csv").rename(
+        columns={"ticker": "symbol", "adj_close": "adjclose"}
+    )
+    a_df = pd.read_csv(starter_dir / "corporate_actions.csv").rename(columns={"ticker": "symbol"})
     fx_df = pd.read_csv(starter_dir / "fx_usdcad_daily.csv")
     m_df = pd.read_csv(starter_dir / "macro_rates.csv")
 
@@ -70,7 +102,7 @@ def _load_offline_inputs(
         ticker = str(row["ticker"]).strip()
         market, currency = deduce_market_and_currency(ticker)
         candidates.append({
-            "ticker": ticker,
+            "symbol": ticker,
             "name": str(row.get("name", ticker)).strip(),
             "asset_class": str(row.get("asset_class", "equity")).strip(),
             "market": str(row.get("market") if pd.notna(row.get("market")) else market).strip(),
@@ -82,7 +114,7 @@ def _load_offline_inputs(
     prices_by_ticker: dict[str, pd.DataFrame] = {}
     if not p_df.empty:
         p_df["date"] = p_df["date"].astype(str).str.slice(0, 10)
-        for t, grp in p_df.groupby("ticker"):
+        for t, grp in p_df.groupby("symbol"):
             prices_by_ticker[str(t)] = grp.sort_values("date").reset_index(drop=True)
 
     return candidates, prices_by_ticker, a_df, fx_df, m_df
@@ -117,9 +149,12 @@ def build_dataset(
 
     if mode == "offline":
         candidates, prices_by_ticker, raw_actions, fx_df, raw_macro = _load_offline_inputs(starter_dir)
-        yf_sectors: dict[str, str] = {}
+        yf_info: dict[str, dict[str, str]] = {}
     else:
-        candidates = load_universe_candidates(universe_yaml)
+        candidates = _merge_candidates(
+            load_universe_candidates(universe_yaml),
+            fetch_sp500_top(SP500_TOP_N, cache_dir=cache_dir),
+        )
         prices_by_ticker, raw_actions = download_prices_in_batches(
             candidates=candidates,
             start_date=req_start,
@@ -133,8 +168,8 @@ def build_dataset(
             end_date=req_end,
             cache_dir=cache_dir,
         )
-        equity_tickers = [c["ticker"] for c in candidates if c["asset_class"] == "equity"]
-        yf_sectors = fetch_yfinance_sectors(equity_tickers, cache_dir=cache_dir)
+        yahoo_symbols = [c["symbol"] for c in candidates if c["asset_class"] != "crypto"]
+        yf_info = fetch_yfinance_info(yahoo_symbols, cache_dir=cache_dir)
 
     # Validation de chaque candidat et calcul des indicateurs 1 an
     retained_rows: list[dict[str, Any]] = []
@@ -143,12 +178,12 @@ def build_dataset(
     first_date_by_ticker: dict[str, str] = {}
 
     for cand in candidates:
-        ticker = cand["ticker"]
+        ticker = cand["symbol"]
         p_df = prices_by_ticker.get(ticker)
         val_res = validate_candidate_prices(ticker, p_df, min_rows=min_history_rows)
         if not val_res["valid"] or p_df is None:
             excluded_tickers.append({
-                "ticker": ticker,
+                "symbol": ticker,
                 "name": cand.get("name", ticker),
                 "assetClass": cand.get("asset_class", "equity"),
                 "reason": val_res["reason"],
@@ -158,42 +193,51 @@ def build_dataset(
             })
             continue
 
-        clean_p = p_df.dropna(subset=["close", "adj_close"]).sort_values("date").reset_index(drop=True)
+        clean_p = p_df.dropna(subset=["close", "adjclose"]).sort_values("date").reset_index(drop=True)
         clean_p["date"] = clean_p["date"].astype(str).str.slice(0, 10)
-        clean_p["ticker"] = ticker
+        clean_p["symbol"] = ticker
         clean_p["currency"] = cand["currency"]
-        for c in ("open", "high", "low", "close", "adj_close"):
+        for c in ("open", "high", "low", "close", "adjclose"):
             clean_p[c] = pd.to_numeric(clean_p[c], errors="coerce").round(6)
         clean_p["volume"] = pd.to_numeric(clean_p["volume"], errors="coerce").fillna(0).astype("int64")
         clean_p = clean_p[
-            ["date", "ticker", "open", "high", "low", "close", "adj_close", "volume", "currency"]
+            ["date", "symbol", "open", "high", "low", "close", "adjclose", "volume", "currency"]
         ]
 
         indicators = compute_1y_indicators(clean_p)
 
-        # Secteur et source du secteur
+        # Métadonnées : Yahoo en priorité pour actions, FNB et indice ; repli sur la liste de candidats
+        meta = yf_info.get(ticker, {})
+        sector = cand["sector"]
+        sector_source = cand.get("sector_source", "universe.yaml")
+        name = cand["name"]
+        industry: str | None = None
+        country: str | None = None
         if mode == "offline":
-            sector = cand["sector"]
             sector_source = cand.get("sector_source", "starter")
-        elif cand["asset_class"] == "equity" and yf_sectors.get(ticker):
-            sector = yf_sectors[ticker]
-            sector_source = "yfinance"
-        else:
-            sector = cand["sector"]
-            sector_source = "universe.yaml"
+            if cand["asset_class"] != "crypto":
+                country = _country_fallback(ticker)
+        elif cand["asset_class"] != "crypto":
+            if meta.get("sector"):
+                sector, sector_source = meta["sector"], "yfinance"
+            name = meta.get("name") or name
+            industry = meta.get("industry")
+            country = meta.get("country") or _country_fallback(ticker)
 
         first_d = str(val_res["first_date"])
         last_d = str(val_res["last_date"])
         first_date_by_ticker[ticker] = first_d
 
         retained_rows.append({
-            "ticker": ticker,
-            "name": cand["name"],
+            "symbol": ticker,
+            "name": name,
             "asset_class": cand["asset_class"],
             "market": cand["market"],
             "currency": cand["currency"],
             "sector": sector,
             "sector_source": sector_source,
+            "industry": industry,
+            "country": country,
             "first_date": first_d,
             "last_date": last_d,
             "return_1y": indicators["return_1y"],
@@ -208,16 +252,16 @@ def build_dataset(
     universe_df = pd.DataFrame(retained_rows)
     universe_df.insert(0, "asset_id", [f"A{i:02d}" for i in range(1, len(universe_df) + 1)])
 
-    prices_df = pd.concat(retained_prices_list, ignore_index=True).sort_values(["ticker", "date"]).reset_index(drop=True)
+    prices_df = pd.concat(retained_prices_list, ignore_index=True).sort_values(["symbol", "date"]).reset_index(drop=True)
 
     # Filtrer corporate_actions aux seuls tickers retenus
-    retained_set = set(universe_df["ticker"])
+    retained_set = set(universe_df["symbol"])
     if not raw_actions.empty:
-        actions_df = raw_actions[raw_actions["ticker"].isin(retained_set)].copy()
+        actions_df = raw_actions[raw_actions["symbol"].isin(retained_set)].copy()
         actions_df["ex_date"] = actions_df["ex_date"].astype(str).str.slice(0, 10)
-        actions_df = actions_df.sort_values(["ticker", "ex_date"]).reset_index(drop=True)
+        actions_df = actions_df.sort_values(["symbol", "ex_date"]).reset_index(drop=True)
     else:
-        actions_df = pd.DataFrame(columns=["ex_date", "ticker", "action", "value", "unit"])
+        actions_df = pd.DataFrame(columns=["ex_date", "symbol", "action", "value", "unit"])
 
     # Macro avec publication_date (snake_case)
     macro_df = add_macro_publication_date(raw_macro)
@@ -244,7 +288,7 @@ def build_dataset(
 
     # Validation et génération de etf_enriched.json
     etf_raw = json.loads(etf_source_json.read_text(encoding="utf-8"))
-    asset_class_map = dict(zip(universe_df["ticker"], universe_df["asset_class"]))
+    asset_class_map = dict(zip(universe_df["symbol"], universe_df["asset_class"]))
     etf_output, etf_errors, etf_warnings = validate_etf_enriched(
         source_data=etf_raw,
         universe_asset_classes=asset_class_map,
@@ -260,7 +304,7 @@ def build_dataset(
 
     prices_dir = out_dir / "prices"
     prices_dir.mkdir(parents=True, exist_ok=True)
-    for ticker, grp in prices_df.groupby("ticker", sort=False):
+    for ticker, grp in prices_df.groupby("symbol", sort=False):
         grp.reset_index(drop=True).to_parquet(prices_dir / f"{ticker}.parquet", index=False)
 
     prices_all_dir = out_dir / "prices_all"
@@ -312,7 +356,7 @@ def build_dataset(
             "macroRows": int(len(macro_df)),
         },
         "currencies": ["CAD", "USD"],
-        "retainedTickers": universe_df["ticker"].tolist(),
+        "retainedTickers": universe_df["symbol"].tolist(),
         "excludedTickers": excluded_tickers,
         "firstDateByTicker": first_date_by_ticker,
         "shortHistoryTickers": quality_report["shortHistories"],
@@ -358,10 +402,13 @@ def build_dataset(
         ],
         "processing": [
             "Prices kept in native listing currency (.TO = CAD, others = USD); no forward-fill and no calendar alignment.",
-            "adj_close back-adjusted by Yahoo Finance for splits and dividends; close adjusted for splits only; splits in corporate_actions.parquet are never re-applied.",
-            "1-year indicators in universe.parquet (return_1y, volatility_1y, max_drawdown_1y) computed on the last 1 year of adj_close with sqrt(252) annualization.",
+            "Column names follow the team calculation code: symbol (not ticker) and adjclose (not adj_close).",
+            "Universe = our candidates (universe.yaml) + the 400 largest S&P 500 market caps at extraction (Wikipedia list, Yahoo fast_info market cap) + the ^GSPC index (asset_class='index', not investable). History starts 2015-01-01 for all.",
+            "industry and country come from Yahoo Finance (Ticker.info) for equities, ETFs and the index; country falls back to the listing suffix (.TO = Canada, else United States); both are null for crypto.",
+            "adjclose back-adjusted by Yahoo Finance for splits and dividends; close adjusted for splits only; splits in corporate_actions.parquet are never re-applied.",
+            "1-year indicators in universe.parquet (return_1y, volatility_1y, max_drawdown_1y) computed on the last 1 year of adjclose with sqrt(252) annualization.",
             "Candidate validation rejects tickers with no data, non-positive prices, or fewer than min_history_rows observations; shorter histories (< 10 years, e.g. ZEQT.TO launched in 2022) are retained without backfill and flagged via first_date / firstDate.",
-            "Equity sectors enriched from yfinance metadata (sector_source='yfinance') with fallback to universe.yaml (sector_source='universe.yaml').",
+            "Sectors enriched from yfinance metadata (sector_source='yfinance') with fallback to universe.yaml (sector_source='universe.yaml').",
             "Monthly macro series (STATIC_TOTALCPICHANGE, CPIAUCSL, UNRATE) assigned publication_date = 28th of the following month (conservative rule R10); daily series assigned publication_date = date.",
             "CNQ.TO 2022-08-22 1.021 split on the day of a 0.75 CAD dividend isolated in corporate_actions.parquet (anomaly_note) and qualityReport.isolatedAnomalies.",
         ],

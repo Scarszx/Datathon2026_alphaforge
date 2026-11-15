@@ -39,19 +39,24 @@ from data.ingestion.validators import (
 FIXTURES_DIR = Path(__file__).resolve().parent.parent / "fixtures"
 
 
+def _read_prices() -> pd.DataFrame:
+    """Prix du mini-jeu (format du jeu de départ), au nommage du jeu : symbol / adjclose."""
+    return pd.read_csv(FIXTURES_DIR / "prices_daily.csv").rename(columns={"ticker": "symbol", "adj_close": "adjclose"})
+
+
 # ==========================================================================
 # 1. Tests des indicateurs précalculés sur 1 an (return_1y, volatility_1y, max_drawdown_1y)
 # ==========================================================================
 
 
 def test_compute_1y_indicators_exact_math() -> None:
-    """Vérifie le calcul exact du rendement total, de la volatilité √252 et du max drawdown sur adj_close."""
+    """Vérifie le calcul exact du rendement total, de la volatilité √252 et du max drawdown sur adjclose."""
     # Série synthétique : 100 -> 110 -> 99 -> 121
-    # close est volontairement différent pour vérifier que seul adj_close est utilisé.
+    # close est volontairement différent pour vérifier que seul adjclose est utilisé.
     df = pd.DataFrame({
         "date": ["2026-01-02", "2026-01-05", "2026-01-06", "2026-01-07"],
         "close": [100.0, 100.0, 100.0, 100.0],
-        "adj_close": [100.0, 110.0, 99.0, 121.0],
+        "adjclose": [100.0, 110.0, 99.0, 121.0],
     })
     res = compute_1y_indicators(df)
 
@@ -69,9 +74,9 @@ def test_compute_1y_indicators_exact_math() -> None:
 
 def test_compute_1y_indicators_on_fixtures() -> None:
     """Vérifie le calcul des indicateurs sur les 3 tickers du mini-jeu data/fixtures/."""
-    prices = pd.read_csv(FIXTURES_DIR / "prices_daily.csv")
+    prices = _read_prices()
     for ticker in ("RY.TO", "CNQ.TO", "SPY"):
-        sub = prices[prices["ticker"] == ticker]
+        sub = prices[prices["symbol"] == ticker]
         ind = compute_1y_indicators(sub)
         assert ind["return_1y"] is not None
         assert ind["volatility_1y"] is not None and ind["volatility_1y"] > 0
@@ -85,10 +90,10 @@ def test_compute_1y_indicators_edge_cases() -> None:
         "volatility_1y": None,
         "max_drawdown_1y": None,
     }
-    single = pd.DataFrame({"date": ["2026-01-01"], "adj_close": [100.0]})
+    single = pd.DataFrame({"date": ["2026-01-01"], "adjclose": [100.0]})
     assert compute_1y_indicators(single)["return_1y"] is None
 
-    neg = pd.DataFrame({"date": ["2026-01-01", "2026-01-02"], "adj_close": [100.0, -5.0]})
+    neg = pd.DataFrame({"date": ["2026-01-01", "2026-01-02"], "adjclose": [100.0, -5.0]})
     assert compute_1y_indicators(neg)["return_1y"] is None
 
 
@@ -139,6 +144,23 @@ def test_add_macro_publication_date_on_fixtures() -> None:
 # ==========================================================================
 
 
+def test_deduce_market_and_currency_index() -> None:
+    assert deduce_market_and_currency("^GSPC") == ("US", "USD")
+
+
+def test_merge_candidates_keeps_ours_and_adds_sp500_and_index() -> None:
+    from data.ingestion.build_dataset import _country_fallback, _merge_candidates
+
+    base = [{"symbol": "RY.TO", "name": "Royal Bank", "asset_class": "equity", "market": "TSX",
+             "currency": "CAD", "sector": "Financials"}]
+    merged = _merge_candidates(base, ["AAPL", "RY.TO", "BRK-B", "AAPL"])
+    symbols = [c["symbol"] for c in merged]
+    assert symbols == ["RY.TO", "AAPL", "BRK-B", "^GSPC"]
+    assert merged[0]["name"] == "Royal Bank"  # nos métadonnées ne sont pas écrasées
+    assert merged[-1]["asset_class"] == "index" and merged[-1]["currency"] == "USD"
+    assert _country_fallback("RY.TO") == "Canada" and _country_fallback("AAPL") == "United States"
+
+
 def test_deduce_market_and_currency() -> None:
     assert deduce_market_and_currency("RY.TO") == ("TSX", "CAD")
     assert deduce_market_and_currency("BIP-UN.TO") == ("TSX", "CAD")
@@ -156,8 +178,8 @@ def test_validate_candidate_prices_rejects_empty_and_short_and_bad_prices() -> N
     assert res_empty["reason"] == "no_data"
 
     # 2. Historique trop court (60 lignes < 252)
-    prices = pd.read_csv(FIXTURES_DIR / "prices_daily.csv")
-    ry_short = prices[prices["ticker"] == "RY.TO"].copy()
+    prices = _read_prices()
+    ry_short = prices[prices["symbol"] == "RY.TO"].copy()
     assert len(ry_short) < 252
     res_short = validate_candidate_prices("RY.TO", ry_short, min_rows=252)
     assert res_short["valid"] is False
@@ -172,16 +194,16 @@ def test_validate_candidate_prices_rejects_empty_and_short_and_bad_prices() -> N
 
     # 4. Prix nul ou négatif -> écarté
     bad_df = ry_short.copy()
-    bad_df.loc[bad_df.index[0], "adj_close"] = 0.0
+    bad_df.loc[bad_df.index[0], "adjclose"] = 0.0
     res_bad = validate_candidate_prices("RY.TO", bad_df, min_rows=10)
     assert res_bad["valid"] is False
-    assert "invalid_or_non_positive_adj_close" in res_bad["reason"]
+    assert "invalid_or_non_positive_adjclose" in res_bad["reason"]
 
 
 def test_universe_yaml_coverage() -> None:
     """Vérifie que universe.yaml contient ~250 candidats dont les 31 du starter et tous les titres requis."""
     candidates = load_universe_candidates(DEFAULT_UNIVERSE_YAML)
-    tickers = {c["ticker"] for c in candidates}
+    tickers = {c["symbol"] for c in candidates}
 
     assert 220 <= len(candidates) <= 280
 
@@ -341,12 +363,12 @@ def test_validate_etf_enriched_catches_bad_weights_missing_dates_and_equities() 
 
 def test_cnq_2022_08_22_anomaly_isolated() -> None:
     """Vérifie l'isolation du split 1.021 de CNQ.TO le 2022-08-22 le jour du dividende de 0.75 CAD."""
-    actions = pd.read_csv(FIXTURES_DIR / "corporate_actions.csv")
+    actions = pd.read_csv(FIXTURES_DIR / "corporate_actions.csv").rename(columns={"ticker": "symbol"})
     enriched, isolated = isolate_cnq_anomaly_and_check_actions(actions)
 
     assert len(isolated) == 1
     anom = isolated[0]
-    assert anom["ticker"] == "CNQ.TO"
+    assert anom["symbol"] == "CNQ.TO"
     assert anom["exDate"] == "2022-08-22"
     assert anom["action"] == "split"
     assert anom["value"] == pytest.approx(1.021)
@@ -354,7 +376,7 @@ def test_cnq_2022_08_22_anomaly_isolated() -> None:
 
     flagged = enriched[enriched["anomaly_note"].notna()]
     assert len(flagged) == 1
-    assert flagged.iloc[0]["ticker"] == "CNQ.TO"
+    assert flagged.iloc[0]["symbol"] == "CNQ.TO"
     assert flagged.iloc[0]["ex_date"] == "2022-08-22"
 
 
@@ -392,13 +414,15 @@ def test_build_dataset_offline_on_fixtures(tmp_path: Path) -> None:
     u_df = pd.read_parquet(out_dir / "universe.parquet")
     expected_u_cols = {
         "asset_id",
-        "ticker",
+        "symbol",
         "name",
         "asset_class",
         "market",
         "currency",
         "sector",
         "sector_source",
+        "industry",
+        "country",
         "first_date",
         "last_date",
         "return_1y",
