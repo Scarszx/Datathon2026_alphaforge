@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { SUGGESTIONS } from "../agent/agent";
-import { useApp } from "../lib/store";
+import { useApp } from "../lib/legacyStore";
 import type { Message } from "../lib/types";
 
 const DATE = (ts: number) => new Date(ts).toLocaleDateString("fr-CA", { day: "numeric", month: "short" });

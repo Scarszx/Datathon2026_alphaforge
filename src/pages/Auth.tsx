@@ -1,9 +1,8 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Questionnaire, { ProfileSummary } from "../components/Questionnaire";
-import { useApp } from "../lib/store";
+import { useApp, TEMP_KEY } from "../lib/legacyStore";
 import type { Answers } from "../lib/types";
-import { TEMP_KEY } from "./Landing";
 
 function Shell({ title, children }: { title: string; children: React.ReactNode }) {
   return (

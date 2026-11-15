@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { cad, money } from "../lib/format";
 import { ASSETS } from "../lib/market";
 import { preview } from "../lib/trading";
-import { useApp } from "../lib/store";
+import { useApp } from "../lib/legacyStore";
 import { ACCOUNTS, type Account, type OrderInput } from "../lib/types";
 
 export type OrderPreset = { side: "buy" | "sell"; symbol?: string; holdingId?: string };

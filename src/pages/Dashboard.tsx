@@ -1,13 +1,13 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import AppHeader from "../components/AppHeader";
+import AppHeader from "../components/LegacyAppHeader";
 import Chart from "../components/Chart";
 import Chat from "../components/Chat";
 import OrderModal, { type OrderPreset } from "../components/OrderModal";
 import { cad, money, pct, shortDate, signedCad } from "../lib/format";
 import { ASSETS, RANGE_KEYS, assetOf, fxOf, prevClose, type RangeKey } from "../lib/market";
 import { ALL, computePortfolio, series } from "../lib/portfolio";
-import { useApp } from "../lib/store";
+import { useApp } from "../lib/legacyStore";
 import { ACCOUNTS } from "../lib/types";
 
 const ACCOUNT_OPTIONS = [ALL, ...ACCOUNTS];
