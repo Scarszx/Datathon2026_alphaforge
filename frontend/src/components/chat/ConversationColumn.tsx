@@ -117,9 +117,10 @@ export default function ConversationColumn({
 }) {
   const [v, setV] = useState("");
   const [partial, setPartial] = useState("");
+  const [dictated, setDictated] = useState(false); // le champ contient du texte dicté : rappel de le relire avant l'envoi
   // Saisie vocale (0.4.8) : le texte final s'ajoute à `v`, le texte provisoire s'affiche dans le champ à la suite
   // de `v` (gris italique) et se remplace à chaque mise à jour ; l'envoi reste manuel.
-  const speech = useSpeechToText(lang, (seg) => setV((cur) => appendSpeech(cur, seg, MAX_LEN)), setPartial);
+  const speech = useSpeechToText(lang, (seg) => { setDictated(true); setV((cur) => appendSpeech(cur, seg, MAX_LEN)); }, setPartial);
   const dictating = speech.state === "listening" || speech.state === "finishing";
   const shown = appendSpeech(v, partial, MAX_LEN);
   const field = useRef<HTMLInputElement>(null);
@@ -136,6 +137,7 @@ export default function ConversationColumn({
     speech.abort();
     setPartial("");
     setV("");
+    setDictated(false);
     onSend(text);
   }
   const key = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -175,6 +177,8 @@ export default function ConversationColumn({
             {speech.state === "denied" ? t("chat.mic.denied", lang) : t("chat.mic.error", lang)}
           </p>
         )}
+        {speech.supported && !dictating && !v && <p className="af-mic-note">{t("chat.mic.examples", lang)}</p>}
+        {speech.supported && !dictating && dictated && !!v && <p className="af-mic-note" role="status">{t("chat.mic.review", lang)}</p>}
         <p className="af-disclaimer">{t("app.disclaimer", lang)}</p>
       </div>
     </main>
