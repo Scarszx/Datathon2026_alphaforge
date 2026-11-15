@@ -72,7 +72,7 @@ Attention :
 1. `terraform plan` puis `apply`, par une seule personne.
 2. Exécuter l'ingestion (WS3) et téléverser le jeu de données dans le bucket (préfixe = `DATASET_VERSION`), y compris `etf_enriched.json`.
 3. **Knowledge Base :** lancer `infra/scripts/kb_sync.sh` juste après `apply`. Il envoie `docs/for_KB/` vers `s3://<bucket>/kb/<version>/` (fichiers et `.metadata.json`) et lance l'ingestion. C'est l'étape la plus longue.
-4. Vérifier l'accès à Claude Sonnet 5.5 dans us-east-1 (déjà testé par l'équipe) et **activer Titan Text Embeddings V2** (embeddings de la KB). Le Guardrail est créé par Terraform. Créer les comptes Cognito des personas.
+4. Modèles : Claude Sonnet 5.5 est déjà testé dans us-east-1. Titan Text Embeddings V2 ne demande **aucune activation** : la page *Model access* de Bedrock est retirée, et les modèles serverless sont activés automatiquement au premier appel. Si l'ingestion de la KB échoue sur les embeddings, faire un appel de test au modèle pour le diagnostiquer. Le Guardrail est créé par Terraform. Créer les comptes Cognito des personas.
 5. Tests de bout en bout :
    - login, conversation et portefeuille ;
    - message de cadrage, puis confirmation du mandat ;
@@ -163,7 +163,7 @@ Fusionné dans `main` (`1fc329f`), worktree supprimé. `terraform fmt` et `terra
 
 Les hypothèses sont dans `infra/NOTES-infra.md`. À retenir pour les autres chantiers :
 - **WS5** : la complétion d'un run (partial → done) est à trancher. L'infra n'a **ni droit d'auto-invocation ni timeout long** (30 s, comme l'API Gateway). Si l'invocation asynchrone est retenue, revenir à l'infra : ajouter `lambda:InvokeFunction` sur la Lambda agents elle-même et porter son timeout à environ 180 s.
-- **Intégration** : activer l'accès à **Titan Text Embeddings V2** en plus de Claude Sonnet 5.5, sinon l'ingestion de la KB échoue.
+- **Intégration** : aucune activation manuelle de modèle (Titan Text Embeddings V2 et Claude Sonnet 5.5 sont activés au premier appel, la page *Model access* est retirée).
 - **Tester tôt les faux positifs du Guardrail** : le sujet « recommandation personnalisée » face à une simulation, et le détecteur `US_BANK_ACCOUNT_NUMBER` face aux nombres. Le filtre `PROMPT_ATTACK` n'est pas activé : à discuter.
 - `MODEL_ANALYST` et `MODEL_GOVERNANCE` sont retirés de l'infra, et de `backend/common/config.py` sur `main`.
 

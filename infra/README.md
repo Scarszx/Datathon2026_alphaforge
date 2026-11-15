@@ -75,7 +75,7 @@ C'est l'option la plus rapide à créer sur le compte d'atelier, sans étape man
 ## Ce qui reste manuel après `apply`
 
 0. Lancer `infra/scripts/kb_sync.sh` (corpus + ingestion), puis suivre le job avec la commande qu'il affiche (statut `COMPLETE`, aucun document en échec).
-1. Vérifier l'accès aux modèles Bedrock (console → Bedrock → *Model access*) pour Claude Sonnet 5.5 (profil choisi) **et Titan Text Embeddings V2** (sinon l'ingestion de la KB échoue).
+1. Modèles Bedrock : aucune activation manuelle. La page *Model access* est retirée : Bedrock active les modèles serverless (Claude Sonnet 5.5, Titan Text Embeddings V2) au premier appel. Pour Anthropic, une première utilisation sur un compte peut demander de décrire le cas d'usage ; Sonnet 5.5 est déjà testé sur ce compte.
 2. Créer les comptes Cognito des personas : `admin-create-user` puis `admin-set-user-password` avec `--permanent` (contrat : srv-cognito.notes, pas de changement de mot de passe temporaire).
 3. Exécuter l'ingestion (WS3) et téléverser le jeu de données : `data/output/<version>/` → `s3://<bucket>/dataset/<version>/` (bucket en output `dataset_bucket`).
 4. Déposer le build du front dans `s3://<front bucket>/` (output `front_bucket`).

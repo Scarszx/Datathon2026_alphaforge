@@ -222,7 +222,7 @@ services:
     type: "managed_service"
     description: "Corpus réglementaire (storage-kb-corpus) indexé. Interrogé par agent-auditor avec un filtre de métadonnées juridiction ∈ {CA, province de l'utilisateur}, éventuellement sur sujets."
     notes:
-      - "Magasin de vecteurs : Amazon S3 Vectors (créé en quelques secondes, sans coût fixe, entièrement en Terraform). Embeddings : Titan Text Embeddings V2, 1024 dimensions (accès au modèle à activer). Découpage en passages de 300 tokens. L'ingestion du corpus (job-kb-sync) est l'étape la plus longue : à lancer juste après apply."
+      - "Magasin de vecteurs : Amazon S3 Vectors (créé en quelques secondes, sans coût fixe, entièrement en Terraform). Embeddings : Titan Text Embeddings V2, 1024 dimensions (aucune activation manuelle : Bedrock active les modèles serverless au premier appel). Découpage en passages de 300 tokens. L'ingestion du corpus (job-kb-sync) est l'étape la plus longue : à lancer juste après apply."
       - "Repli : index JSON local des passages clés, pour la démo seulement si la KB n'est pas prête."
 
   - id: "srv-bedrock-guardrails"
