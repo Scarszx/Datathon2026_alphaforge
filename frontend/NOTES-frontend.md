@@ -51,7 +51,7 @@ Le mode démo simule le back dans le navigateur (activé par `npm run dev:demo`,
 
 ## Hors périmètre WS6 (décisions d'équipe, à exécuter sur `main`)
 
-- Suppression des doublons du prototype : `backend/alphaforge/`, `backend/local_server.py`,
+- Suppression des doublons du prototype (faite le 2026-11-14, branche `ws/cleanup`) : `backend/alphaforge/`, `backend/local_server.py`,
   `backend/lambda_handler.py`, `data/build_dataset.py`, `data/universe.py`, `data/dataset/`,
   `data/esg_screen.csv` (l'ingestion officielle est `data/ingestion/`, WS3).
 - Langue des `warnings` serveur, i18n des pages hors `/chat` (voir écarts ci-dessus).
