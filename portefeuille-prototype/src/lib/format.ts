@@ -1,0 +1,51 @@
+/* Formatage fr-CA maison (stable entre serveur et navigateur). */
+
+const NBSP = " ";
+const MONTHS = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
+
+export function money(n: number, decimals = 2) {
+  const [int, dec] = Math.abs(n).toFixed(decimals).split(".");
+  const grouped = int.replace(/\B(?=(\d{3})+(?!\d))/g, NBSP);
+  return (n < 0 ? "−" : "") + grouped + (dec ? "," + dec : "");
+}
+
+export function cad(n: number, decimals = 2) {
+  return money(n, decimals) + NBSP + "$";
+}
+
+export function pct(n: number) {
+  return (n >= 0 ? "+" : "−") + Math.abs(n).toFixed(2).replace(".", ",") + NBSP + "%";
+}
+
+export function signedCad(n: number) {
+  return (n >= 0 ? "+" : "−") + cad(Math.abs(n));
+}
+
+export function shortDate(ts: number, withYear = false) {
+  const d = new Date(ts * 1000);
+  return withYear ? `${MONTHS[d.getMonth()]} ${d.getFullYear()}` : `${d.getDate()} ${MONTHS[d.getMonth()]}`;
+}
+
+export function fullDate(ts: number) {
+  const d = new Date(ts * 1000);
+  return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+export function clock(ts: number) {
+  return time(new Date(ts * 1000));
+}
+
+export function fullDateTime(ts: number) {
+  return `${fullDate(ts)}, ${clock(ts)}`;
+}
+
+/** Grands nombres : 82,47 G, 1,54 M, 867 k */
+export function compact(n: number) {
+  const a = Math.abs(n);
+  const [v, s] = a >= 1e12 ? [n / 1e12, "T"] : a >= 1e9 ? [n / 1e9, "G"] : a >= 1e6 ? [n / 1e6, "M"] : a >= 1e3 ? [n / 1e3, "k"] : [n, ""];
+  return money(v, s ? 2 : 0) + (s ? NBSP + s : "");
+}
+
+export function time(d: Date) {
+  return `${d.getHours()} h ${String(d.getMinutes()).padStart(2, "0")}`;
+}
