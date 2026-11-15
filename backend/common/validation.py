@@ -291,6 +291,17 @@ def _validate_operation(raw: Any) -> dict[str, Any]:
             values = ", ".join(CURRENCIES)
             raise _validation_error(f"currency doit être l'un de : {values}.")
         operation["currency"] = currency
+    # Contrat (schema-operation) : add et remove portent un montant, set_weight un poids cible.
+    # Une opération mal formée n'est jamais interprétée : remove sans montant retire la position
+    # entière, et un « weight » sur add/remove était ignoré en silence.
+    if action == "add" and "amount" not in operation:
+        raise _validation_error("add exige un amount (montant dans currency) ; weight n'est valide que pour set_weight.")
+    if action == "set_weight" and "weight" not in operation:
+        raise _validation_error("set_weight exige un weight (poids cible en %).")
+    if action in ("add", "remove") and "weight" in operation:
+        raise _validation_error(f"{action} n'accepte pas weight : utiliser amount (ou set_weight pour un poids cible).")
+    if action == "set_weight" and "amount" in operation:
+        raise _validation_error("set_weight n'accepte pas amount : utiliser weight (poids cible en %).")
     return operation
 
 
