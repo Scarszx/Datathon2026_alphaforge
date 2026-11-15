@@ -35,12 +35,15 @@ NUMBER_RE = re.compile(
     re.IGNORECASE,
 )
 
+# « fourchette à 90 % » : niveau de la méthode de rééchantillonnage (consigne du rédacteur), pas un chiffre de résultat.
+METHOD_RESAMPLING_LEVEL = 90.0
+
 FORBIDDEN_PATTERNS = [
     r"\byou should (?:buy|sell|invest|hold|add)\b", r"\bwe recommend\b", r"\bi recommend\b", r"\brecommended\b",
-    r"\bguarantee(?:d|s)?\b", r"\brisk[- ]free\b", r"\bsure (?:bet|thing|win)\b", r"\bwill (?:certainly|definitely) (?:rise|grow|gain)\b",
+    r"\bguarantee(?:d|s)?\b", r"\brisk[- ]free\b(?!\s+(?:rate|asset|benchmark))", r"\bsure (?:bet|thing|win)\b", r"\bwill (?:certainly|definitely) (?:rise|grow|gain)\b",
     r"\bbuy now\b", r"\bmust (?:buy|sell)\b", r"\bbest investment\b",
     r"\bvous devriez (?:acheter|vendre|investir|conserver|ajouter)\b", r"\bje (?:vous )?recommande\b",
-    r"\bnous (?:vous )?recommandons\b", r"\brecommand[ée]e?s?\b", r"\bgaranti(?:e|es|s)?\b", r"\bsans risque\b",
+    r"\bnous (?:vous )?recommandons\b", r"\brecommand[ée]e?s?\b", r"\bgaranti(?:e|es|s)?\b", r"(?<!taux )\bsans risque\b",
     r"\bachetez\b", r"\bvendez\b", r"\bmeilleur placement\b", r"\bva (?:certainement|forcément) (?:monter|augmenter)\b",
     r"\bconseiller financier\b", r"\bplanificateur financier\b", r"\bfinancial (?:advisor|adviser|planner)\b",
 ]
@@ -130,6 +133,10 @@ def mandate_constants(mandate: dict[str, Any]) -> set[float]:
         for key in ("amount", "weight"):
             if isinstance(op.get(key), (int, float)):
                 values.add(float(op[key]))
+    for item in (mandate.get("preferences") or {}).get("preferredIndustries") or []:  # mode build : minimums saisis
+        if isinstance(item.get("minWeight"), (int, float)):
+            values.add(float(item["minWeight"]))
+    values.add(METHOD_RESAMPLING_LEVEL)
     return values
 
 

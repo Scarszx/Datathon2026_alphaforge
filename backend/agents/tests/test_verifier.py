@@ -155,3 +155,26 @@ def test_recits_langfuse_le_fnb_d_approximation_est_masque():
     sentence = "The alternative uses a Canadian short-term bond fund (ZST.TO) only as an approximation of the asset category."
     text, hidden, _ = _symbols(sentence, held=set())
     assert text == "" and hidden
+
+
+@pytest.mark.parametrize("sentence", [
+    "The risk-free rate of {EV-07} is a team assumption.", "Le taux sans risque de {EV-07} est une hypothèse d'équipe.",
+])
+def test_taux_sans_risque_n_est_pas_une_promesse(sentence):
+    _, hidden, _ = verify_narrative([_section(sentence)], IDS, MANDATE)
+    assert not hidden
+
+
+@pytest.mark.parametrize("sentence", ["This is a risk-free investment.", "C'est un placement sans risque."])
+def test_promesse_sans_risque_reste_interdite(sentence):
+    _, hidden, report = verify_narrative([_section(sentence)], IDS, MANDATE)
+    assert hidden[0]["reason"] == "forbidden_phrase"
+
+
+def test_constantes_du_mode_build_et_niveau_de_la_fourchette():
+    mandate = {**MANDATE, "preferences": {"preferredIndustries": [{"industry": "Tobacco", "minWeight": 15}, {"industry": "Banks", "minWeight": None}]}}
+    sentence = "You asked for at least 15 % in one industry, and the 90 % range shows the dependence on the period {EV-07}."
+    _, hidden, _ = verify_narrative([_section(sentence)], IDS, mandate)
+    assert not hidden
+    _, hidden, _ = verify_narrative([_section("A drawdown of 37 % occurred {EV-07}.")], IDS, mandate)
+    assert hidden[0]["reason"] == "handwritten_number"
