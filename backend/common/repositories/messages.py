@@ -20,6 +20,9 @@ from backend.common.repositories import _dynamo
 ROLES = ("user", "assistant")
 STATUSES = ("done", "pending", "error")
 
+# Champs de schema-message portés seulement par un message de l'assistant.
+OPTIONAL_ASSISTANT_FIELDS = ("explanation", "quickReplies", "mandateDraft", "runId")
+
 
 def _to_message(item: dict[str, Any]) -> dict[str, Any]:
     """Item DynamoDB -> schema-message (userId n'est pas exposé)."""
@@ -32,8 +35,9 @@ def _to_message(item: dict[str, Any]) -> dict[str, Any]:
         "status": item["status"],
         "createdAt": item["createdAt"],
     }
-    if item.get("explanation") is not None:
-        message["explanation"] = item["explanation"]
+    for key in OPTIONAL_ASSISTANT_FIELDS:
+        if item.get(key) is not None:
+            message[key] = item[key]
     return message
 
 
@@ -69,19 +73,32 @@ def put_message(
     status: str,
     explanation: dict[str, Any] | None = None,
     message_id: str | None = None,
+    quick_replies: list[str] | None = None,
+    mandate_draft: dict[str, Any] | None = None,
+    run_id: str | None = None,
 ) -> dict[str, Any]:
     """Écrit un message (messageId = new_message_id() si non fourni) et le retourne.
 
     role : 'user' ou 'assistant'. status : 'done', 'pending' ou 'error'.
-    explanation n'est présent que pour role = 'assistant'.
+    explanation, quick_replies, mandate_draft et run_id (schema-message :
+    explanation, quickReplies, mandateDraft, runId) ne sont autorisés que pour
+    role = 'assistant'.
     Lève ValueError si ces règles ne sont pas respectées (erreur de programmation).
     """
     if role not in ROLES:
         raise ValueError(f"role invalide : {role!r}")
     if status not in STATUSES:
         raise ValueError(f"status invalide : {status!r}")
-    if explanation is not None and role != "assistant":
-        raise ValueError("explanation n'est autorisé que pour role = 'assistant'")
+    optional = {
+        "explanation": explanation,
+        "quickReplies": quick_replies,
+        "mandateDraft": mandate_draft,
+        "runId": run_id,
+    }
+    if role != "assistant":
+        for key, value in optional.items():
+            if value is not None:
+                raise ValueError(f"{key} n'est autorisé que pour role = 'assistant'")
     item: dict[str, Any] = {
         "sessionId": session_id,
         "messageId": message_id or new_message_id(),
@@ -91,8 +108,9 @@ def put_message(
         "status": status,
         "createdAt": _dynamo.now_iso(),
     }
-    if explanation is not None:
-        item["explanation"] = _dynamo.to_dynamo(explanation)
+    for key, value in optional.items():
+        if value is not None:
+            item[key] = _dynamo.to_dynamo(value)
     _dynamo.table(config.messages_table()).put_item(Item=item)
     return _to_message(item)
 
