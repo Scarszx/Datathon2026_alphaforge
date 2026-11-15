@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { useApp } from "./lib/store";
-import ChatWidget from "./components/ChatWidget";
+import Chat from "./pages/Chat";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Markets from "./pages/Markets";
@@ -13,7 +13,7 @@ import Register from "./pages/Register";
 function Private({ children }: { children: ReactNode }) {
   const { status } = useApp();
   if (status === "loading") return <p className="muted" style={{ padding: 48 }}>Chargement…</p>;
-  return status === "authed" ? <>{children}<ChatWidget /></> : <Navigate to="/login" replace />;
+  return status === "authed" ? children : <Navigate to="/login" replace />;
 }
 
 export default function App() {
@@ -23,6 +23,7 @@ export default function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/inscription" element={<Register />} />
       <Route path="/test-risque" element={<Navigate to="/#profil" replace />} />
+      <Route path="/chat" element={<Private><Chat /></Private>} />
       <Route path="/portefeuille" element={<Private><Portfolio /></Private>} />
       <Route path="/marches" element={<Private><Markets /></Private>} />
       <Route path="/profil" element={<Private><Profile /></Private>} />

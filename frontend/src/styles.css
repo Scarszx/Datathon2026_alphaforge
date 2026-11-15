@@ -591,3 +591,53 @@ fieldset.q.missing legend { color: var(--red); }
 .risk-portfolios { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .risk-portfolios li { display: flex; align-items: baseline; gap: 12px; padding: 12px 16px; border-radius: 12px; background: var(--ghost); }
 .risk-portfolios li span:first-child { flex: 1; }
+
+/* ===== Page /chat : session en 3 colonnes (WS6) — layout seulement, mêmes variables visuelles ===== */
+
+.chat-page { position: relative; height: calc(100dvh - 64px); display: grid; grid-template-columns: 280px 1fr; min-height: 0; }
+.chat-rail { border-right: 1px solid var(--line); }
+.chat-rail .af-brand, .chat-rail .af-overlay-only { display: none; }
+
+.chat-grid { display: grid; grid-template-columns: minmax(280px, 340px) minmax(380px, 1fr) minmax(320px, 420px); min-width: 0; min-height: 0; }
+.chat-col { display: flex; flex-direction: column; min-width: 0; min-height: 0; border-right: 1px solid var(--line); background: #fafafb; }
+.chat-col-mid { background: var(--bg); border-right: 1px solid var(--line); }
+.chat-col-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 20px 20px 24px; }
+.chat-col-foot { flex-shrink: 0; padding: 8px 20px 16px; }
+.chat-col-foot .af-composer { margin: 0; }
+.chat-loading { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); }
+.chat-error { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 6px 14px; box-shadow: 0 4px 16px rgba(17, 19, 24, .08); max-width: 80%; }
+.chat-error .error { margin: 0; font-size: 13px; }
+
+/* Panneau de simulation */
+.sim-panel { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--bg); }
+.sim-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 20px 20px 32px; }
+.scenario-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 8px; }
+.scenario-card { border: 1px solid var(--line); border-radius: 12px; padding: 12px; background: #fff; display: flex; flex-direction: column; gap: 4px; }
+.scenario-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.scenario-head strong { font-size: 13px; }
+.pill { font-size: 11px; font-weight: 600; letter-spacing: .4px; padding: 3px 10px; border-radius: 999px; background: var(--ghost); color: var(--muted); white-space: nowrap; }
+.pill.up { background: #e3f5ee; color: var(--green); }
+.pill.warn { background: #fff4d6; color: #8a5a00; }
+.pill.down { background: var(--red-soft); color: var(--red-dark); }
+
+/* Badges de preuve {EV-nn}/{KB-nn} et carte de preuve */
+.ev-text .ev-badge { font-size: 12px; padding: 1px 9px; margin: 0 2px; background: #fff; }
+.ev-badge.kb { border-style: dashed; }
+.ev-badge.unknown { opacity: .55; border-style: dotted; }
+.proof-overlay .af-shell { grid-template-columns: 1fr; max-width: 720px; margin: 40px auto; height: fit-content; max-height: calc(100% - 80px); border-radius: 16px; overflow: hidden; box-shadow: 0 18px 60px rgba(17, 19, 24, .25); background: var(--bg); }
+.proof-row { display: grid; grid-template-columns: 130px 1fr; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--ghost); align-items: baseline; }
+.proof-caveats { margin: 0; padding-left: 18px; }
+.kb-excerpt { margin: 4px 0 0; padding: 10px 14px; border-left: 3px solid var(--red); background: var(--ghost); border-radius: 0 10px 10px 0; }
+.kb-excerpt p { margin: 6px 0 0; font-size: 13px; }
+.kb-excerpt .tag { font-size: 10px; }
+
+/* Colonne mandat */
+.mandate-card .tbl td:first-child { width: 45%; color: var(--muted); font-size: 12px; }
+.mandate-ops { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; font-size: 13px; }
+.alloc-row { display: grid; grid-template-columns: 96px 1fr 52px; align-items: center; gap: 8px; padding: 2px 0; }
+
+@media (max-width: 1200px) {
+  .chat-grid { grid-template-columns: 1fr 1fr; grid-template-rows: auto; }
+  .sim-panel { grid-column: 1 / -1; border-top: 1px solid var(--line); max-height: 50dvh; }
+  .chat-page { grid-template-columns: 240px 1fr; }
+}
