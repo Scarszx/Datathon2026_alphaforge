@@ -105,7 +105,7 @@ Après l'inscription :
 
 ```
 frontend/src/api/types.ts          types des schémas du contrat
-frontend/src/api/auth.ts           Cognito : connexion, inscription, code de confirmation (jetons en sessionStorage)
+frontend/src/api/auth.ts           Cognito : connexion, inscription (confirmée d'office, sans code) (jetons en sessionStorage)
 frontend/src/api/client.ts         fetch + Bearer + erreurs au format schema-error
 frontend/src/api/endpoints.ts      une fonction par route
 frontend/src/api/demo.ts           mode démo : simulation de Cognito et des routes /v1 (actif seulement si VITE_DEMO=1)

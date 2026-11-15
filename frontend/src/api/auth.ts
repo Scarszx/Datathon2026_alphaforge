@@ -45,12 +45,10 @@ async function cognito(target: string, body: unknown): Promise<any> {
 const COGNITO_ERRORS: Record<string, [ErrorCode, string]> = {
   NotAuthorizedException: ["UNAUTHORIZED", "Identifiants invalides."],
   UserNotFoundException: ["UNAUTHORIZED", "Identifiants invalides."],
-  UserNotConfirmedException: ["UNAUTHORIZED", "Ce compte n'est pas encore confirmé. Entrez le code reçu par courriel."],
+  UserNotConfirmedException: ["UNAUTHORIZED", "Ce compte n'est pas confirmé. Contactez l'équipe."],
   UsernameExistsException: ["VALIDATION_ERROR", "Ce nom d'utilisateur est déjà pris."],
   InvalidPasswordException: ["VALIDATION_ERROR", "Mot de passe refusé : au moins 8 caractères avec majuscule, minuscule, chiffre et symbole."],
   InvalidParameterException: ["VALIDATION_ERROR", "Un des champs est invalide (vérifiez le courriel et le nom d'utilisateur)."],
-  CodeMismatchException: ["VALIDATION_ERROR", "Code de confirmation invalide."],
-  ExpiredCodeException: ["VALIDATION_ERROR", "Ce code a expiré. Demandez-en un nouveau."],
   LimitExceededException: ["VALIDATION_ERROR", "Trop de tentatives. Réessayez dans quelques minutes."],
   TooManyRequestsException: ["VALIDATION_ERROR", "Trop de tentatives. Réessayez dans quelques minutes."],
 };
@@ -74,13 +72,13 @@ export async function signIn(username: string, password: string) {
 }
 
 /**
- * Inscription Cognito (SignUp, public, sans jeton). Retourne `true` si le compte est déjà confirmé
- * (pool à confirmation automatique), sinon un code est envoyé par courriel et doit passer par confirmSignUp.
+ * Inscription Cognito (SignUp, public, sans jeton). Le déclencheur pre sign-up confirme le compte
+ * d'office : aucun code par courriel, la connexion peut suivre tout de suite.
  */
-export async function signUp(username: string, password: string, email: string, givenName: string, familyName: string): Promise<boolean> {
-  if (DEMO) { demoSignUp(username, password, email, `${givenName} ${familyName}`); return true; } // compte confirmé d'office
+export async function signUp(username: string, password: string, email: string, givenName: string, familyName: string): Promise<void> {
+  if (DEMO) { demoSignUp(username, password, email, `${givenName} ${familyName}`); return; }
   // Attributs standard Cognito; le client d'application doit avoir le droit d'écrire given_name et family_name.
-  const r = await cognito("SignUp", {
+  await cognito("SignUp", {
     ClientId: CLIENT_ID, Username: username, Password: password,
     UserAttributes: [
       { Name: "email", Value: email },
@@ -88,15 +86,6 @@ export async function signUp(username: string, password: string, email: string, 
       { Name: "family_name", Value: familyName },
     ],
   });
-  return r.UserConfirmed === true;
-}
-
-export async function confirmSignUp(username: string, code: string) {
-  await cognito("ConfirmSignUp", { ClientId: CLIENT_ID, Username: username, ConfirmationCode: code });
-}
-
-export async function resendCode(username: string) {
-  await cognito("ResendConfirmationCode", { ClientId: CLIENT_ID, Username: username });
 }
 
 export function signOut() { write(null); inflight = null; }

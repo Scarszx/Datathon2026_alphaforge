@@ -1,6 +1,6 @@
 import { useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
-import { confirmSignUp, resendCode, signUp } from "../api/auth";
+import { signUp } from "../api/auth";
 import { listPortfolios } from "../api/endpoints";
 import { ApiError, errorText } from "../api/errors";
 import type { Jurisdiction } from "../api/types";
@@ -12,12 +12,12 @@ import { EMPTY_INDUSTRIES, type IndustryChoice } from "../lib/industries";
 import { loadPersonalAnswers } from "../lib/personalDraft";
 
 /*
- * Inscription : 1) compte  2) questionnaire de risque  3) code de confirmation Cognito (si le pool l'exige).
+ * Inscription : 1) compte  2) questionnaire de risque. Le compte est confirmé d'office (déclencheur pre sign-up), sans code par courriel.
  * Ensuite : connexion, PUT /v1/me/profile avec le profil déduit du questionnaire, et résultat enregistré
  * pour les portefeuilles existants (comme sur /profil). Le mot de passe ne vit qu'en mémoire pendant le parcours.
  */
 type Answers = Record<string, number>;
-type Step = "account" | "risk" | "code" | "done";
+type Step = "account" | "risk" | "done";
 
 export default function Register() {
   const { status, login, saveProfile } = useApp();
@@ -29,9 +29,7 @@ export default function Register() {
   const answers = useRef<Answers | null>(null);
   const provinceRef = useRef<Jurisdiction | null>(null);
   const industriesRef = useRef<IndustryChoice>(EMPTY_INDUSTRIES);
-  const [code, setCode] = useState("");
   const [err, setErr] = useState("");
-  const [info, setInfo] = useState("");
   const [busy, setBusy] = useState(false);
   const finishing = useRef(false);
 
@@ -61,9 +59,8 @@ export default function Register() {
     industriesRef.current = industries;
     provinceRef.current = province;
     setBusy(true); setErr("");
-    let confirmed: boolean;
     try {
-      confirmed = await signUp(f.username.trim(), f.password, f.email.trim(), f.firstName.trim(), f.lastName.trim());
+      await signUp(f.username.trim(), f.password, f.email.trim(), f.firstName.trim(), f.lastName.trim());
     } catch (x) {
       setErr(errorText(x)); setBusy(false);
       // Nom d'utilisateur pris, mot de passe refusé, courriel invalide : à corriger à l'étape 1.
@@ -71,8 +68,7 @@ export default function Register() {
       if (x instanceof ApiError && x.code === "VALIDATION_ERROR") setStep("account");
       return;
     }
-    if (confirmed) await finish().catch(afterAccountError);
-    else { setInfo(`Un code de confirmation a été envoyé à ${f.email.trim()}.`); setStep("code"); }
+    await finish().catch(afterAccountError);
     setBusy(false);
   }
 
@@ -80,22 +76,6 @@ export default function Register() {
   function afterAccountError(x: unknown) {
     setErr(`Compte créé, mais la connexion a échoué : ${errorText(x)}`);
     setStep("done");
-  }
-
-  async function confirm(e: FormEvent) {
-    e.preventDefault();
-    if (!code.trim()) return setErr("Entrez le code reçu par courriel.");
-    setBusy(true); setErr(""); setInfo("");
-    try {
-      await confirmSignUp(f.username.trim(), code.trim());
-    } catch (x) { setErr(errorText(x)); setBusy(false); return; }
-    await finish().catch(afterAccountError);
-    setBusy(false);
-  }
-
-  async function resend() {
-    setErr(""); setInfo("");
-    try { await resendCode(f.username.trim()); setInfo("Nouveau code envoyé."); } catch (x) { setErr(errorText(x)); }
   }
 
   /** Compte créé et confirmé : connexion, puis enregistrement du profil. */
@@ -162,17 +142,6 @@ export default function Register() {
                 <p className="muted small">Votre profil de risque pourra être rempli sur la page Profil après la connexion.</p>
                 <Link to="/login" className="btn">Aller à la connexion</Link>
               </div>
-            </>
-          ) : step === "code" ? (
-            <>
-              <h1>Confirmer le compte</h1>
-              <form onSubmit={confirm} className="stack" noValidate>
-                {info && <div className="banner ok">{info}</div>}
-                <div className="field"><label htmlFor="code">Code de confirmation</label><input id="code" inputMode="numeric" autoComplete="one-time-code" value={code} onChange={(e) => setCode(e.target.value)} /></div>
-                {err && <p className="error" role="alert">{err}</p>}
-                <button className="btn" disabled={busy}>{busy ? "Vérification…" : "Confirmer"}</button>
-                <div className="auth-links"><button type="button" className="link" onClick={resend}>Renvoyer le code</button></div>
-              </form>
             </>
           ) : (
             <>
