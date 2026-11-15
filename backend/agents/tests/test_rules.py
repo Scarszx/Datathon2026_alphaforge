@@ -100,6 +100,9 @@ def test_r8_esg(store):
 
 
 def _engine(store, **overrides):
+    overrides.setdefault("compareCategory", "short-term-bonds")  # None = pas de comparaison demandée
+    if overrides["compareCategory"] is None:
+        del overrides["compareCategory"]
     item = _item(**overrides)
     result = run_engine(store, item, {"holdings": robert_holdings(store), "baseCurrency": "CAD"}, EvidenceRegistry("fr"))
     return item, result
@@ -117,7 +120,7 @@ def test_scenario_vedette_robert_nvda(store):
     for rule in ("R1", "R2", "R7"):
         assert _by(verdicts, rule, 2)["status"] == "pass"
     assert by_scenario[2] != "fail"
-    assert _by(verdicts, "R4")["reasonCode"] == "ALTERNATIVE_PRESENTED"
+    assert _by(verdicts, "R4")["reasonCode"] == "COMPARISON_SHOWN"
     assert _by(verdicts, "R5")["status"] == "pass"
     assert all(v["citations"] == [] for v in verdicts)
 
@@ -141,17 +144,54 @@ def test_horizon_10_ans_change_le_verdict(store):
     assert _by(verdicts, "R2", 1)["status"] in ("pass", "warn")
 
 
-def test_r4_alternative_manquante(store):
+def test_r4_ne_peut_plus_echouer(store):
+    # Sans demande : pas de scénario 2, R4 pass.
+    item, result = _engine(store, compareCategory=None)
+    assert [s.index for s in result.scenarios] == [0, 1]
+    verdict = _by(rules.check_rules(store, item, result), "R4")
+    assert (verdict["status"], verdict["reasonCode"]) == ("pass", "COMPARISON_NOT_REQUESTED")
+    # Demandée et construite : pass ; demandée mais introuvable dans le jeu de données : not_verified, jamais fail.
     item, result = _engine(store)
+    verdict = _by(rules.check_rules(store, item, result), "R4")
+    assert (verdict["status"], verdict["reasonCode"]) == ("pass", "COMPARISON_SHOWN")
     result.scenarios = result.scenarios[:2]
-    verdicts = rules.check_rules(store, item, result)
-    assert _by(verdicts, "R4")["status"] == "fail"
+    verdict = _by(rules.check_rules(store, item, result), "R4")
+    assert (verdict["status"], verdict["reasonCode"]) == ("not_verified", "COMPARISON_UNAVAILABLE")
+    assert all(_by(rules.check_rules(store, i, r), "R4")["status"] != "fail" for i, r in (_engine(store), _engine(store, compareCategory=None)))
 
 
-def test_r5_titre_nomme_dans_l_alternative(store):
+def test_r5_symbole_dans_le_texte_visible(store):
+    for field in ("description", "proxy_note", "label"):
+        item, result = _engine(store)
+        setattr(result.scenarios[2], field, "Buy SPY instead.")
+        assert _by(rules.check_rules(store, item, result), "R5")["status"] == "fail", field
     item, result = _engine(store)
-    result.scenarios[2].description = "Buy ZST.TO instead."
+    result.scenarios[2].notes.append("No price data on the window for SPY.")
     assert _by(rules.check_rules(store, item, result), "R5")["status"] == "fail"
+    item, result = _engine(store)
+    result.registry.items.append({"id": "EV-99", "kind": "metric", "label": "Annualized volatility of SPY", "source": "s"})
+    assert _by(rules.check_rules(store, item, result), "R5")["status"] == "fail"
+
+
+def test_r5_ne_lit_pas_les_symboles_ecrits_ou_detenus_par_l_utilisateur(store):
+    item, result = _engine(store)  # NVDA est écrit par l'utilisateur, RY.TO est détenu
+    result.scenarios[1].notes.append("Last price for NVDA and RY.TO dated 2026-11-12 (stale).")
+    assert _by(rules.check_rules(store, item, result), "R5")["status"] == "pass"
+
+
+def test_aucun_symbole_dans_les_textes_visibles_du_scenario_2(store):
+    """Fait quand (lot B) : avec demande, aucun symbole du FNB d'approximation sans clic ; il reste dans method/source."""
+    import re
+
+    item, result = _engine(store)
+    visible = rules.visible_texts(result)
+    assert not any(re.search(r"\b(?:ZST|XSB)\.TO\b", text) for text in visible)
+    s2 = result.scenarios[2]
+    assert s2.label == "Comparison by asset category"
+    assert s2.description.startswith("Same amount allocated to Canadian short-term bonds, a category this tool places at level")
+    assert "ZST" not in (s2.proxy_note or "")
+    detail = next(e for e in result.registry.items if e["label"] == "Annualized volatility of the category Canadian short-term bonds (approximated)")
+    assert "ZST.TO" in detail["method"] and "calculation only, not a selection" in detail["method"] and "ZST.TO" in detail["source"]
 
 
 def test_r9_mentions_de_la_province():
@@ -174,13 +214,17 @@ def test_messages_par_defaut_en_anglais_sans_chiffre(store):
         assert verdict["messageEn"] and not any(ch.isdigit() for ch in verdict["messageEn"])
 
 
-def test_r4_non_applicable_pour_un_reequilibrage(store):
-    """Mode B : pas de scénario 2 par construction. R4 n'échoue pas à tort et ne se dit pas réussie : non vérifiée."""
+def test_r4_pour_un_reequilibrage(store):
+    """Mode B : sans demande de comparaison R4 est pass (COMPARISON_NOT_REQUESTED) ; demandée mais non construite, not_verified."""
+    item, result = _engine(store, compareCategory=None)
+    item["mandate"] = {**item["mandate"], "mode": "rebalance"}
+    verdict = _by(rules.check_rules(store, item, result), "R4")
+    assert (verdict["status"], verdict["reasonCode"]) == ("pass", "COMPARISON_NOT_REQUESTED")
     item, result = _engine(store)
     item["mandate"] = {**item["mandate"], "mode": "rebalance"}
     result.scenarios = result.scenarios[:2]
     verdict = _by(rules.check_rules(store, item, result), "R4")
-    assert verdict["status"] == "not_verified" and verdict["reasonCode"] == "ALTERNATIVE_NOT_APPLICABLE"
+    assert (verdict["status"], verdict["reasonCode"]) == ("not_verified", "COMPARISON_UNAVAILABLE")
 
 
 def test_r6_concentration_sectorielle_avertit_sans_echouer():

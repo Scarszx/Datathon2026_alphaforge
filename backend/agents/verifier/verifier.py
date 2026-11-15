@@ -76,6 +76,26 @@ _JUDGEMENT = [re.compile(p, re.IGNORECASE) for p in JUDGEMENT_PATTERNS]
 _DISCLAIMER = re.compile(DISCLAIMER_PATTERN, re.IGNORECASE)
 
 
+# Symboles de l'univers (lot B) : une phrase du récit ne nomme que les symboles que l'utilisateur a écrits ou détient.
+# Exclus : codes de province, identifiants de règle, symboles d'une seule lettre (T, V, O… se confondent avec le texte).
+NON_SYMBOLS = frozenset({"ON", "QC", "BC", "AB", "SK", "MB", "NB", "NS", "PE", "NL", "YT", "NT", "NU"})
+RULE_ID_RE = re.compile(r"R\d+")
+
+
+def symbol_pattern(universe: set[str]) -> re.Pattern[str] | None:
+    symbols = sorted((t for t in universe if len(t) >= 2 and t not in NON_SYMBOLS and not RULE_ID_RE.fullmatch(t)), key=len, reverse=True)
+    if not symbols:
+        return None
+    # Mêmes bornes que rules._contains_ticker ; sensible à la casse (les mots courants ne sont pas des symboles).
+    return re.compile(r"(?<![A-Za-z0-9.\-])(?:" + "|".join(re.escape(t) for t in symbols) + r")(?![A-Za-z0-9\-])")
+
+
+def unlisted_symbols(sentence: str, pattern: re.Pattern[str] | None, allowed: set[str]) -> list[str]:
+    if pattern is None:
+        return []
+    return sorted({m.group(0) for m in pattern.finditer(PLACEHOLDER_RE.sub(" ", sentence))} - allowed)
+
+
 def placeholders(text: str) -> list[str]:
     return PLACEHOLDER_RE.findall(text or "")
 
@@ -144,10 +164,17 @@ def forbidden_phrases(sentence: str) -> list[str]:
 
 
 def verify_narrative(
-    sections: list[dict[str, Any]], evidence_ids: set[str], mandate: dict[str, Any]
+    sections: list[dict[str, Any]], evidence_ids: set[str], mandate: dict[str, Any],
+    universe: set[str] | None = None, held: set[str] | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, str]], dict[str, Any]]:
-    """Contrôle les sections { key, textEn, text } ; renvoie (sections nettoyées, phrases masquées, rapport)."""
+    """Contrôle les sections { key, textEn, text } ; renvoie (sections nettoyées, phrases masquées, rapport).
+
+    `universe` : symboles du jeu de données ; avec lui, toute phrase qui nomme un symbole que l'utilisateur n'a ni écrit
+    (opérations, subjectTicker) ni détenu (`held`) est masquée (le FNB d'approximation de la comparaison, notamment)."""
     constants = mandate_constants(mandate)
+    pattern = symbol_pattern(universe or set())
+    allowed = set(held or set()) | {op["ticker"] for op in mandate.get("operations") or []}
+    allowed |= {mandate["subjectTicker"]} if mandate.get("subjectTicker") else set()
     hidden: list[dict[str, str]] = []
     cleaned: list[dict[str, Any]] = []
     total = resolved = numbers = forbidden = 0
@@ -165,7 +192,7 @@ def verify_narrative(
             unknown = [i for i in ids if i not in evidence_ids]
             resolved += len(ids) - len(unknown)
             bad_numbers = handwritten_numbers(sentence, constants)
-            bad_phrases = forbidden_phrases(sentence)
+            bad_phrases = forbidden_phrases(sentence) + unlisted_symbols(sentence, pattern, allowed)
             numbers += len(bad_numbers)
             forbidden += len(bad_phrases)
             if unknown:

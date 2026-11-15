@@ -30,6 +30,7 @@ from backend.agents.verifier.verifier import forbidden_phrases, verify_narrative
 from backend.common.http import ApiError
 from backend.common.ids import new_run_id
 from backend.common.repositories import analyses as analyses_repo
+from backend.common.repositories import portfolios as portfolios_repo
 
 INTERNAL_EVENT = "complete_run"
 
@@ -43,6 +44,15 @@ GENERAL_LIMITATIONS = [
     "Educational simulation only: no order is placed and nothing here is personalized financial advice.",
     "The result would be the same for anyone who gives the same answers; AlphaForge takes no position on what is suitable for the user.",
 ]
+
+
+def _held_tickers(user_id: str, mandate: dict[str, Any]) -> set[str]:
+    """Symboles détenus par l'utilisateur : le récit peut les nommer. Illisible : aucun (le contrôle masque davantage)."""
+    try:
+        portfolio = portfolios_repo.get_portfolio(user_id, mandate["portfolioId"]) or {}
+    except Exception:  # noqa: BLE001 - fail-closed sur le texte, jamais sur le run
+        return set()
+    return {h["ticker"] for h in portfolio.get("holdings", [])}
 
 
 def _now() -> str:
@@ -215,7 +225,8 @@ def complete_run(
                     session_id=session_id,
                     user_id=user_id,
                 ) as verifier_span:
-                    cleaned, hidden, verifier_report = verify_narrative(sections_t, registry.ids(), mandate)
+                    cleaned, hidden, verifier_report = verify_narrative(
+                        sections_t, registry.ids(), mandate, set(store.universe().index), _held_tickers(user_id, mandate))
                     verifier_report["placeholdersMatch"] = verifier_report["placeholdersMatch"] and match
                     telemetry.set_span_output(verifier_span, verifier_report)
                 shown = " ".join(s["text"] for s in cleaned)

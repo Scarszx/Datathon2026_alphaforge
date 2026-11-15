@@ -15,6 +15,7 @@ import math
 import uuid
 from typing import Any
 
+from backend.common.categories import category_ids
 from backend.common.http import ApiError
 
 # Même borne que la couche d'accès DynamoDB (backend/common/repositories).
@@ -60,6 +61,7 @@ MANDATE_FIELDS = (
     "userLanguage",
     "operations",
     "subjectTicker",
+    "compareCategory",
     "fieldSources",
 )
 
@@ -401,6 +403,13 @@ def validate_mandate_create(body: dict[str, Any]) -> dict[str, Any]:
         if not subject_ticker:
             raise _validation_error("subjectTicker ne peut pas être vide.")
         mandate["subjectTicker"] = subject_ticker
+
+    compare_category = _string(body, "compareCategory", required=False)
+    if compare_category is not None:
+        if compare_category not in category_ids():
+            values = ", ".join(category_ids())
+            raise _validation_error(f"compareCategory doit être l'un de : {values}.")
+        mandate["compareCategory"] = compare_category
 
     if "fieldSources" in body:
         mandate["fieldSources"] = _validate_field_sources(body["fieldSources"])

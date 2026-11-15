@@ -23,7 +23,7 @@ def analysis_record(mandate: dict[str, Any], scenarios: list[dict[str, Any]], ve
     """Ce que lit le rédacteur : tout en anglais, valeurs incluses pour comparer, jamais pour recopier."""
     return {
         "mandate": {k: mandate.get(k) for k in ("mode", "objective", "objectiveDetail", "horizonYears", "province",
-                                                 "operations", "subjectTicker", "preferences", "fieldSources") if mandate.get(k) is not None},
+                                                 "operations", "subjectTicker", "compareCategory", "preferences", "fieldSources") if mandate.get(k) is not None},
         "scenarios": [{k: s.get(k) for k in ("index", "label", "description", "proxyNote", "verdict", "metrics") if s.get(k) is not None} for s in scenarios],
         "verdicts": [{k: v.get(k) for k in ("rule", "scenario", "status", "reasonCode", "messageEn", "evidence", "citations", "threshold") if v.get(k) is not None} for v in verdicts],
         "evidence": [{k: e.get(k) for k in ("id", "kind", "label", "scenario", "value", "window", "currency", "document", "section", "caveats") if e.get(k) is not None} for e in evidence],

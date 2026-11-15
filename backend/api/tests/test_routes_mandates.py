@@ -427,3 +427,20 @@ def test_rules_config_path_personnalise_est_pris_en_compte(
     )
     assert response["statusCode"] == 201
     assert body_of(response)["effectiveMaxLossPct"] == 15
+
+
+def test_create_mandate_compare_category_choisie_par_l_utilisateur(fake_mandate_repos, ticker_validator):
+    def post(**overrides):
+        return handle_request(
+            event("POST /v1/conversations/{sessionId}/mandates", path_parameters={"sessionId": SESSION_ID},
+                  body=valid_mandate_body(**overrides)),
+            ticker_validator=ticker_validator,
+        )
+
+    assert "compareCategory" not in body_of(post())["mandate"]
+    ok = post(compareCategory="aggregate-bonds")
+    assert ok["statusCode"] == 201 and body_of(ok)["mandate"]["compareCategory"] == "aggregate-bonds"
+    # Demander la comparaison crée une nouvelle version et le champ figure parmi les champs modifiés.
+    assert body_of(ok)["version"] == 2 and "compareCategory" in body_of(ok)["changedFields"]
+    for bad in ("XBB.TO", "bonds", 3, True):
+        assert post(compareCategory=bad)["statusCode"] == 400

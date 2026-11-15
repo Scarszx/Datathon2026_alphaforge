@@ -188,6 +188,8 @@ def propose_mandate(ctx: RequestContext, draft: dict[str, Any]) -> dict[str, Any
         return {"valid": False, "errors": ["draft must be a JSON object."]}
     # Valeurs de contexte, jamais celles du modèle.
     draft = {**draft, "portfolioId": ctx.portfolio_id, "userLanguage": ctx.user_language}
+    # La comparaison par catégorie est une demande de l'utilisateur (bouton) : l'orchestrateur ne la met jamais.
+    draft.pop("compareCategory", None)
     if ctx.province and "province" not in draft:
         draft["province"] = ctx.province
     try:

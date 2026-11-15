@@ -113,3 +113,45 @@ def test_recits_reels_de_langfuse_du_15_novembre():
         kept = " ".join(s["text"] for s in cleaned)
         for phrase in narrative["mustBeHidden"]:
             assert phrase not in kept, phrase
+
+
+# --- lot B : symboles de l'univers ----------------------------------------------------------------------------------
+
+UNIVERSE = {"ZST.TO", "XBB.TO", "NVDA", "SPY", "ON", "T", "V", "R6", "BTC-USD"}
+
+
+def _symbols(text, held=frozenset({"XBB.TO"})):
+    cleaned, hidden, report = verify_narrative([_section(text)], IDS, MANDATE, UNIVERSE, set(held))
+    return cleaned[0]["text"], hidden, report
+
+
+@pytest.mark.parametrize("sentence", [
+    "The comparison uses ZST.TO only as an approximation.",
+    "L'alternative utilise un fonds (ZST.TO) pour le calcul.",
+    "The reference is SPY.", "Crypto assets such as BTC-USD are volatile.",
+])
+def test_symbole_non_ecrit_ni_detenu_masque(sentence):
+    text, hidden, report = _symbols(sentence)
+    assert text == "" and hidden[0]["reason"] == "forbidden_phrase" and report["forbiddenPhrases"] >= 1
+
+
+@pytest.mark.parametrize("sentence", [
+    "NVDA is the security you typed.", "XBB.TO is already in your portfolio.",
+    "Rule R6 applies in ON.", "The T and V symbols are not searched.", "The zst fund is lowercase text.",
+    "Volatility reaches {EV-07} for ZSTX.", "Securities regulators in QC publish guidance.",
+])
+def test_symboles_ecrits_detenus_exclus_ou_hors_perimetre_conserves(sentence):
+    text, hidden, _ = _symbols(sentence)
+    assert hidden == [] and text == sentence
+
+
+def test_sans_univers_le_controle_de_symbole_est_inactif():
+    cleaned, hidden, _ = verify_narrative([_section("The comparison uses ZST.TO.")], IDS, MANDATE)
+    assert hidden == [] and cleaned[0]["text"] == "The comparison uses ZST.TO."
+
+
+def test_recits_langfuse_le_fnb_d_approximation_est_masque():
+    """Traces du 2026-11-15 : « (ZST.TO) » et « (XBB.TO) » dans le récit alors que l'utilisateur n'a écrit que NVDA/TSLA."""
+    sentence = "The alternative uses a Canadian short-term bond fund (ZST.TO) only as an approximation of the asset category."
+    text, hidden, _ = _symbols(sentence, held=set())
+    assert text == "" and hidden

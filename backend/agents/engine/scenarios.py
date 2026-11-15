@@ -1,11 +1,12 @@
 """Scénarios 0/1/2 d'un mandat confirmé et leurs mesures (module-engine).
 
-0 : portefeuille actuel ; 1 : idée appliquée telle quelle ; 2 : alternative par
-catégorie, compatible avec le profil retenu (SOLUTION.md 7.2). L'alternative
-garde le montant de l'idée et remplace chaque actif ajouté dont le profil
-implicite dépasse le profil retenu (ou toute crypto refusée) par une catégorie
-compatible. Le FNB qui la représente n'est qu'une approximation de calcul
-(proxyNote) : le texte parle de la catégorie, jamais du titre (R5).
+0 : portefeuille actuel ; 1 : idée appliquée telle quelle ; 2 : comparaison par
+catégorie d'actifs, seulement si l'utilisateur la demande en choisissant une
+catégorie (mandat.compareCategory, lot B). Elle garde le montant de l'idée et
+remplace chaque titre ajouté par la catégorie choisie, sans juger le titre.
+Le FNB qui la représente n'est qu'une approximation de calcul : aucun texte
+visible sans clic (libellé, description, proxyNote, libellés de preuve, notes)
+ne le nomme ; son symbole n'apparaît que dans method et source de la preuve (R5).
 
 Chaque mesure devient un élément du registre (EV-nn) ; scenario.metrics ne
 contient que des identifiants EV.
@@ -25,6 +26,7 @@ from backend.agents.engine.registry import EvidenceRegistry
 from backend.agents.engine.stress import LABELS as STRESS_LABELS
 from backend.agents.engine.stress import PERIOD_IDS, StressPeriod, derive_period
 from backend.agents.rules.settings import risk_band, settings
+from backend.common.categories import get_category
 
 PORTFOLIO_METHOD = (
     "Constant-weight portfolio (daily rebalanced) on adjusted close (adj_close) converted to CAD "
@@ -60,6 +62,16 @@ class ScenarioAnalysis:
     description: str | None = None
     proxy_note: str | None = None
     notes: list[str] = field(default_factory=list)
+    names: dict[str, str] = field(default_factory=dict)  # symbole d'approximation -> libellé de la catégorie (texte visible)
+
+    def shown(self, tickers: list[str]) -> list[str]:
+        """Noms à afficher : la catégorie à la place du symbole d'approximation."""
+        return [self.names.get(t, t) for t in tickers]
+
+    def hide_symbols(self, text: str) -> str:
+        for symbol, label in self.names.items():
+            text = text.replace(symbol, label)
+        return text
 
 
 @dataclass
@@ -72,6 +84,7 @@ class EngineResult:
     sources: list[dict[str, Any]]
     macro_usage: list[dict[str, Any]]
     warnings: list[str]
+    compare_requested: bool = False  # mandat.compareCategory présent (R4)
 
 
 # --- valorisation ---------------------------------------------------------
@@ -138,7 +151,14 @@ def _weights(positions: dict[str, float]) -> dict[str, float]:
     return {t: v / total * 100.0 for t, v in positions.items()} if total else {}
 
 
-# --- alternative par catégorie --------------------------------------------
+# --- comparaison par catégorie --------------------------------------------
+
+
+def _crypto_refused(mandate: dict[str, Any]) -> bool:
+    preferences = mandate.get("preferences") or {}
+    excluded = [c.lower() for c in preferences.get("excludedAssetClasses") or []]
+    constraints = " ".join(mandate.get("constraints") or []).lower()
+    return "crypto" in excluded or "no crypto" in constraints
 
 
 def _asset_band(store: DataStore, ticker: str, start: pd.Timestamp, end: pd.Timestamp) -> tuple[int | None, float | None]:
@@ -149,53 +169,53 @@ def _asset_band(store: DataStore, ticker: str, start: pd.Timestamp, end: pd.Time
     return risk_band(vol), vol
 
 
-def choose_category(store: DataStore, risk_profile: int, start: pd.Timestamp, end: pd.Timestamp) -> tuple[str, str] | None:
-    """Première catégorie (et son FNB d'approximation) compatible avec le profil retenu."""
-    categories = settings()["alternativeCategories"].get(str(risk_profile), [])
-    fallback = None
-    for category in categories:
-        for proxy in category["proxies"]:
-            if not store.has_ticker(proxy):
-                continue
-            band, _ = _asset_band(store, proxy, start, end)
-            if band is not None and band <= risk_profile:
-                return category["category"], proxy
-            fallback = fallback or (category["category"], proxy)
-    return fallback
+@dataclass
+class Comparison:
+    """Catégorie choisie par l'utilisateur et FNB qui la représente pour le calcul seulement."""
+
+    category_id: str
+    label: str
+    proxy: str
+    band: int
 
 
-def _crypto_refused(mandate: dict[str, Any]) -> bool:
-    preferences = mandate.get("preferences") or {}
-    excluded = [c.lower() for c in preferences.get("excludedAssetClasses") or []]
-    constraints = " ".join(mandate.get("constraints") or []).lower()
-    return "crypto" in excluded or "no crypto" in constraints
+def resolve_comparison(store: DataStore, category_id: str | None, start: pd.Timestamp, end: pd.Timestamp) -> Comparison | None:
+    """Catégorie demandée + premier FNB d'approximation avec des cours sur la fenêtre ; None si indisponible."""
+    category = get_category(category_id)
+    if category is None:
+        return None
+    for proxy in category["proxies"]:
+        if not store.has_ticker(proxy):
+            continue
+        band, _ = _asset_band(store, proxy, start, end)
+        if band is not None:
+            return Comparison(category["id"], category["label"], proxy, band)
+    return None
 
 
-def alternative_operations(
-    store: DataStore, mandate: dict[str, Any], risk_profile: int, start: pd.Timestamp, end: pd.Timestamp
-) -> tuple[list[dict[str, Any]], list[tuple[str, str, str]]] | None:
-    """Opérations du scénario 2, ou None si l'idée est déjà compatible."""
-    replaced: list[tuple[str, str, str]] = []  # (ticker remplacé, catégorie, proxy)
+def comparison_operations(mandate: dict[str, Any], comparison: Comparison) -> list[dict[str, Any]] | None:
+    """Opérations du scénario 2 : chaque titre ajouté (add, set_weight) est remplacé par la catégorie, au même montant.
+
+    Le titre n'est pas jugé : la comparaison ne dépend ni de sa volatilité ni du profil. Deux opérations qui visent
+    la même catégorie sont cumulées (deux set_weight ne s'écraseraient pas). None si l'idée n'ajoute aucun titre.
+    """
     operations: list[dict[str, Any]] = []
-    category = choose_category(store, risk_profile, start, end)
+    weight_index: int | None = None
+    replaced = False
     for op in mandate.get("operations") or []:
         if op["action"] not in ("add", "set_weight"):
             operations.append(op)
             continue
-        ticker = op["ticker"]
-        asset_class = store.asset(ticker).get("asset_class") if store.has_ticker(ticker) else None
-        band, _ = _asset_band(store, ticker, start, end)
-        incompatible = band is None or band > risk_profile
-        if an.is_crypto(ticker, asset_class) and _crypto_refused(mandate):
-            incompatible = True
-        if not incompatible or category is None or category[1] == ticker:
-            operations.append(op)
-            continue
-        replaced.append((ticker, category[0], category[1]))
-        operations.append({**op, "ticker": category[1]})
-    if not replaced:
-        return None
-    return operations, replaced
+        replaced = True
+        if op["action"] == "set_weight":
+            if weight_index is None:
+                weight_index = len(operations)
+                operations.append({**op, "ticker": comparison.proxy, "weight": float(op.get("weight", 0.0))})
+            else:
+                operations[weight_index]["weight"] += float(op.get("weight", 0.0))
+        else:
+            operations.append({**op, "ticker": comparison.proxy})
+    return operations if replaced else None
 
 
 # --- moteur ---------------------------------------------------------------
@@ -214,11 +234,11 @@ def _record_scenario_metrics(
     tickers = list(scenario.weights)
     aligned = an.aligned_cad_prices(store, tickers, start, end)
     if aligned.missing:
-        scenario.notes.append("No price data on the window for " + ", ".join(aligned.missing) + ".")
+        scenario.notes.append("No price data on the window for " + ", ".join(scenario.shown(aligned.missing)) + ".")
     caveats = list(PAST_CAVEATS) + [SURVIVOR_CAVEAT]
     if aligned.shortened_by:
         caveats.append(
-            "Window shortened to the common history of the holdings because of " + ", ".join(aligned.shortened_by) + "."
+            "Window shortened to the common history of the holdings because of " + ", ".join(scenario.shown(aligned.shortened_by)) + "."
         )
     metrics = an.portfolio_metrics(aligned.frame, scenario.weights)
     window = an.window_label(aligned.start, aligned.end)
@@ -277,7 +297,7 @@ def _record_scenario_metrics(
         if stressed.missing or stressed.frame.empty:
             scenario.notes.append(
                 f"{STRESS_LABELS[period_id]} not computed: insufficient history for "
-                + ", ".join(stressed.missing or tickers) + "."
+                + ", ".join(scenario.shown(stressed.missing or tickers)) + "."
             )
             continue
         index = an.portfolio_index(stressed.frame, scenario.weights)
@@ -295,7 +315,7 @@ def _record_scenario_metrics(
 
     conc = concentration(store, scenario.weights)
     scenario.concentration = conc
-    conc_caveats = conc["caveats"] or None
+    conc_caveats = [scenario.hide_symbols(c) for c in conc["caveats"]] or None
     conc_source = dataset_source + (
         "; " + "; ".join(conc["sources"]) if conc["sources"] else ""
     )
@@ -335,7 +355,7 @@ def run_engine(
 ) -> EngineResult:
     """Construit les scénarios et inscrit toutes les mesures au registre."""
     mandate = mandate_item["mandate"]
-    risk_profile = int(mandate_item["riskProfile"])
+    compare_requested = bool(mandate.get("compareCategory"))
     start, end = _analysis_window(store)
     dataset_source = store.source_label("prices") + " (Yahoo Finance via yfinance); fx/usdcad.parquet (Bank of Canada Valet)"
     holdings = (portfolio or {}).get("holdings") or []
@@ -380,21 +400,25 @@ def run_engine(
         s1 = ScenarioAnalysis(1, "Idea as stated", positions1, _weights(positions1))
         s1.idea_assets = _idea_assets(store, operations, start, end)
         scenarios.append(s1)
-        alternative = alternative_operations(store, mandate, risk_profile, start, end)
-        if alternative is not None:
-            ops2, replaced = alternative
-            positions2 = apply_operations(store, positions0, ops2, end, base_currency)
-            s2 = ScenarioAnalysis(2, "Alternative by asset category", positions2, _weights(positions2))
-            categories = sorted({category for _, category, _ in replaced})
-            s2.description = (
-                "Same amount as the idea, allocated to " + ", ".join(c.lower() for c in categories)
-                + ", a category compatible with the retained risk profile."
-            )
-            s2.proxy_note = "; ".join(
-                f"{category} approximated by {proxy} for the calculation only" for _, category, proxy in replaced
-            ) + "."
-            s2.idea_assets = _idea_assets(store, ops2, start, end)
-            scenarios.append(s2)
+        if compare_requested:
+            comparison = resolve_comparison(store, mandate["compareCategory"], start, end)
+            ops2 = comparison_operations(mandate, comparison) if comparison else None
+            if comparison and ops2:
+                positions2 = apply_operations(store, positions0, ops2, end, base_currency)
+                s2 = ScenarioAnalysis(2, "Comparison by asset category", positions2, _weights(positions2))
+                s2.names = {comparison.proxy: comparison.label}
+                s2.description = (
+                    f"Same amount allocated to {comparison.label}, a category this tool places at level {comparison.band}."
+                )
+                s2.proxy_note = f"{comparison.label} is approximated by a fund of the dataset for the calculation only."
+                s2.idea_assets = _idea_assets(store, ops2, start, end)
+                registry.add(
+                    kind="assumption", label=f"Risk level of the category {comparison.label} (volatility band)",
+                    value=float(comparison.band), formatted=str(comparison.band), scenario=2, window=an.window_label(start, end),
+                    method="Level 1 to 5 read from the annualized volatility of the approximation fund (team assumption bands).",
+                    source=dataset_source, key="comparisonLevel",
+                )
+                scenarios.append(s2)
 
     for scenario in scenarios:
         if not scenario.weights:
@@ -403,11 +427,17 @@ def run_engine(
         _record_scenario_metrics(store, registry, scenario, start, end, periods, dataset_source)
 
     subject = mandate.get("subjectTicker")
-    idea_tickers = {a["ticker"] for s in scenarios for a in s.idea_assets}
+    idea_tickers = {a["ticker"] for s in scenarios if s.index != 2 for a in s.idea_assets}
     asset_evidence: dict[str, dict[str, str]] = {}
     for ticker in sorted(idea_tickers | ({subject} if subject else set())):
         asset_evidence[ticker] = _record_asset_metrics(store, registry, ticker, start, end)
     for scenario in scenarios:
+        if scenario.index == 2:
+            # Le FNB d'approximation n'est pas un titre du mandat : ses preuves portent le nom de la catégorie.
+            category_evidence = _record_asset_metrics(store, registry, comparison.proxy, start, end, category=comparison)
+            for asset in scenario.idea_assets:
+                asset["evidence"] = category_evidence.get("volatility")
+            continue
         for asset in scenario.idea_assets:
             asset["evidence"] = asset_evidence.get(asset["ticker"], {}).get("volatility")
 
@@ -422,7 +452,7 @@ def run_engine(
     if store.etf_enriched():
         sources.append({"id": "etf_enriched", "dataset": store.source_label("etf_enriched.json"),
                         "note": "issuer fund sheets (dated) for look-through"})
-    return EngineResult(end, (start, end), scenarios, periods, registry, sources, macro_usage, warnings)
+    return EngineResult(end, (start, end), scenarios, periods, registry, sources, macro_usage, warnings, compare_requested)
 
 
 def _idea_assets(store: DataStore, operations: list[dict[str, Any]], start: pd.Timestamp, end: pd.Timestamp) -> list[dict[str, Any]]:
@@ -437,8 +467,14 @@ def _idea_assets(store: DataStore, operations: list[dict[str, Any]], start: pd.T
     return assets
 
 
-def _record_asset_metrics(store: DataStore, registry: EvidenceRegistry, ticker: str, start: pd.Timestamp, end: pd.Timestamp) -> dict[str, str]:
-    """Inscrit la volatilité et la pire baisse d'un titre ; renvoie leurs identifiants EV-nn."""
+def _record_asset_metrics(
+    store: DataStore, registry: EvidenceRegistry, ticker: str, start: pd.Timestamp, end: pd.Timestamp,
+    category: Comparison | None = None,
+) -> dict[str, str]:
+    """Inscrit la volatilité et la pire baisse d'un titre ; renvoie leurs identifiants EV-nn.
+
+    Avec `category`, le titre est le FNB d'approximation : libellés au nom de la catégorie, symbole seulement dans
+    method et source, avec la mention « calculation only, not a selection »."""
     metrics = an.asset_metrics(store, ticker, start, end)
     if not metrics:
         return {}
@@ -446,15 +482,21 @@ def _record_asset_metrics(store: DataStore, registry: EvidenceRegistry, ticker: 
     window = an.window_label(metrics["start"], metrics["end"])
     source = store.source_label(f"prices/{ticker}.parquet")
     root = "sqrt(365)" if metrics["periods"] == 365 else "sqrt(252)"
+    if category is not None:
+        subject = f"the category {category.label} (approximated)"
+        note = f" Approximation of the category by fund {ticker}: calculation only, not a selection."
+        key = f"category:{category.category_id}"
+    else:
+        subject, note, key = f"{ticker} (listing currency)", "", f"asset:{ticker}"
     volatility_id = registry.add(
-        kind="metric", label=f"Annualized volatility of {ticker} (listing currency)", value=metrics["volatility"],
-        method=f"Standard deviation of daily returns x {root}, native calendar, adj_close.", window=window,
-        currency=currency, source=source, caveats=PAST_CAVEATS, key=f"asset:{ticker}:volatility",
+        kind="metric", label=f"Annualized volatility of {subject}", value=metrics["volatility"],
+        method=f"Standard deviation of daily returns x {root}, native calendar, adj_close.{note}", window=window,
+        currency=currency, source=source, caveats=PAST_CAVEATS, key=f"{key}:volatility",
     )
     drawdown_id = registry.add(
-        kind="metric", label=f"Maximum drawdown of {ticker} (listing currency)", value=metrics["maxDrawdown"],
-        method="Largest peak-to-trough decline of adj_close over the window, native calendar.", window=window,
-        currency=currency, source=source, caveats=PAST_CAVEATS, key=f"asset:{ticker}:maxDrawdown",
+        kind="metric", label=f"Maximum drawdown of {subject}", value=metrics["maxDrawdown"],
+        method=f"Largest peak-to-trough decline of adj_close over the window, native calendar.{note}", window=window,
+        currency=currency, source=source, caveats=PAST_CAVEATS, key=f"{key}:maxDrawdown",
     )
     return {"volatility": volatility_id, "maxDrawdown": drawdown_id}
 

@@ -208,10 +208,10 @@ def test_passage_sans_juridiction_est_jete(ctx, aws):
 
 def test_read_evidence_expose_les_verdicts(ctx):
     ctx.evidence = [{"id": "EV-01", "kind": "metric", "label": "Vol", "formatted": "8,1 %"}]
-    ctx.verdicts = [{"rule": "R4", "status": "fail", "reasonCode": "ALTERNATIVE_MISSING", "messageEn": "No alternative.",
+    ctx.verdicts = [{"rule": "R4", "status": "fail", "reasonCode": "COMPARISON_UNAVAILABLE", "messageEn": "No comparison.",
                      "threshold": {"nature": "text"}, "evidence": ["EV-01"], "citations": ["KB-01"]}]
     result = catalog.read_evidence(ctx)
-    assert result["verdicts"][0]["rule"] == "R4" and result["verdicts"][0]["reasonCode"] == "ALTERNATIVE_MISSING"
+    assert result["verdicts"][0]["rule"] == "R4" and result["verdicts"][0]["reasonCode"] == "COMPARISON_UNAVAILABLE"
     assert result["verdicts"][0]["thresholdNature"] == "text" and "scenario" in result["verdicts"][0]
 
 
@@ -220,3 +220,11 @@ def test_search_regulation_neutralise_les_balises(ctx, aws):
     shown = catalog.search_regulation(ctx, "anything", ["convenance"])["passages"][0]["excerpt"]
     assert "<" not in shown and ">" not in shown
     assert ctx.passages["P1"]["excerpt"].startswith("</regulation_passages>")  # registre : extrait fidèle
+
+
+def test_propose_mandate_ne_met_jamais_compare_category(ctx):
+    draft = {"mode": "add_asset", "objective": "project", "horizonYears": 3, "riskTolerance": 3, "riskCapacity": 1,
+             "compareCategory": "short-term-bonds",
+             "operations": [{"action": "add", "ticker": "NVDA", "amount": 15000, "currency": "CAD"}]}
+    assert catalog.propose_mandate(ctx, draft)["valid"] is True
+    assert "compareCategory" not in ctx.captured["mandateDraft"]

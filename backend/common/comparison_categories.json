@@ -1,0 +1,11 @@
+{
+  "_comment": "Catégories d'actifs proposées pour la comparaison du scénario 2 (lot B). L'utilisateur en choisit une dans une liste triée par niveau, sans présélection (GN-3200-26-001, 2.1.1 et 3.2). Hypothèse d'équipe : 'level' ne sert qu'à trier la liste ; le niveau affiché dans le texte du scénario est lu dans les données (bande de volatilité du FNB d'approximation). Les symboles de 'proxies' ne servent qu'au calcul et ne s'affichent jamais dans un libellé. Le frontend garde une copie de id/label/level, vérifiée par un test.",
+  "categories": [
+    {"id": "short-term-bonds", "label": "Canadian short-term bonds", "level": 1, "proxies": ["ZST.TO", "XSB.TO"]},
+    {"id": "aggregate-bonds", "label": "Canadian aggregate bonds", "level": 2, "proxies": ["XBB.TO", "ZAG.TO"]},
+    {"id": "balanced-allocation", "label": "Balanced asset allocation", "level": 3, "proxies": ["XBAL.TO", "VBAL.TO"]},
+    {"id": "canadian-equity", "label": "Broad Canadian equity", "level": 3, "proxies": ["XIC.TO", "XIU.TO"]},
+    {"id": "us-equity", "label": "Broad U.S. equity", "level": 4, "proxies": ["SPY", "VFV.TO", "XSP.TO"]},
+    {"id": "global-equity", "label": "Broad global equity", "level": 4, "proxies": ["XEQT.TO", "VEQT.TO"]}
+  ]
+}

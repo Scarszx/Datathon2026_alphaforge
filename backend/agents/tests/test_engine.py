@@ -8,7 +8,7 @@ import pytest
 from backend.agents.engine import analytics as an
 from backend.agents.engine.concentration import concentration
 from backend.agents.engine.registry import EvidenceRegistry, format_number
-from backend.agents.engine.scenarios import apply_operations, choose_category, run_engine
+from backend.agents.engine.scenarios import apply_operations, comparison_operations, resolve_comparison, run_engine
 from backend.agents.engine.stress import derive_period
 from backend.agents.tests.conftest import ROBERT_AMOUNTS, robert_holdings, robert_mandate
 from backend.common.mandates import evaluate_mandate
@@ -96,21 +96,48 @@ def test_operations_add_remove_set_weight(store):
     assert weighted["SPY"] == pytest.approx(100) and sum(weighted.values()) == pytest.approx(200)
 
 
-def test_alternative_par_categorie_compatible_avec_le_profil(store):
+def test_categorie_choisie_et_fnb_d_approximation(store):
     start, end = store.last_date() - pd.DateOffset(years=5), store.last_date()
-    assert choose_category(store, 1, start, end) == ("Canadian short-term bonds", "ZST.TO")
+    comparison = resolve_comparison(store, "short-term-bonds", start, end)
+    assert (comparison.label, comparison.proxy) == ("Canadian short-term bonds", "ZST.TO") and 1 <= comparison.band <= 5
+    assert resolve_comparison(store, "inconnue", start, end) is None and resolve_comparison(store, None, start, end) is None
+
+
+def test_comparaison_remplace_chaque_titre_ajoute_sans_le_juger(store):
+    start, end = store.last_date() - pd.DateOffset(years=5), store.last_date()
+    comparison = resolve_comparison(store, "short-term-bonds", start, end)
+    mandate = robert_mandate(operations=[
+        {"action": "add", "ticker": "RY.TO", "amount": 1000, "currency": "CAD"},  # titre peu volatil : remplacé quand même
+        {"action": "add", "ticker": "NVDA", "amount": 2000, "currency": "CAD"},
+        {"action": "set_weight", "ticker": "SPY", "weight": 5},
+        {"action": "set_weight", "ticker": "AAPL", "weight": 7},
+        {"action": "remove", "ticker": "TD.TO"},
+    ])
+    ops = comparison_operations(mandate, comparison)
+    assert [o["ticker"] for o in ops if o["action"] == "add"] == ["ZST.TO", "ZST.TO"]
+    assert [o["amount"] for o in ops if o["action"] == "add"] == [1000, 2000]
+    weights = [o for o in ops if o["action"] == "set_weight"]
+    assert len(weights) == 1 and weights[0]["weight"] == 12 and weights[0]["ticker"] == "ZST.TO"  # cumulés, non écrasés
+    assert any(o["action"] == "remove" and o["ticker"] == "TD.TO" for o in ops)
+    assert comparison_operations(robert_mandate(operations=[{"action": "remove", "ticker": "RY.TO"}]), comparison) is None
+
+
+def test_pas_de_scenario_2_sans_demande(store):
+    result = run_engine(store, _mandate_item(), {"holdings": robert_holdings(store), "baseCurrency": "CAD"}, EvidenceRegistry("fr"))
+    assert [s.index for s in result.scenarios] == [0, 1] and result.compare_requested is False
+    assert not any("category" in (item.get("label") or "") for item in result.registry.items)
 
 
 def test_scenarios_robert_et_registre(store):
     registry = EvidenceRegistry("fr")
     holdings = robert_holdings(store)
-    result = run_engine(store, _mandate_item(), {"holdings": holdings, "baseCurrency": "CAD"}, registry)
-    assert [s.index for s in result.scenarios] == [0, 1, 2]
+    result = run_engine(store, _mandate_item(compareCategory="short-term-bonds"), {"holdings": holdings, "baseCurrency": "CAD"}, registry)
+    assert [s.index for s in result.scenarios] == [0, 1, 2] and result.compare_requested is True
     s0, s1, s2 = result.scenarios
     assert sum(s0.positions_cad.values()) == pytest.approx(sum(ROBERT_AMOUNTS.values()), rel=1e-6)
     assert s1.positions_cad["NVDA"] == pytest.approx(15000)
     assert "NVDA" not in s2.positions_cad and s2.positions_cad["ZST.TO"] == pytest.approx(30000)
-    assert "approximated by ZST.TO" in s2.proxy_note and "ZST.TO" not in s2.description
+    assert "ZST.TO" not in s2.proxy_note and "ZST.TO" not in s2.description and "ZST.TO" not in s2.label
     for scenario in result.scenarios:
         for key in ("volatility", "maxDrawdown", "stress2022", "topSingleWeight", "techWeightLookThrough"):
             assert registry.get(scenario.evidence[key])["scenario"] == scenario.index
