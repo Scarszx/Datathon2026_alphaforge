@@ -9,6 +9,7 @@ export default function AppHeader() {
       <div className="wrap">
         <NavLink to="/portefeuille" className="logo"><span className="logo-mark" aria-hidden="true" />AlphaForge</NavLink>
         <nav className="nav" aria-label="Navigation principale">
+          <NavLink to="/chat" className={cls}>Session</NavLink>
           <NavLink to="/portefeuille" className={cls}>Portefeuille</NavLink>
           <NavLink to="/marches" className={cls}>Marchés</NavLink>
           <NavLink to="/profil" className={cls}>Profil</NavLink>
