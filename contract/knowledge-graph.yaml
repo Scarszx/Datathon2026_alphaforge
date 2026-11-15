@@ -1,12 +1,24 @@
 application:
   name: "AlphaForge"
-  version: "0.4.4"
+  version: "0.4.5"
   description: "Banc d'essai agentique et auto-explicatif pour l'investisseur autonome : il cadre l'intention, simule son impact sur le portefeuille et l'audite contre les textes réglementaires canadiens (simulation seulement). Datathon 2026."
-  status: "validé par l'équipe (0.4.0 le 2026-11-14, 0.4.1 le 2026-11-15) ; 0.4.2 et 0.4.3 validées par l'utilisateur le 2026-11-15, à relire par l'équipe ; 0.4.4 demandée par l'utilisateur le 2026-11-15 (lot A), à relire par l'équipe"
+  status: "validé par l'équipe (0.4.0 le 2026-11-14, 0.4.1 le 2026-11-15) ; 0.4.2 et 0.4.3 validées par l'utilisateur le 2026-11-15, à relire par l'équipe ; 0.4.4 et 0.4.5 demandées par l'utilisateur le 2026-11-15 (lots A et B), à relire par l'équipe"
   solution_ref: "SOLUTION.md (racine du dépôt) : décisions de produit et de conception détaillées"
   # Règle d'équipe : ce fichier est la référence. Toute modification passe par un accord de l'équipe.
   # Voir aussi : la page de présentation du contrat (même contenu, avec schémas).
   changelog:
+    - version: "0.4.5"
+      date: "2026-11-15"
+      status: "demandé par l'utilisateur le 2026-11-15 (lot B, pas encore déployé) ; à relire par l'équipe"
+      summary:
+        - "Le scénario 2 n'est plus construit automatiquement : il devient une comparaison par catégorie d'actifs, construite seulement si l'utilisateur la demande (bouton « Comparer avec une catégorie d'actifs », nouvelle version du mandat comme les curseurs « et si »). Plus de jugement du titre : chaque titre ajouté (add, set_weight) est remplacé par la catégorie choisie, au même montant."
+        - "schema-mandate-create-request.compareCategory (facultatif) : identifiant de la catégorie choisie par l'utilisateur parmi backend/common/comparison_categories.json (short-term-bonds, aggregate-bonds, balanced-allocation, canadian-equity, us-equity, global-equity), sans présélection (GN-3200-26-001, 2.1.1 et 3.2). L'orchestrateur ne le met jamais ; propose_mandate le retire. Valeur inconnue : VALIDATION_ERROR."
+        - "schema-scenario (index 2) : libellé « Comparison by asset category », description générique (« Same amount allocated to <catégorie>, a category this tool places at level <n>. »), proxyNote sans symbole. Aucun symbole dans le libellé, la description, le proxyNote, les libellés de preuve ni les notes ; le symbole du FNB d'approximation n'apparaît que dans method et source de la preuve, avec la mention « calculation only, not a selection »."
+        - "R4 (comparaison) : motifs COMPARISON_NOT_REQUESTED (pass), COMPARISON_SHOWN (pass), COMPARISON_UNAVAILABLE (not_verified). R4 ne peut plus échouer et ne déclenche aucune recherche. ALTERNATIVE_NOT_REQUIRED, ALTERNATIVE_PRESENTED et ALTERNATIVE_MISSING disparaissent."
+        - "R5 : lit tout le texte visible sans clic (libellés, descriptions, proxyNote, libellés de preuve, notes des scénarios) et ignore les symboles que l'utilisateur a écrits (opérations, subjectTicker) ou détient."
+        - "module-verifier : masque toute phrase du récit qui contient un symbole de l'univers que l'utilisateur n'a ni écrit ni détenu (sensible à la casse, mêmes bornes que R5 ; codes de province, identifiants de règle et symboles d'une lettre exclus). Constaté dans Langfuse le 2026-11-15 : « (ZST.TO) » et « (XBB.TO) » dans le récit."
+      impacts_to_handle:
+        - "frontend : bouton et liste de catégories (copie de id/label/level de comparison_categories.json, vérifiée par un test), libellés des motifs de R4, texte « Comparaison par catégorie ». Sans compareCategory le front actuel reçoit 2 scénarios au lieu de 3 : il doit l'accepter."
     - version: "0.4.4"
       date: "2026-11-15"
       status: "demandé par l'utilisateur le 2026-11-15 (lot A, pas encore déployé) ; à relire par l'équipe"
@@ -678,6 +690,7 @@ data_schemas:
       - { name: "userLanguage", type: "string", required: true, description: "ISO 639-1; langue d'affichage. Tous les champs texte du mandat sont en anglais (language_policy)." }
       - { name: "operations", type: "array", items_ref: "schema-operation", description: "vide pour diagnose" }
       - { name: "subjectTicker", type: "string", description: "titre étudié en mode diagnose" }
+      - { name: "compareCategory", type: "string", enum: ["short-term-bonds", "aggregate-bonds", "balanced-allocation", "canadian-equity", "us-equity", "global-equity"], description: "comparaison par catégorie d'actifs demandée par l'utilisateur (0.4.5) : identifiant de la catégorie choisie, absent = pas de scénario 2. Jamais mis par l'orchestrateur. Liste dans backend/common/comparison_categories.json." }
       - { name: "fieldSources", type: "object", description: "par champ : persona | user_answer | team_assumption | slider" }
 
   - id: "schema-mandate"
@@ -729,10 +742,10 @@ data_schemas:
 
   - id: "schema-scenario"
     fields:
-      - { name: "index", type: "integer", enum: [0, 1, 2], required: true, description: "0 actuel, 1 idée telle quelle, 2 alternative" }
+      - { name: "index", type: "integer", enum: [0, 1, 2], required: true, description: "0 actuel, 1 idée telle quelle, 2 comparaison par catégorie d'actifs (0.4.5 : seulement si mandat.compareCategory)" }
       - { name: "label", type: "string", required: true }
-      - { name: "description", type: "string", description: "alternative : formulée par catégorie d'actifs, jamais comme recommandation d'un titre (R5)" }
-      - { name: "proxyNote", type: "string", description: "ex. « exposition large US approchée par SPY pour le calcul »" }
+      - { name: "description", type: "string", description: "comparaison : générique, par catégorie, sans symbole (R5)" }
+      - { name: "proxyNote", type: "string", description: "ex. « Broad U.S. equity is approximated by a fund of the dataset for the calculation only. » Sans symbole (0.4.5)." }
       - { name: "allocation", type: "array", description: "{ label, weight } par catégorie" }
       - { name: "metrics", type: "object", description: "par mesure : identifiant EV-nn (volatility, maxDrawdown, stress2022, stressRates, stressCrypto, topSingleWeight, techWeightLookThrough)" }
       - { name: "verdict", type: "string", enum: ["pass", "warn", "fail"], required: true }
@@ -742,7 +755,7 @@ data_schemas:
       - { name: "rule", type: "string", required: true, description: "R1..R10" }
       - { name: "scenario", type: "integer" }
       - { name: "status", type: "string", enum: ["pass", "warn", "fail", "not_verified"], required: true }
-      - { name: "reasonCode", type: "string", required: true, description: "ex. MAX_LOSS_EXCEEDED, CONCENTRATION_HIGH" }
+      - { name: "reasonCode", type: "string", required: true, description: "ex. MAX_LOSS_EXCEEDED, CONCENTRATION_HIGH ; R4 : COMPARISON_NOT_REQUESTED, COMPARISON_SHOWN, COMPARISON_UNAVAILABLE (0.4.5)" }
       - { name: "evidence", type: "array", items_type: "string", description: "EV-nn" }
       - { name: "citations", type: "array", items_type: "string", description: "KB-nn, rempli par agent-auditor pour les statuts warn et fail seulement (0.4.4) : toujours vide pour pass et not_verified" }
       - { name: "threshold", type: "object", description: "{ value, nature: text | team_assumption }" }
@@ -984,7 +997,7 @@ modules:
     rules:
       - "adj_close, conversion en CAD avec report du dernier taux; devise native aussi affichée."
       - "Annualisation √252 (actions, FNB) et √365 (crypto); portefeuilles sur l'intersection des jours ouvrés nord-américains."
-      - "Alternative (scénario 2) : même montant, actif risqué remplacé par une catégorie compatible avec le profil, ou poche plafonnée (hypothèse d'équipe). Le FNB utilisé pour le calcul est signalé comme approximation (proxyNote)."
+      - "Comparaison (scénario 2, 0.4.5) : seulement si le mandat porte compareCategory. Même montant, chaque titre ajouté remplacé par la catégorie choisie par l'utilisateur, sans jugement du titre. Le FNB utilisé pour le calcul n'est nommé que dans method et source de la preuve (« calculation only, not a selection »)."
     owner_agent: "Agent-Backend-Agents"
 
   - id: "module-rules"
@@ -1075,7 +1088,7 @@ tools:
 
   - id: "tool-propose-mandate"
     name: "propose_mandate"
-    description: "Valide un brouillon de mandat (schema-mandate-create-request) et le joint au message de l'assistant (mandateDraft). Ne confirme rien : la confirmation passe par api-mandates-create."
+    description: "Valide un brouillon de mandat (schema-mandate-create-request) et le joint au message de l'assistant (mandateDraft). Retire compareCategory (0.4.5). Ne confirme rien : la confirmation passe par api-mandates-create."
     used_by: ["agent-orchestrator"]
     params:
       - { name: "draft", type: "object", required: true, validation: "schema-mandate-create-request; tickers dans l'univers" }
@@ -1183,8 +1196,8 @@ rules_catalog:
     - { id: "R1", check: "riskProfile = min(riskTolerance, riskCapacity)", basis: "Avis ACVM-OCRI 31-368, partie A", nature: "text" }
     - { id: "R2", check: "pire baisse simulée > effectiveMaxLossPct (défauts : <3 ans 10 %, 3-8 ans 20 %, >8 ans 35 %)", basis: "31-103 art. 13.2-13.3; seuils", nature: "text + team_assumption" }
     - { id: "R3", check: "impact mesuré sur tout le portefeuille", basis: "31-368, partie C", nature: "text" }
-    - { id: "R4", check: "au moins une alternative si WARN ou FAIL", basis: "31-368, partie C", nature: "text" }
-    - { id: "R5", check: "aucun titre nommé comme recommandation", basis: "OCRI GN-3200-26-001", nature: "text" }
+    - { id: "R4", check: "comparaison par catégorie d'actifs affichée seulement sur demande ; jamais fail (COMPARISON_NOT_REQUESTED, COMPARISON_SHOWN, COMPARISON_UNAVAILABLE) — 0.4.5", basis: "principe de 31-368, partie C (gamme d'options), sans évaluation de convenance", nature: "text" }
+    - { id: "R5", check: "aucun symbole de titre dans le texte visible sans clic, hors ceux que l'utilisateur a écrits ou détient", basis: "OCRI GN-3200-26-001", nature: "text" }
     - { id: "R6", check: "titre unique (avec composition des FNB) : WARN > 10 %, FAIL > 20 %", basis: "aucune règle officielle trouvée", nature: "team_assumption" }
     - { id: "R7", check: "crypto : avertissement sourcé; plafond 0 % si refusée, 5 % si profil ≤ 3, 10 % si profil 4-5", basis: "Avis 21-329 et 21-332; plafonds", nature: "text + team_assumption" }
     - { id: "R8", check: "« ESG » seulement si une source le montre (fonds); actions : secteur + controverses non vérifiées", basis: "Avis 81-334", nature: "text" }
