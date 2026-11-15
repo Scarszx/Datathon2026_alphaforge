@@ -829,7 +829,7 @@ jobs:
     owner_agent: "Agent-Data"
     reads_from: ["ext-yahoo-finance", "ext-bank-of-canada", "ext-fred"]
     writes_to: ["storage-dataset"]
-    base: "alphaforge_starter/build_dataset.py (jeu fourni : 31 actifs, 2021-11-12 à 2026-11-12), élargi à l'univers choisi par l'équipe"
+    base: "alphaforge_starter/build_dataset.py (jeu fourni : 31 actifs, 2021-11-12 à 2026-11-12), élargi par l'équipe (2026-11-14) à environ 250 actifs (FNB canadiens courants dont XSP.TO et ZEQT.TO, S&P/TSX 60, grandes capitalisations et FNB américains, 3 cryptos) sur 10 ans; liste de candidats dans data/ingestion/universe.yaml, chaque ticker validé à l'ingestion (SOLUTION.md section 10)"
     outputs: ["Parquet par ticker", "universe.parquet avec indicateurs", "manifest.json"]
     deadline_note: "Le compte AWS d'équipe est supprimé le 2026-11-16 en fin de journée : code sur GitHub, données sur les portables."
 
@@ -922,7 +922,7 @@ modules:
   - id: "module-engine"
     name: "Moteur de calcul"
     runs_in: "srv-agent-runtime"
-    role: "Construit les scénarios 0/1/2 et calcule : rendement, volatilité annualisée, pire baisse, tests de résistance (2022, hausse des taux dérivée de V39079/DFF, krach crypto dérivé de BTC-USD), concentration par titre, secteur, pays et devise (avec composition des FNB), corrélations. Chaque résultat est inscrit au registre (EV-nn)."
+    role: "Construit les scénarios 0/1/2 et calcule : rendement, volatilité annualisée, pire baisse, tests de résistance (2022, krach COVID 2020 dérivé de SPY, hausse des taux dérivée de V39079/DFF, krach crypto dérivé de BTC-USD), concentration par titre, secteur, pays et devise (avec composition des FNB), corrélations. Chaque résultat est inscrit au registre (EV-nn)."
     uses_tools: ["tool-get-prices", "tool-get-macro", "tool-compute-metrics", "tool-get-portfolio", "tool-portfolio-impact", "tool-stress-test", "tool-concentration"]
     rules:
       - "adj_close, conversion en CAD avec report du dernier taux; devise native aussi affichée."
@@ -1045,10 +1045,10 @@ tools:
 
   - id: "tool-stress-test"
     name: "stress_test"
-    description: "Rejoue un portefeuille sur une période de stress dérivée des données (y2022, rate_hikes, crypto_crash)."
+    description: "Rejoue un portefeuille sur une période de stress dérivée des données (y2022, covid_2020, rate_hikes, crypto_crash)."
     used_by: ["module-engine"]
     params:
-      - { name: "period_id", type: "string", enum: ["y2022", "rate_hikes", "crypto_crash"], required: true }
+      - { name: "period_id", type: "string", enum: ["y2022", "covid_2020", "rate_hikes", "crypto_crash"], required: true }
     returns: "{ period, start, end, drawdown, evidenceIds[] }"
     reads: ["storage-dataset"]
 
@@ -1137,7 +1137,6 @@ rules_catalog:
 # ==========================================
 open_questions:
   - "Chat synchrone (départ) ou asynchrone : à reconsidérer si les agents dépassent environ 25 s."
-  - "Univers d'actifs à télécharger au-delà des 31 du jeu fourni, et données ESG, fondamentaux, composition des FNB."
   - "Empaquetage de pandas/pyarrow dans la Lambda et temps de chargement à froid : à tester tôt."
   - "Isolation IAM par agent : choix actuel = rôle unique et limites dans le code. Évolutions possibles : rôles étroits par outil (STS) ou Lambdas d'outils."
   - "Route /v1/agents (registre public) : optionnelle. À régénérer pour v0.4.0 (agents, modules, outils)."

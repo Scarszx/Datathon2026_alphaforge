@@ -317,8 +317,21 @@ Les seuils marqués « hypothèse » vivent dans un fichier de configuration (pa
   - 10 actions US : AAPL, MSFT, NVDA, GOOGL, AMZN, TSLA, JPM, JNJ, PG, XOM.
   - 9 FNB : XIU.TO, SPY, QQQ, ESGV, XBB.TO, ZST.TO, AGG, TLT, GLD.
   - 2 cryptos : BTC-USD, ETH-USD.
-  - **Il n'y a ni ZEQT, ni XSP, ni COST** : ne pas les utiliser sans les ajouter et les documenter.
+  - ZEQT, XSP et COST n'y sont pas. Ils sont ajoutés par le jeu élargi ci-dessous.
 - `prices_daily.csv` (~40 000 lignes), `corporate_actions.csv`, `fx_usdcad_daily.csv` (Banque du Canada), `macro_rates.csv` (format long : V39079, rendements 2 et 10 ans GoC, IPC Canada, DFF, DGS2, DGS10, CPIAUCSL, UNRATE), `sources_metadata.csv`, `build_dataset.py`.
+
+**Jeu élargi (décision d'équipe du 2026-11-14)** : le jeu de départ ne suffit pas. Son README le dit lui-même : *« It is not the dataset the jury expects you to use »* (« ce n'est pas le jeu de données que le jury s'attend à vous voir utiliser »). Et le critère « Données » pèse 20 %. WS3 construit donc un jeu plus large, toujours au format du contrat :
+- **Univers d'environ 250 actifs**, choisis pour servir les cas d'usage, et non 5 000 titres :
+  - **FNB canadiens courants chez les investisseurs autonomes** : indices larges, FNB de répartition d'actifs, obligations, dividendes, secteurs, or, ESG, épargne, dont **XSP.TO, ZEQT.TO** (cités dans l'atelier), XEQT.TO, VFV.TO, ZAG.TO ;
+  - **les constituants du S&P/TSX 60** ;
+  - **les grandes capitalisations américaines** de tous les secteurs, y compris des titres très médiatisés (test de Robert) ;
+  - **les FNB américains** : larges, sectoriels SPDR, obligations, or, immobilier, ESG, thématiques (test d'Amira) ;
+  - **3 cryptos** : BTC-USD, ETH-USD, SOL-USD.
+- **Liste de candidats** dans `data/ingestion/universe.yaml`, rangée par catégorie. **Chaque ticker est validé à l'ingestion** : ceux que yfinance ne renvoie pas, ou qui ont trop peu d'historique, sont écartés et listés dans le manifeste. Aucun ticker n'est inventé.
+- **Fenêtre de 10 ans** (environ 2016-11 → 2026-11) au lieu de 5. On gagne deux crises réelles comme tests de résistance : fin 2018 et le **krach COVID de 2020**, en plus de 2022. Les actifs plus récents (ex. ZEQT.TO, lancé en 2022) ont un historique plus court : il est signalé, jamais comblé.
+- **Version du jeu** = date d'extraction. La variable Terraform `dataset_version` et `backend/api/tickers.json` (validation des tickers de WS4) sont mis à jour à l'intégration.
+- **Volume** : environ 250 actifs × 2 500 jours, soit environ 600 000 lignes. C'est léger en Parquet.
+- **Biais du survivant amplifié par 10 ans** : on le dit explicitement dans les limites.
 
 **Pièges du jeu de départ à traiter (et à documenter) :**
 1. Utiliser `adj_close` pour les rendements. Les prix sont déjà ajustés pour les fractionnements : **ne pas réappliquer** les lignes `split`.
@@ -340,11 +353,12 @@ Les seuils marqués « hypothèse » vivent dans un fichier de configuration (pa
 
 **Périodes de test de résistance**, dérivées des données par un outil qui écrit sa propre preuve EV (pas de dates choisies à la main) :
 - **2022** : année civile 2022, quand actions et obligations ont baissé ensemble ;
+- **Krach COVID 2020** : du sommet au creux de SPY au premier semestre 2020 (possible grâce à la fenêtre de 10 ans) ;
 - **Hausse des taux** : du premier relèvement au dernier, selon V39079 (BoC) ou DFF (Fed) ;
 - **Krach crypto** : du sommet au creux de BTC-USD dans la fenêtre.
 
 **Fiche enrichie des FNB — `assets_metadata_enriched.json`** (décidé) :
-- **Pour les 9 FNB seulement :**
+- **Pour les 9 FNB du jeu de départ, plus les FNB clés du jeu élargi** (XSP.TO, ZEQT.TO, XEQT.TO, VFV.TO, ZAG.TO, XIC.TO), soit environ 15 fiches relevées à la main. Pour les autres FNB, on indique « composition non disponible » et l'exposition se lit par catégorie :
   - `sector_weights` ;
   - `top_holdings` (5 à 10 positions avec leur poids) ;
   - `country_weights` ;
@@ -486,7 +500,7 @@ Les calculs, les règles et le vérificateur ont aussi des **tests unitaires san
 | Chiffres non sourcés (« NVDA −62 % en 2022 », « 32 % tech dans SPY ») | Tout chiffre doit venir de nos calculs ou d'une fiche d'émetteur datée |
 | Vérificateur bloquant avec nouvelle tentative | Trop lent et risqué en direct : emplacements `{EV}` et masquage non bloquant |
 | Optimisation « portefeuille optimal » sur rendements passés | Contraire à l'esprit de l'énoncé (pas de prédiction à partir du passé) |
-| Univers de 5 000 titres | Inutile pour des personas ; 31 actifs, plus la composition des FNB, suffisent |
+| Univers de 5 000 titres | Inutile pour des personas. On retient environ 250 actifs choisis par cas d'usage, sur 10 ans (section 10) : plus que les 31 du jeu de départ, que son propre README juge insuffisant, mais pas un univers de filtrage de marché |
 | Corpus ou prompts bilingues, ou en français | Une seule langue interne (l'anglais) rend le comportement des agents et la recherche dans la KB plus prévisibles ; la langue de l'utilisateur ne sert qu'à l'affichage |
 
 ## 19. Points ouverts et risques

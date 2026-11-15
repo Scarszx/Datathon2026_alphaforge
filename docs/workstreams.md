@@ -28,7 +28,7 @@ Les chantiers déjà terminés en v0.3.0 (✅) restent valables. Leurs compléme
                       │
                       ├──► ✅ WS1 infra  + ✅ WS1b infra v0.4 (Analyses, KB, Guardrail, IAM, routes) ─┐
                       ├──► ✅ WS2 db     + ✅ WS2b db v0.4 (repository analyses)                    ─┤
-                      ├──►    WS3 data   (inclut publication_date et etf_enriched.json)              ─┼──► intégration (humain)
+                      ├──►    WS3 data   (jeu élargi ~250 actifs × 10 ans, publication_date, FNB)     ─┼──► intégration (humain)
                       ├──► ✅ WS4 api    + ✅ WS4b api v0.4 (mandats, registre)                      ─┤
                       ├──►    WS5 agents (orchestrateur, auditeur, rédacteur, modules, runs)         ─┤
                       └──►    WS6 front  (session en 3 colonnes)                                     ─┘
@@ -74,7 +74,7 @@ Attention :
 - ⬜ À faire :
   - tester les faux positifs du Guardrail ;
   - créer les comptes Cognito des personas ;
-  - envoyer le jeu de données dans `dataset/2026-11-12/` après WS3 ;
+  - envoyer le jeu de données élargi dans `dataset/<version>/` après WS3 (version = date d'extraction), puis mettre à jour la variable Terraform `dataset_version` et régénérer `backend/api/tickers.json` à partir de `universe.parquet` (validation des tickers de WS4) ;
   - envoyer le build du front dans le bucket front après WS6 ;
   - reconstruire et redéployer les Lambdas avec le code de WS4b et de WS5.
 
@@ -253,27 +253,46 @@ Point de départ : le jeu fourni par l'organisation, hors git, ici :
 /home/rr-djk/Documents/hackathons/Datathon2026_alphaforge/mes_docs_perso/Datathon2026/alphaforge_starter/
 Lis son README.md, sources_metadata.csv et build_dataset.py avant d'écrire du code. Lis aussi SOLUTION.md section 10 (méthodes et pièges).
 
-Objectif : un script reproductible qui produit le jeu de données au format de la section storage du contrat (Parquet, dossier daté), données journalières seulement.
+Objectif : un script reproductible qui produit un JEU ÉLARGI au format de la section storage du contrat (Parquet, dossier daté), données journalières seulement. Décision d'équipe du 2026-11-14 (SOLUTION.md section 10, « Jeu élargi ») : les 31 actifs du jeu de départ ne suffisent pas. Son README le dit (« It is not the dataset the jury expects you to use »), et le critère « Données » pèse 20 %.
+
+Cible :
+- environ 250 actifs sur 10 ans (environ 2016-11 → date d'extraction), choisis pour les cas d'usage. Ce n'est pas un univers de filtrage de marché ;
+- version du jeu = date d'extraction (YYYY-MM-DD).
 
 À produire dans data/ingestion/ :
+- data/ingestion/universe.yaml : liste de CANDIDATS rangée par catégorie, avec pour chaque ticker sa catégorie (asset_class : equity, etf_equity, etf_bond, etf_commodity, etf_reit, crypto…).
+  - Le marché et la devise se déduisent du suffixe : .TO = TSX et CAD, -USD = crypto, sinon US et USD.
+  - Inclure au minimum les 31 actifs du jeu de départ, plus :
+    - les FNB canadiens courants chez les investisseurs autonomes : indices larges (XIC, ZCN, VCN, XSP, VFV, ZSP, XUS, XEF, XEC, XAW) ; FNB de répartition (ZEQT, XEQT, VEQT, XGRO, VGRO, XBAL, VBAL) ; obligations (ZAG, XSB, ZFL, XHY) ; dividendes (XEI, ZDV, ZWC) ; secteurs (XIT, XFN, XEG, XUT, XRE) ; or (XGD, CGL) ; ESG (XESG) ; épargne (CASH, ZMMK). Tous en .TO ;
+    - les constituants du S&P/TSX 60 (.TO) ;
+    - environ 40 grandes capitalisations américaines de tous les secteurs, dont des titres très médiatisés ;
+    - les FNB américains : larges (VTI, VOO, IVV, IWM, VEA, VWO, EFA, EEM) ; SPDR sectoriels (XLK, XLF, XLE, XLV, XLU, XLP, XLI, XLY, XLB, XLRE, XLC) ; obligations (BND, IEF, SHY, TIP, LQD, HYG) ; or (IAU) ; immobilier (VNQ) ; ESG (ESGU, SUSA) ; thématiques (ICLN, SOXX, SMH, ARKK) ;
+    - les cryptos BTC-USD, ETH-USD, SOL-USD.
+  - Ces listes sont des CANDIDATS : n'ajoute aucun ticker que tu n'es pas sûr d'exister, et fais confiance à la validation.
 - Un script qui :
-  (a) reprend les fichiers du jeu fourni ;
-  (b) accepte une liste d'actifs supplémentaires dans data/ingestion/universe.yaml et les télécharge en journalier via yfinance par lots, avec reprise en cas d'erreur. La liste est vide par défaut : les 31 actifs suffisent ;
-  (c) écrit dans data/output/<version>/ : manifest.json, universe.parquet, prices/{ticker}.parquet, prices_all/year=YYYY/, fx/usdcad.parquet, macro/macro.parquet, corporate_actions.parquet, etf_enriched.json.
+  (a) reprend les fichiers du jeu fourni (mode hors ligne, pour les tests) ;
+  (b) télécharge les prix journaliers des candidats via yfinance par lots de 50 à 100, avec pause entre les lots, sauvegarde après chaque lot (reprise possible) et nouvel essai des échecs. Il télécharge aussi les dividendes et les fractionnements ;
+  (c) VALIDE chaque candidat. Un ticker sans données, ou avec trop peu d'historique (seuil documenté, par exemple moins d'un an), est écarté et listé dans manifest.json avec la raison. Un historique plus court que 10 ans (ex. ZEQT lancé en 2022) est conservé et signalé (champ firstDate), jamais comblé ;
+  (d) retélécharge sur 10 ans le taux USD/CAD (API Valet de la Banque du Canada) et les 9 séries macro du jeu de départ (Valet et FRED fredgraph.csv), en reprenant les identifiants de séries et la logique de build_dataset.py ;
+  (e) remplit le secteur de chaque action à partir des métadonnées yfinance quand elles existent, sinon avec la catégorie de universe.yaml. La source est notée dans une colonne sectorSource ;
+  (f) écrit dans data/output/<version>/ : manifest.json, universe.parquet, prices/{ticker}.parquet, prices_all/year=YYYY/, fx/usdcad.parquet, macro/macro.parquet, corporate_actions.parquet, etf_enriched.json.
 - universe.parquet : les colonnes du jeu fourni, plus des indicateurs précalculés sur 1 an (rendement total, volatilité annualisée sur 252 jours avec adj_close, baisse maximale).
 - macro.parquet : ajoute une colonne publication_date pour les séries mensuelles (STATIC_TOTALCPICHANGE, CPIAUCSL, UNRATE), selon une règle de décalage documentée. Les séries journalières ont publication_date = date.
-- etf_enriched.json : pour les 9 FNB seulement (XIU.TO, SPY, QQQ, ESGV, XBB.TO, ZST.TO, AGG, TLT, GLD) :
+- etf_enriched.json : pour environ 15 FNB clés seulement (les 9 du jeu de départ : XIU.TO, SPY, QQQ, ESGV, XBB.TO, ZST.TO, AGG, TLT, GLD, plus XSP.TO, ZEQT.TO, XEQT.TO, VFV.TO, ZAG.TO, XIC.TO). Les autres FNB sont marqués « composition non disponible » :
   - sectorWeights, topHoldings (5 à 10 avec poids), countryWeights, merPct, et exclusions pour ESGV ;
   - chaque valeur avec sourceUrl et asOfDate (fiche de l'émetteur).
   Les valeurs sont relevées à la main par un humain dans data/ingestion/etf_enriched.source.json ; le script les valide et les copie. Fournis un gabarit vide et une validation (somme des poids proche de 100, dates présentes).
   N'invente aucune valeur. Aucun indicateur ESG pour les actions.
 - Contrôle qualité : doublons, prix nuls ou négatifs, tickers absents, sauts suspects d'un jour. Isole et documente l'anomalie CNQ.TO du 2022-08-22 (« split » 1,021 le jour d'un dividende de 0,75 $), et ne réapplique jamais les splits.
-- manifest.json : sources, date d'extraction, période, tickers, devises, traitements, version, et règle de publication_date.
+- manifest.json : sources, date d'extraction, période, tickers retenus et écartés (avec raison), premier jour de données par ticker, devises, traitements, version, règle de publication_date.
 - Une commande documentée pour téléverser data/output/<version>/ vers s3://<bucket>/dataset/<version>/ (ne l'exécute pas).
-- data/README.md : comment régénérer, sources et conditions d'utilisation, limites (calendriers non alignés, adj_close qui change si on retélécharge, biais du survivant, licence Yahoo pour usage personnel).
+- data/README.md : comment régénérer, sources et conditions d'utilisation, limites (calendriers non alignés, adj_close qui change si on retélécharge, biais du survivant amplifié par la fenêtre de 10 ans et la sélection faite en 2026, historiques courts de certains FNB, licence Yahoo pour usage personnel).
 
-Contraintes : rien dans data/output/ n'est commité. Pour les tests, crée un mini-jeu (3 tickers, quelques mois) dans data/fixtures/, et teste les indicateurs, publication_date et la validation de etf_enriched.
-Définition de fini : le script produit le jeu complet à partir du seul jeu fourni (sans téléchargement), et les tests passent.
+Contraintes : rien dans data/output/ n'est commité. Pour les tests, crée un mini-jeu (3 tickers, quelques mois) dans data/fixtures/, et teste les indicateurs, publication_date, la validation des candidats (ticker vide, historique trop court) et la validation de etf_enriched. Les tests n'appellent pas le réseau.
+Définition de fini :
+- les tests passent ;
+- le mode hors ligne produit un jeu complet à partir du seul jeu fourni ;
+- le mode complet a été exécuté une fois. Le jeu élargi est dans data/output/<version>/, avec dans manifest.json le nombre de tickers retenus et écartés et la période réelle. Résume ces chiffres à la fin.
 ```
 
 ---
