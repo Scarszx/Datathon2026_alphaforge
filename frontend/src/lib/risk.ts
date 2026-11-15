@@ -1,5 +1,6 @@
-/* Questionnaire de profil de risque : chaque réponse vaut de 1 à 5 points (score total : 5 à 25). */
-import type { InvestorProfile, RiskLevel } from "../api/types";
+/* Questionnaire de profil de risque : chaque réponse vaut de 1 à 5 points (score total : 5 à 25).
+ * v0.4.0 : tolérance et capacité de perte séparées (règle R1, avis 31-368), et province pour la Knowledge Base et les mentions R9. */
+import type { InvestorProfile, Jurisdiction, RiskLevel } from "../api/types";
 
 export type Question = { id: string; label: string; options: string[] }; // options[i] vaut i + 1 point
 
@@ -25,6 +26,18 @@ export const QUESTIONS: Question[] = [
 export const SCORE_MIN = QUESTIONS.length;     // 5
 export const SCORE_MAX = QUESTIONS.length * 5; // 25
 
+/* Provinces reconnues par le contrat (conventions.jurisdictions), sans CA (textes nationaux, pas une province). */
+export const PROVINCES: { code: Jurisdiction; label: string }[] = [
+  { code: "QC", label: "Québec" }, { code: "ON", label: "Ontario" }, { code: "BC", label: "Colombie-Britannique" },
+  { code: "AB", label: "Alberta" }, { code: "SK", label: "Saskatchewan" }, { code: "MB", label: "Manitoba" },
+  { code: "NB", label: "Nouveau-Brunswick" }, { code: "NS", label: "Nouvelle-Écosse" },
+  { code: "PE", label: "Île-du-Prince-Édouard" }, { code: "NL", label: "Terre-Neuve-et-Labrador" },
+  { code: "YT", label: "Yukon" }, { code: "NT", label: "Territoires du Nord-Ouest" }, { code: "NU", label: "Nunavut" },
+];
+
+export const PROVINCE_LABELS: Record<Jurisdiction, string> =
+  Object.fromEntries(PROVINCES.map((p) => [p.code, p.label])) as Record<Jurisdiction, string>;
+
 /** Score total : somme des points (1 à 5) de chaque réponse. `answers` = index d'option (0 à 4) par question. */
 export function totalScore(answers: Record<string, number>): number {
   return QUESTIONS.reduce((sum, q) => sum + answers[q.id] + 1, 0);
@@ -35,7 +48,7 @@ export function riskCalc(score: number): number {
   return 10 - 9 * ((score - SCORE_MIN) / (SCORE_MAX - SCORE_MIN));
 }
 
-export type PortfolioRisk = { score: number; value: number; answers: Record<string, number>; computedAt: string };
+export type PortfolioRisk = { score: number; value: number; answers: Record<string, number>; province?: Jurisdiction; computedAt: string };
 
 const key = (userId: string) => `af.risk.${userId}`;
 
@@ -58,9 +71,9 @@ export function loadLatestRisk(userId: string): PortfolioRisk | null {
 }
 
 /** Calcule le résultat, le garde comme dernier résultat et l'enregistre pour chaque portefeuille donné. */
-export function saveRisk(userId: string, portfolioIds: string[], answers: Record<string, number>): PortfolioRisk {
+export function saveRisk(userId: string, portfolioIds: string[], answers: Record<string, number>, province?: Jurisdiction): PortfolioRisk {
   const score = totalScore(answers);
-  const result: PortfolioRisk = { score, value: riskCalc(score), answers, computedAt: new Date().toISOString() };
+  const result: PortfolioRisk = { score, value: riskCalc(score), answers, ...(province ? { province } : {}), computedAt: new Date().toISOString() };
   const all = loadRisk(userId);
   for (const id of portfolioIds) all[id] = result;
   localStorage.setItem(key(userId), JSON.stringify(all));
@@ -98,12 +111,19 @@ export function isComplete(answers: Record<string, number>) {
   return QUESTIONS.every((q) => answers[q.id] !== undefined);
 }
 
-/** Profil investisseur déduit du questionnaire (contraintes, préférences et exclusions laissées vides). */
-export function profileFromAnswers(answers: Record<string, number>): InvestorProfile {
+/**
+ * Profil investisseur déduit du questionnaire (contraintes, préférences et exclusions laissées vides).
+ * v0.4.0 : tolérance et capacité de perte séparées — la question « Perte maximale acceptable » donne la
+ * tolérance (ce que la personne accepte de subir), la question « Capacité financière » la capacité (R1).
+ */
+export function profileFromAnswers(answers: Record<string, number>, province?: Jurisdiction): InvestorProfile {
   const [min, max] = HORIZONS[answers.horizon];
   const goal = QUESTIONS.find((q) => q.id === "goal")!.options[answers.goal];
   return {
     riskLevel: riskLevelOf(totalScore(answers)),
+    riskTolerance: answers.maxLoss + 1,
+    riskCapacity: answers.capacity + 1,
+    ...(province ? { province } : {}),
     horizonMinYears: min,
     ...(max !== null ? { horizonMaxYears: max } : {}),
     objective: goal,

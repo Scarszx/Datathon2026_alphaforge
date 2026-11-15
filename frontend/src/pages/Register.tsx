@@ -3,6 +3,7 @@ import { Link, Navigate, useNavigate } from "react-router-dom";
 import { confirmSignUp, resendCode, signUp } from "../api/auth";
 import { listPortfolios } from "../api/endpoints";
 import { ApiError, errorText } from "../api/errors";
+import type { Jurisdiction } from "../api/types";
 import PublicHeader from "../components/PublicHeader";
 import RiskForm from "../components/RiskForm";
 import { profileFromAnswers, saveRisk } from "../lib/risk";
@@ -24,6 +25,7 @@ export default function Register() {
   const [terms, setTerms] = useState(false);
   const [errs, setErrs] = useState<Record<string, string>>({});
   const answers = useRef<Answers | null>(null);
+  const provinceRef = useRef<Jurisdiction | null>(null);
   const [code, setCode] = useState("");
   const [err, setErr] = useState("");
   const [info, setInfo] = useState("");
@@ -51,8 +53,9 @@ export default function Register() {
     if (Object.keys(x).length === 0) { setErr(""); setStep("risk"); }
   }
 
-  async function create(a: Answers) {
+  async function create(a: Answers, province: Jurisdiction) {
     answers.current = a;
+    provinceRef.current = province;
     setBusy(true); setErr("");
     let confirmed: boolean;
     try {
@@ -102,9 +105,10 @@ export default function Register() {
       throw x;
     }
     const a = answers.current!;
+    const province = provinceRef.current!;
     let warning = "";
     try {
-      await saveProfile(profileFromAnswers(a));
+      await saveProfile(profileFromAnswers(a, province));
     } catch (x) {
       warning = `Compte créé, mais le profil n'a pas pu être enregistré : ${errorText(x)} Vous pouvez le remplir sur cette page.`;
     }
@@ -112,7 +116,7 @@ export default function Register() {
     // le reçoivent à l'ouverture de /profil (syncRisk).
     let ids: string[] = [];
     try { ids = (await listPortfolios()).items.map((p) => p.portfolioId); } catch { /* liste indisponible */ }
-    saveRisk(userId, ids, a);
+    saveRisk(userId, ids, a, province);
     nav(warning ? "/profil" : "/portefeuille", { replace: true, state: warning ? { warning } : undefined });
   }
 
@@ -131,7 +135,7 @@ export default function Register() {
         <main className="wrap" style={{ maxWidth: 720, padding: "40px 24px 80px" }}>
           <h1 className="auth-h">Votre profil financier</h1>
           <p className="muted" style={{ margin: "6px 0 24px" }}>
-            Cinq questions pour situer votre tolérance au risque. Aucune information sensible n'est requise.
+            Cinq questions pour situer votre tolérance au risque, plus votre province. Aucune information sensible n'est requise.
           </p>
           <RiskForm busy={busy} submitLabel={busy ? "Création…" : "Créer mon compte"} onSubmit={create}>
             {err && <p className="error" role="alert">{err}</p>}

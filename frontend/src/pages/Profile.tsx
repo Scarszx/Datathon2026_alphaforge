@@ -1,11 +1,11 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useLocation } from "react-router-dom";
 import { errorText } from "../api/errors";
-import type { InvestorProfile, Portfolio, RiskLevel } from "../api/types";
+import type { InvestorProfile, Jurisdiction, Portfolio, RiskLevel } from "../api/types";
 import AppHeader from "../components/AppHeader";
 import { listPortfolios } from "../api/endpoints";
 import RiskForm, { RiskResult } from "../components/RiskForm";
-import { loadLatestRisk, loadRisk, QUESTIONS, saveRisk, SCORE_MAX, syncRisk, type PortfolioRisk } from "../lib/risk";
+import { PROVINCES, PROVINCE_LABELS, loadLatestRisk, loadRisk, QUESTIONS, saveRisk, SCORE_MAX, syncRisk, type PortfolioRisk } from "../lib/risk";
 import { useApp } from "../lib/store";
 
 const RISK: { value: RiskLevel; label: string }[] = [
@@ -31,12 +31,12 @@ function RiskQuestionnaire({ userId }: { userId: string }) {
       .catch(() => setPortfolios([]));
   }, [userId]);
 
-  async function submit(answers: Record<string, number>) {
+  async function submit(answers: Record<string, number>, province: Jurisdiction) {
     setMsg(""); setErr("");
     setBusy(true);
     try {
       const items = portfolios ?? (await listPortfolios()).items;
-      const r = saveRisk(userId, items.map((p) => p.portfolioId), answers);
+      const r = saveRisk(userId, items.map((p) => p.portfolioId), answers, province);
       setLatest(r);
       setStored(loadRisk(userId));
       setEditing(false);
@@ -56,14 +56,14 @@ function RiskQuestionnaire({ userId }: { userId: string }) {
 
       {editing ? (
         <>
-          <RiskForm initial={latest?.answers ?? {}} submitLabel={busy ? "Calcul…" : "Calculer et enregistrer"} busy={busy} onSubmit={submit}>
+          <RiskForm initial={latest?.answers ?? {}} initialProvince={latest?.province ?? ""} submitLabel={busy ? "Calcul…" : "Calculer et enregistrer"} busy={busy} onSubmit={submit}>
             {err && <p className="error" role="alert">{err}</p>}
           </RiskForm>
           {latest && <button type="button" className="link" style={{ marginTop: 12 }} onClick={() => setEditing(false)}>Annuler</button>}
         </>
       ) : latest && (
         <div className="stack">
-          <RiskResult answers={latest.answers} />
+          <RiskResult answers={latest.answers} province={latest.province} />
           <table className="risk-answers">
             <thead><tr><th>Question</th><th>Votre réponse</th><th>Points</th></tr></thead>
             <tbody>
@@ -98,6 +98,9 @@ export default function Profile() {
   const warning = (useLocation().state as { warning?: string } | null)?.warning;
   const p = user?.investorProfile;
   const [risk, setRisk] = useState<RiskLevel>(p?.riskLevel ?? "moderate");
+  const [tolerance, setTolerance] = useState(p?.riskTolerance ? String(p.riskTolerance) : "");
+  const [capacity, setCapacity] = useState(p?.riskCapacity ? String(p.riskCapacity) : "");
+  const [province, setProvince] = useState<Jurisdiction | "">(p?.province ?? "");
   const [hMin, setHMin] = useState(p ? String(p.horizonMinYears) : "");
   const [hMax, setHMax] = useState(p?.horizonMaxYears != null ? String(p.horizonMaxYears) : "");
   const [objective, setObjective] = useState(p?.objective ?? "");
@@ -115,8 +118,16 @@ export default function Profile() {
     if (!Number.isInteger(min) || min < 0) return setErr("L'horizon minimum doit être un nombre entier d'années.");
     if (max !== undefined && (!Number.isInteger(max) || max < min)) return setErr("L'horizon maximum doit être un entier supérieur ou égal au minimum.");
     if (!objective.trim()) return setErr("L'objectif est requis.");
+    const tol = tolerance.trim() === "" ? undefined : Number(tolerance);
+    const cap = capacity.trim() === "" ? undefined : Number(capacity);
+    if (tol !== undefined && (!Number.isInteger(tol) || tol < 1 || tol > 5)) return setErr("La tolérance à la perte est un entier de 1 à 5.");
+    if (cap !== undefined && (!Number.isInteger(cap) || cap < 1 || cap > 5)) return setErr("La capacité à encaisser une perte est un entier de 1 à 5.");
     const body: InvestorProfile = {
-      riskLevel: risk, horizonMinYears: min, ...(max !== undefined ? { horizonMaxYears: max } : {}),
+      riskLevel: risk,
+      ...(tol !== undefined ? { riskTolerance: tol } : {}),
+      ...(cap !== undefined ? { riskCapacity: cap } : {}),
+      ...(province ? { province } : {}),
+      horizonMinYears: min, ...(max !== undefined ? { horizonMaxYears: max } : {}),
       objective: objective.trim(), constraints: lines(constraints), preferences: lines(preferences), excludedAssetClasses: lines(excluded),
     };
     setErr(""); setBusy(true);
@@ -132,12 +143,29 @@ export default function Profile() {
           <div className="meta">@{user?.username}{user?.baseCurrency ? ` · devise d'affichage : ${user.baseCurrency}` : ""}</div>
         </div></div>
         {warning && !p && <div className="banner warn" style={{ marginBottom: 20 }}>{warning}</div>}
-        {!p && <div className="banner" style={{ background: "var(--ghost)", marginBottom: 20 }}>Profil non rempli : l'agent de gouvernance ne pourra pas vérifier l'adéquation de ses réponses tant qu'il n'est pas complété.</div>}
+        {!p && <div className="banner" style={{ background: "var(--ghost)", marginBottom: 20 }}>Profil non rempli : l'auditeur ne pourra pas vérifier l'adéquation de ses réponses tant qu'il n'est pas complété.</div>}
         {saved && <div className="banner ok" style={{ marginBottom: 20 }}>Profil enregistré.</div>}
         {user && <RiskQuestionnaire userId={user.userId} />}
         <form className="stack" onSubmit={submit} noValidate style={{ paddingBottom: 64 }}>
           <div className="field"><label htmlFor="risk">Niveau de risque</label>
             <select id="risk" className="input" value={risk} onChange={(e) => setRisk(e.target.value as RiskLevel)}>{RISK.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}</select></div>
+          <div className="row2">
+            <div className="field"><label htmlFor="tol">Tolérance à la perte (1 à 5)</label>
+              <select id="tol" className="input" value={tolerance} onChange={(e) => setTolerance(e.target.value)}>
+                <option value="">Non renseignée</option>
+                {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
+              </select></div>
+            <div className="field"><label htmlFor="cap">Capacité à encaisser une perte (1 à 5)</label>
+              <select id="cap" className="input" value={capacity} onChange={(e) => setCapacity(e.target.value)}>
+                <option value="">Non renseignée</option>
+                {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
+              </select></div>
+          </div>
+          <div className="field"><label htmlFor="prov">Province ou territoire</label>
+            <select id="prov" className="input" value={province} onChange={(e) => setProvince(e.target.value as Jurisdiction | "")}>
+              <option value="">Non renseignée</option>
+              {PROVINCES.map((pr) => <option key={pr.code} value={pr.code}>{pr.label} ({pr.code})</option>)}
+            </select></div>
           <div className="row2">
             <div className="field"><label htmlFor="hmin">Horizon minimum (années)</label><input id="hmin" inputMode="numeric" value={hMin} onChange={(e) => setHMin(e.target.value)} /></div>
             <div className="field"><label htmlFor="hmax">Horizon maximum (facultatif)</label><input id="hmax" inputMode="numeric" value={hMax} onChange={(e) => setHMax(e.target.value)} /></div>
