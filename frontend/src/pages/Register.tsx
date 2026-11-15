@@ -8,6 +8,8 @@ import PublicHeader from "../components/PublicHeader";
 import RiskForm from "../components/RiskForm";
 import { profileFromAnswers, saveRisk } from "../lib/risk";
 import { useApp } from "../lib/store";
+import { EMPTY_INDUSTRIES, type IndustryChoice } from "../lib/industries";
+import { loadPersonalAnswers } from "../lib/personalDraft";
 
 /*
  * Inscription : 1) compte  2) questionnaire de risque  3) code de confirmation Cognito (si le pool l'exige).
@@ -26,7 +28,7 @@ export default function Register() {
   const [errs, setErrs] = useState<Record<string, string>>({});
   const answers = useRef<Answers | null>(null);
   const provinceRef = useRef<Jurisdiction | null>(null);
-  const industriesRef = useRef<string[]>([]);
+  const industriesRef = useRef<IndustryChoice>(EMPTY_INDUSTRIES);
   const [code, setCode] = useState("");
   const [err, setErr] = useState("");
   const [info, setInfo] = useState("");
@@ -54,7 +56,7 @@ export default function Register() {
     if (Object.keys(x).length === 0) { setErr(""); setStep("risk"); }
   }
 
-  async function create(a: Answers, province: Jurisdiction, industries: string[]) {
+  async function create(a: Answers, province: Jurisdiction, industries: IndustryChoice) {
     answers.current = a;
     industriesRef.current = industries;
     provinceRef.current = province;
@@ -139,7 +141,7 @@ export default function Register() {
           <p className="muted" style={{ margin: "6px 0 24px" }}>
             Cinq questions pour situer votre tolérance au risque, plus votre province et vos industries d'intérêt. Aucune information sensible n'est requise.
           </p>
-          <RiskForm showIndustries busy={busy} submitLabel={busy ? "Création…" : "Créer mon compte"} onSubmit={create}>
+          <RiskForm showIndustries initial={loadPersonalAnswers() ?? {}} busy={busy} submitLabel={busy ? "Création…" : "Créer mon compte"} onSubmit={create}>
             {err && <p className="error" role="alert">{err}</p>}
           </RiskForm>
           <button type="button" className="link" style={{ marginTop: 16 }} onClick={() => setStep("account")}>← Retour</button>

@@ -4,7 +4,7 @@
  * « Capacité financière ». Le niveau retenu (R1, avis 31-368) est le plus bas des deux, partout :
  * accueil, profil, mandat, R1, catégorie de comparaison. L'ancienne échelle à quatre libellés
  * (riskLevel) n'est plus envoyée à l'API. La description des niveaux est dans lib/riskScale.ts. */
-import { industryPrefs } from "./industries";
+import { EMPTY_INDUSTRIES, industryPrefs, type IndustryChoice } from "./industries";
 import type { InvestorProfile, Jurisdiction } from "../api/types";
 
 export type Question = { id: string; label: string; options: string[] }; // options[i] vaut i + 1 point
@@ -107,7 +107,7 @@ export function isComplete(answers: Record<string, number>) {
  * financière ») obligatoires et envoyées telles quelles ; riskLevel n'est plus envoyé (R1 : le niveau
  * retenu est calculé côté API comme le plus bas des deux).
  */
-export function profileFromAnswers(answers: Record<string, number>, province?: Jurisdiction, industries: string[] = []): InvestorProfile {
+export function profileFromAnswers(answers: Record<string, number>, province?: Jurisdiction, industries: IndustryChoice = EMPTY_INDUSTRIES): InvestorProfile {
   const [min, max] = HORIZONS[answers.horizon];
   const goal = QUESTIONS.find((q) => q.id === "goal")!.options[answers.goal];
   return {

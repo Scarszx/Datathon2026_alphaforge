@@ -3,6 +3,7 @@ import { isComplete, PROVINCES, QUESTIONS, totalScore, SCORE_MAX } from "../lib/
 import { levelLabel, retainedLevel, VOLATILITY_ASSUMPTION } from "../lib/riskScale";
 import type { Jurisdiction } from "../api/types";
 import IndustryPicker from "./IndustryPicker";
+import { EMPTY_INDUSTRIES, type IndustryChoice } from "../lib/industries";
 
 type Answers = Record<string, number>;
 
@@ -14,11 +15,11 @@ export default function RiskForm({
   initial = {}, initialProvince = "", showIndustries = false, submitLabel, busy = false, onSubmit, children,
 }: {
   initial?: Answers; initialProvince?: string; showIndustries?: boolean; submitLabel: string; busy?: boolean;
-  onSubmit: (a: Answers, province: Jurisdiction, industries: string[]) => void; children?: ReactNode;
+  onSubmit: (a: Answers, province: Jurisdiction, industries: IndustryChoice) => void; children?: ReactNode;
 }) {
   const [answers, setAnswers] = useState<Answers>(initial);
   const [province, setProvince] = useState(initialProvince);
-  const [industries, setIndustries] = useState<string[]>([]);
+  const [industries, setIndustries] = useState<IndustryChoice>(EMPTY_INDUSTRIES);
   const [tried, setTried] = useState(false);
   const done = QUESTIONS.filter((q) => answers[q.id] !== undefined).length;
   const missingProvince = !PROVINCES.some((p) => p.code === province);
@@ -60,7 +61,7 @@ export default function RiskForm({
       </fieldset>
       {showIndustries && (
         <fieldset className="q">
-          <legend>{QUESTIONS.length + 2}. Industries qui vous intéressent (facultatif, plusieurs choix possibles)</legend>
+          <legend>{QUESTIONS.length + 2}. Industries : ce que vous aimez et ce que vous préférez éviter (facultatif, plusieurs choix possibles)</legend>
           <IndustryPicker value={industries} onChange={setIndustries} />
         </fieldset>
       )}
