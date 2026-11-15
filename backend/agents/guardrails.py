@@ -18,6 +18,14 @@ from backend.common import config
 
 _CLIENT = None
 
+# Contexte donné au classificateur de sujets, en entrée seulement. Sans lui, des
+# phrases de simulation (« How can you help me? », « Compare XSP and ZEQT for my
+# portfolio ») sont prises pour des demandes de conseil. Mesuré sur la version 3
+# (ApplyGuardrail, 4 essais, 13 phrases légitimes et 15 violations) : phrases
+# légitimes bloquées 10/13 -> 1/13, violations laissées passer 0/15 -> 0/15.
+# Le préfixe ne sert qu'à la classification : il n'est jamais stocké ni affiché.
+INPUT_CONTEXT_PREFIX = "In the simulator: "
+
 
 @dataclass
 class GuardrailResult:
@@ -58,6 +66,7 @@ def apply(text: str, source: str, client=None) -> GuardrailResult:
     guardrail_id, version = config.guardrail_id(), config.guardrail_version()
     if not text or not guardrail_id or not version:
         return GuardrailResult(False, text, False)
+    guarded = INPUT_CONTEXT_PREFIX + text if source == "INPUT" else text
     with telemetry.trace_span(
         f"guardrail.{source.lower()}",
         observation_type="guardrail",
@@ -66,7 +75,7 @@ def apply(text: str, source: str, client=None) -> GuardrailResult:
         try:
             response = (client or _client()).apply_guardrail(
                 guardrailIdentifier=guardrail_id, guardrailVersion=version, source=source,
-                content=[{"text": {"text": text}}],
+                content=[{"text": {"text": guarded}}],
             )
         except Exception as exc:  # panne : fail-open, journalisée sans le texte
             log_event("guardrail.error", source=source, error=type(exc).__name__)
@@ -75,6 +84,8 @@ def apply(text: str, source: str, client=None) -> GuardrailResult:
             return res
         outputs = response.get("outputs") or []
         replacement = outputs[0].get("text") if outputs else None
+        if replacement and source == "INPUT" and replacement.startswith(INPUT_CONTEXT_PREFIX):
+            replacement = replacement[len(INPUT_CONTEXT_PREFIX):]  # texte masqué : sans le préfixe
         if response.get("action") != "GUARDRAIL_INTERVENED":
             res = GuardrailResult(False, text, True)
             telemetry.set_span_output(span, {"blocked": res.blocked, "checked": res.checked})
