@@ -78,6 +78,15 @@ data "aws_iam_policy_document" "api" {
     resources = [local.table_arn.analyses]
   }
 
+  # srv-transcribe (0.4.8) : signature de l'URL WebSocket de la saisie vocale.
+  # Transcribe Streaming n'accepte que "*" comme ressource.
+  statement {
+    sid       = "TranscribeStreaming"
+    effect    = "Allow"
+    actions   = ["transcribe:StartStreamTranscriptionWebSocket"]
+    resources = ["*"]
+  }
+
   # Journaux (groupes créés par Terraform, rétention 14 jours).
   statement {
     sid       = "Logs"

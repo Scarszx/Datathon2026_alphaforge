@@ -1,4 +1,4 @@
-"""Les 13 outils du contrat (section tools), en fonctions pures du contexte.
+"""Les 14 outils du contrat (section tools), en fonctions pures du contexte.
 
 Chaque outil valide ses paramètres et construit lui-même sa lecture
 (rule-tool-validation). Une erreur attendue est renvoyée comme
@@ -19,6 +19,7 @@ from typing import Any
 
 import pandas as pd
 
+from backend.agents.data.store import NON_INVESTABLE_CLASSES
 from backend.agents.engine import analytics as an
 from backend.agents.engine.concentration import concentration as concentration_of
 from backend.agents.engine.scenarios import holding_values_cad, run_engine
@@ -108,7 +109,8 @@ def search_assets(ctx: RequestContext, query: str, asset_class: str | None = Non
     rows = [
         (ticker, row, _norm(ticker), _norm(row["name"]))
         for ticker, row in universe.iterrows()
-        if not asset_class or str(row["asset_class"]).lower() == asset_class.lower()
+        if (not asset_class or str(row["asset_class"]).lower() == asset_class.lower())
+        and str(row["asset_class"]).lower() not in NON_INVESTABLE_CLASSES
     ]
     multi = len(terms) > 1
     per_term = max(MAX_ASSETS // len(terms), 3) if multi else MAX_ASSETS
@@ -198,8 +200,8 @@ def propose_mandate(ctx: RequestContext, draft: dict[str, Any]) -> dict[str, Any
         mandate = validate_mandate_create(draft)
     except ApiError as error:
         return {"valid": False, "errors": [error.message]}
-    unknown = [op["ticker"] for op in mandate.get("operations", []) if not ctx.store.has_ticker(op["ticker"])]
-    if mandate.get("subjectTicker") and not ctx.store.has_ticker(mandate["subjectTicker"]):
+    unknown = [op["ticker"] for op in mandate.get("operations", []) if not ctx.store.is_investable(op["ticker"])]
+    if mandate.get("subjectTicker") and not ctx.store.is_investable(mandate["subjectTicker"]):
         unknown.append(mandate["subjectTicker"])
     if unknown:
         return {"valid": False, "errors": [f"Unknown ticker(s): {', '.join(unknown)}. Use search_assets."]}
@@ -336,7 +338,7 @@ def compute_metrics(ctx: RequestContext, tickers: list[str], start: str, end: st
     result: dict[str, Any] = {
         "metrics": out, "period": f"{start}/{end}",
         "assumptions": [
-            "adj_close; percentages in the listing currency; volatility annualized with sqrt(252) or sqrt(365) for crypto.",
+            "adjclose; percentages in the listing currency; volatility annualized with sqrt(252) or sqrt(365) for crypto.",
         ],
         "source": ctx.store.source_label("prices"),
     }
@@ -345,6 +347,36 @@ def compute_metrics(ctx: RequestContext, tickers: list[str], start: str, end: st
         result["correlation"] = an.correlation_matrix(aligned.frame)
         result["assumptions"].append("Correlation of daily CAD returns on common trading days.")
     return result
+
+
+def market_stats(ctx: RequestContext, tickers: list[str], start: str, end: str) -> dict[str, Any]:
+    if not isinstance(tickers, list) or not tickers or len(tickers) > MAX_METRIC_TICKERS:
+        return _error(f"tickers must be a list of 1 to {MAX_METRIC_TICKERS} symbols.")
+    for ticker in tickers:
+        if not ctx.store.has_ticker(ticker):
+            return _unknown_ticker(ctx, ticker)
+    if not ctx.store.has_ticker(an.MARKET_INDEX):
+        return _error(f"Market index {an.MARKET_INDEX} is missing from this dataset version.")
+    start_ts, end_ts = _parse_date(start, "start"), _parse_date(end, "end")
+    for value in (start_ts, end_ts):
+        if isinstance(value, str):
+            return _error(value)
+    stats = an.market_stats(ctx.store, tickers, start_ts, end_ts)
+    rounded = {
+        ticker: {k: (None if v is None else round(v, 2 if k in ("annual_return", "std_dev") else 4))
+                 if k != "observations" else v for k, v in values.items()}
+        for ticker, values in stats.items()
+    }
+    return {
+        "stats": rounded, "benchmark": an.MARKET_INDEX, "period": f"{start}/{end}",
+        "assumptions": [
+            "Daily returns on adjclose in the listing currency, no currency conversion (a CAD listing is compared with the USD index) and no price carried forward.",
+            "annual_return = mean x periods, in %; std_dev = std x sqrt(periods), in %; variance = var x periods, as a decimal; periods = 252, or 365 for crypto.",
+            "beta = cov(asset, market) / var(market) and market_correlation use only the days both quote (observations); fewer than "
+            f"{an.MIN_MARKET_OBSERVATIONS} common days gives null.",
+        ],
+        "source": ctx.store.source_label("prices"),
+    }
 
 
 def _current_weights(ctx: RequestContext) -> dict[str, float] | dict[str, Any]:
@@ -437,6 +469,7 @@ TOOL_FUNCTIONS = {
     "get_prices": get_prices,
     "get_macro": get_macro,
     "compute_metrics": compute_metrics,
+    "market_stats": market_stats,
     "get_portfolio": get_portfolio,
     "get_profile": get_profile,
     "propose_mandate": propose_mandate,

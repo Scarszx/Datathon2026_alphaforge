@@ -23,8 +23,10 @@ import pandas as pd
 
 from backend.common import config
 
-PRICE_COLUMNS = ["date", "close", "adj_close", "currency"]
-UNIVERSE_COLUMNS = ["ticker", "name", "asset_class", "market", "currency", "sector"]
+PRICE_COLUMNS = ["date", "close", "adjclose", "currency"]
+UNIVERSE_COLUMNS = ["symbol", "name", "asset_class", "market", "currency", "sector"]
+OPTIONAL_UNIVERSE_COLUMNS = ["industry", "country"]  # absentes des jeux antérieurs à 0.4.8
+NON_INVESTABLE_CLASSES = {"index"}  # ex. ^GSPC : référence de comparaison, jamais en portefeuille
 
 
 class DatasetError(RuntimeError):
@@ -97,33 +99,40 @@ class DataStore:
         return self._cached("manifest", load)
 
     def universe(self) -> pd.DataFrame:
-        """Une ligne par actif, indexée par ticker (colonnes UNIVERSE_COLUMNS)."""
+        """Une ligne par actif, indexée par symbole (colonnes UNIVERSE_COLUMNS)."""
 
         def load() -> pd.DataFrame:
             frame = self._parquet("universe.parquet")
             missing = [c for c in UNIVERSE_COLUMNS if c not in frame.columns]
             if missing:
                 raise DatasetError(f"universe.parquet lacks columns: {missing}")
-            return frame.set_index("ticker", drop=False)
+            return frame.set_index("symbol", drop=False)
 
         return self._cached("universe", load)
 
     def has_ticker(self, ticker: str) -> bool:
         return ticker in self.universe().index
 
+    def is_investable(self, ticker: str) -> bool:
+        """Dans l'univers et pas un indice de référence."""
+        if not self.has_ticker(ticker):
+            return False
+        return str(self.universe().loc[ticker, "asset_class"]).lower() not in NON_INVESTABLE_CLASSES
+
     def asset(self, ticker: str) -> dict[str, Any]:
         row = self.universe().loc[ticker]
-        return {c: (None if pd.isna(row[c]) else row[c]) for c in UNIVERSE_COLUMNS}
+        columns = UNIVERSE_COLUMNS + [c for c in OPTIONAL_UNIVERSE_COLUMNS if c in row.index]
+        return {c: (None if pd.isna(row[c]) else row[c]) for c in columns}
 
     def prices(self, ticker: str) -> pd.DataFrame:
-        """Prix journaliers d'un ticker : index date (Timestamp), colonnes close, adj_close, currency."""
+        """Prix journaliers d'un ticker : index date (Timestamp), colonnes close, adjclose, currency."""
 
         def load() -> pd.DataFrame:
             safe = ticker.replace("/", "_")
             frame = self._parquet(f"prices/{safe}.parquet", PRICE_COLUMNS)
             frame["date"] = pd.to_datetime(frame["date"])
-            frame = frame.dropna(subset=["adj_close"]).sort_values("date")
-            frame = frame[frame["adj_close"] > 0]
+            frame = frame.dropna(subset=["adjclose"]).sort_values("date")
+            frame = frame[frame["adjclose"] > 0]
             return frame.drop_duplicates("date", keep="last").set_index("date")
 
         return self._cached(f"prices:{ticker}", load)

@@ -69,6 +69,17 @@ def test_concentration_avec_composition_des_fnb(store):
     assert unknown["lookThroughComplete"] is False and "AGG" in unknown["caveats"][0]
 
 
+def test_pays_lu_dans_la_colonne_country_du_jeu(store):
+    from backend.agents.engine.concentration import _country_of
+
+    assert store.asset("RY.TO")["country"] == "Canada" and store.asset("BTC-USD")["country"] is None
+    assert _country_of("RY.TO", "equity", "Canada") == "CA"
+    assert _country_of("NVDA", "equity", "United States") == "US"
+    assert _country_of("ASML", "equity", "Netherlands") == "Netherlands"  # pays hors CA/US conservé
+    assert _country_of("RY.TO", "equity") == "CA" and _country_of("NVDA", "equity") == "US"  # repli suffixe
+    assert _country_of("BTC-USD", "crypto", "United States") == "Crypto"
+
+
 def test_fiche_de_fnb_vide_n_est_pas_une_composition(store, monkeypatch):
     """Un gabarit non rempli (listes vides, sans source) ne doit pas faire croire à une transparence."""
     empty = {"ticker": "XIU.TO", "sectorWeights": {}, "countryWeights": {}, "topHoldings": []}
@@ -181,3 +192,48 @@ def test_bootstrap_historique_trop_court_ne_donne_pas_de_fourchette():
     import pandas as pd
     from backend.agents.engine.analytics import bootstrap_ranges
     assert bootstrap_ranges(pd.Series([1.0, 1.01, 1.02])) == {}
+
+
+def _fake_series(monkeypatch, series: dict):
+    from backend.agents.engine import analytics as an
+
+    monkeypatch.setattr(an, "native_series", lambda store, ticker: series[ticker])
+
+
+def test_market_stats_formules_du_script(store, monkeypatch):
+    import numpy as np
+    import pandas as pd
+
+    from backend.agents.engine import analytics as an
+
+    days = pd.bdate_range("2024-01-01", periods=120)
+    rm = pd.Series(np.random.default_rng(1).normal(0.0004, 0.01, len(days)), index=days)
+    market = (1 + rm).cumprod() * 100
+    double = (1 + 2 * rm).cumprod() * 50  # rendement quotidien = 2 x marché : bêta 2, corrélation 1
+    _fake_series(monkeypatch, {"^GSPC": market, "RY.TO": double, "BTC-USD": double})
+    stats = an.market_stats(store, ["RY.TO", "BTC-USD", "^GSPC"], days[0], days[-1])
+    r = double.pct_change().dropna()
+    ry = stats["RY.TO"]
+    assert ry["beta"] == pytest.approx(2.0, abs=1e-9) and ry["market_correlation"] == pytest.approx(1.0, abs=1e-9)
+    assert ry["annual_return"] == pytest.approx(r.mean() * 252 * 100) and ry["variance"] == pytest.approx(r.var() * 252)
+    assert ry["std_dev"] == pytest.approx(r.std() * 252**0.5 * 100)
+    assert ry["observations"] == 119
+    btc = stats["BTC-USD"]  # crypto : annualisation sur 365
+    assert btc["std_dev"] == pytest.approx(r.std() * 365**0.5 * 100)
+    assert stats["^GSPC"]["beta"] == pytest.approx(1.0) and stats["^GSPC"]["market_correlation"] == pytest.approx(1.0)
+
+
+def test_market_stats_jours_communs_et_seuil(store, monkeypatch):
+    import numpy as np
+    import pandas as pd
+
+    from backend.agents.engine import analytics as an
+
+    days = pd.bdate_range("2024-01-01", periods=60)
+    rng = np.random.default_rng(2)
+    market = pd.Series((1 + rng.normal(0, 0.01, 60)).cumprod() * 100, index=days)
+    short = pd.Series((1 + rng.normal(0, 0.01, 10)).cumprod() * 10, index=days[:10])  # 9 rendements communs
+    _fake_series(monkeypatch, {"^GSPC": market, "RY.TO": short})
+    stats = an.market_stats(store, ["RY.TO"], days[0], days[-1])["RY.TO"]
+    assert stats["beta"] is None and stats["market_correlation"] is None
+    assert stats["std_dev"] is not None and stats["observations"] == 9  # rendement et risque restent calculés

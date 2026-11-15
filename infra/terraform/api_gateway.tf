@@ -2,7 +2,7 @@
 # Routes exactement comme dans le contrat (services.routes_to et apis.provider).
 
 locals {
-  # 17 APIs du contrat v0.4.0, avec l'intégration Lambda qui les dessert.
+  # 18 APIs du contrat v0.4.8, avec l'intégration Lambda qui les dessert.
   routes = {
     me_get               = { method = "GET", path = "/v1/me", target = "api" }
     me_profile_put       = { method = "PUT", path = "/v1/me/profile", target = "api" }
@@ -21,6 +21,7 @@ locals {
     mandates_list        = { method = "GET", path = "/v1/conversations/{sessionId}/mandates", target = "api" }
     runs_create          = { method = "POST", path = "/v1/conversations/{sessionId}/runs", target = "agents" }
     runs_get             = { method = "GET", path = "/v1/conversations/{sessionId}/runs/{runId}", target = "agents" }
+    speech_session       = { method = "POST", path = "/v1/speech/session", target = "api" }
   }
 }
 

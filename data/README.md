@@ -71,8 +71,8 @@ Pour mettre à jour la liste embarquée de validation des tickers de la Lambda A
 | Chemin | Format / Clés | Contenu |
 |---|---|---|
 | `manifest.json` | JSON (`camelCase`) | Version, date d'extraction, période demandée et réelle, nombre et liste des tickers retenus et écartés (avec raison), `firstDateByTicker`, `shortHistoryTickers`, `publicationDateRule`, sources, traitements et `qualityReport`. |
-| `universe.parquet` | Parquet (`snake_case`) | `asset_id, ticker, name, asset_class, market, currency, sector, sector_source, first_date, last_date, return_1y, volatility_1y, max_drawdown_1y`. |
-| `prices/{ticker}.parquet` | Parquet (`snake_case`) | `date, ticker, open, high, low, close, adj_close, volume, currency` (un fichier par actif retenu). |
+| `universe.parquet` | Parquet (`snake_case`) | `asset_id, symbol, name, asset_class, market, currency, sector, sector_source, industry, country, first_date, last_date, return_1y, volatility_1y, max_drawdown_1y`. |
+| `prices/{symbol}.parquet` | Parquet (`snake_case`) | `date, symbol, open, high, low, close, adjclose, volume, currency` (un fichier par actif retenu). |
 | `prices_all/year=YYYY/part-0.parquet` | Parquet (`snake_case`) | Mêmes colonnes que `prices/{ticker}.parquet`, regroupant tous les actifs retenus par année civile. |
 | `fx/usdcad.parquet` | Parquet (`snake_case`) | `date, usdcad, cadusd` (taux journalier de la Banque du Canada et son inverse). |
 | `macro/macro.parquet` | Parquet (`snake_case`) | `date, series_id, value, unit, frequency, label, source, publication_date`. |

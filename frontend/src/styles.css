@@ -575,6 +575,17 @@ fieldset.q.missing legend { color: var(--loss-ink); }
 .af-send { width: 40px; height: 40px; border-radius: 50%; background: var(--red); color: #fff; display: grid; place-items: center; transition: background .15s; }
 .af-send:hover { background: var(--red-dark); }
 .af-send:disabled { background: #B7CFC4; color: #F4FAF6; cursor: not-allowed; }
+.af-mic { position: relative; width: 36px; height: 36px; border-radius: 50%; color: var(--muted); display: grid; place-items: center; transition: background .15s, color .15s; }
+.af-mic:hover { background: var(--red-soft); color: var(--red); }
+.af-mic:disabled { opacity: .5; cursor: not-allowed; }
+.af-mic.listening { color: var(--red); background: var(--red-soft); }
+.af-mic.listening::after { content: ""; position: absolute; top: 5px; right: 5px; width: 8px; height: 8px; border-radius: 50%; background: #d92d20; animation: af-mic-pulse 1.2s ease-in-out infinite; }
+@keyframes af-mic-pulse { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .af-mic.listening::after { animation: none; } }
+.af-mic-note { font-size: 12px; margin: 6px 20px 0; }
+.af-mic-note.err { color: #b42318; }
+/* Texte provisoire de la dictée : dans le champ, en gris italique tant que Transcribe n'a pas validé la phrase. */
+.af-composer-live input { color: var(--faint); font-style: italic; }
 .af-disclaimer { font-size: 11px; color: var(--faint); text-align: center; margin-top: 10px; }
 
 @media (max-width: 860px) {

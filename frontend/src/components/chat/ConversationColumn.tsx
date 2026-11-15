@@ -5,6 +5,8 @@ import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 
 import type { MandateCreateRequest, Message } from "../../api/types";
 import { t, type Lang } from "../../lib/i18n";
 import { PROVINCES } from "../../lib/risk";
+import { appendSpeech } from "../../lib/speech";
+import { useSpeechToText } from "../../lib/useSpeechToText";
 import Explanation from "../Explanation";
 import EvidenceText from "./EvidenceText";
 import MandateCard from "./MandateCard";
@@ -114,13 +116,25 @@ export default function ConversationColumn({
   onConfirmDraft: (m: MandateCreateRequest) => void;
 }) {
   const [v, setV] = useState("");
+  const [partial, setPartial] = useState("");
+  // Saisie vocale (0.4.8) : le texte final s'ajoute à `v`, le texte provisoire s'affiche dans le champ à la suite
+  // de `v` (gris italique) et se remplace à chaque mise à jour ; l'envoi reste manuel.
+  const speech = useSpeechToText(lang, (seg) => setV((cur) => appendSpeech(cur, seg, MAX_LEN)), setPartial);
+  const dictating = speech.state === "listening" || speech.state === "finishing";
+  const shown = appendSpeech(v, partial, MAX_LEN);
+  const field = useRef<HTMLInputElement>(null);
+  // Garde la fin de la phrase en cours visible quand elle dépasse la largeur du champ.
+  useEffect(() => { const el = field.current; if (el && partial) el.scrollLeft = el.scrollWidth; }, [partial]);
   const end = useRef<HTMLDivElement>(null);
   useEffect(() => { end.current?.scrollIntoView({ block: "end" }); }, [messages.length, busy]);
 
   function submit(e: FormEvent) {
     e.preventDefault();
-    const text = v.trim();
+    // Le texte en cours de reconnaissance fait partie du message : on l'ajoute avant d'abandonner la dictée.
+    const text = shown.trim();
     if (!text || busy) return;
+    speech.abort();
+    setPartial("");
     setV("");
     onSend(text);
   }
@@ -139,11 +153,28 @@ export default function ConversationColumn({
         <div ref={end} />
       </div>
       <div className="chat-col-foot">
-        <form className="af-composer" onSubmit={submit}>
-          <input value={v} onChange={(e) => setV(e.target.value)} onKeyDown={key}
+        <form className={`af-composer${partial ? " af-composer-live" : ""}`} onSubmit={submit}>
+          {/* Lecture seule pendant la dictée : une frappe copierait le texte provisoire dans `v`, qui serait réaffiché. */}
+          <input ref={field} value={shown} onChange={(e) => setV(e.target.value)} onKeyDown={key} readOnly={dictating}
             placeholder={t("chat.placeholder", lang)} aria-label={t("chat.send", lang)} maxLength={MAX_LEN} />
-          <button type="submit" className="af-send" disabled={busy || !v.trim()} aria-label={t("chat.send", lang)}>↑</button>
+          {speech.supported && (
+            <button type="button" className={`af-mic${speech.state === "listening" ? " listening" : ""}`}
+              disabled={busy || speech.state === "connecting" || speech.state === "finishing"} aria-pressed={speech.state === "listening"}
+              aria-label={t(speech.state === "listening" ? "chat.mic.stop" : "chat.mic.start", lang)}
+              title={t(speech.state === "listening" ? "chat.mic.stop" : "chat.mic.start", lang)}
+              onClick={() => (speech.state === "listening" ? speech.stop() : void speech.start())}>
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="9" y="3" width="6" height="11" rx="3" /><path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
+              </svg>
+            </button>
+          )}
+          <button type="submit" className="af-send" disabled={busy || !shown.trim()} aria-label={t("chat.send", lang)}>↑</button>
         </form>
+        {(speech.state === "denied" || speech.state === "error") && (
+          <p className="af-mic-note err" role="status">
+            {speech.state === "denied" ? t("chat.mic.denied", lang) : t("chat.mic.error", lang)}
+          </p>
+        )}
         <p className="af-disclaimer">{t("app.disclaimer", lang)}</p>
       </div>
     </main>

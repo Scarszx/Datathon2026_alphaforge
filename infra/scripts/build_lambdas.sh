@@ -7,7 +7,8 @@
 # pandas, pyarrow et numpy sont exclus de la Lambda agents : fournis par la
 # couche AWS SDK for pandas (variable pandas_layer_arn).
 #
-# Usage : infra/scripts/build_lambdas.sh   (aucun appel AWS)
+# Usage : infra/scripts/build_lambdas.sh [api|agents]   (aucun appel AWS)
+#         sans argument : construit les deux zips ; avec un nom : celui-là seulement.
 
 set -euo pipefail
 
@@ -38,7 +39,10 @@ check_tickers_json() {
         echo "  (handlers pas encore livrés : contrôle tickers.json reporté)"
         return 0
     fi
-    if unzip -l "$zip" | grep -qE "backend/api/tickers[.]json$"; then
+    # Listing capturé avant grep -q : sous pipefail, la fermeture anticipée du tube faisait échouer unzip (SIGPIPE).
+    local listing
+    listing="$(unzip -l "$zip")"
+    if grep -qE "backend/api/tickers[.]json$" <<<"$listing"; then
         echo "  contrôle tickers.json : présent dans le zip"
     else
         echo "ERREUR : backend/api/tickers.json absent du zip de $name." >&2
@@ -92,6 +96,10 @@ build_lambda() {
     fi
 }
 
-build_lambda api
-build_lambda agents
+target="${1:-all}"
+case "$target" in
+    all) build_lambda api; build_lambda agents ;;
+    api|agents) build_lambda "$target" ;;
+    *) echo "Usage : $0 [api|agents]" >&2; exit 2 ;;
+esac
 echo "=== Zips prêts dans $build_dir ==="

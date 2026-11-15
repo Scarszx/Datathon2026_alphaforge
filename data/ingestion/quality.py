@@ -13,7 +13,7 @@ def isolate_cnq_anomaly_and_check_actions(
 ) -> tuple[pd.DataFrame, list[dict[str, Any]]]:
     """Isole et documente l'anomalie CNQ.TO du 2022-08-22 dans corporate_actions.
 
-    Les fractionnements (splits) ne sont jamais réappliqués aux prix (`close` et `adj_close`
+    Les fractionnements (splits) ne sont jamais réappliqués aux prix (`close` et `adjclose`
     sont déjà ajustés par Yahoo Finance).
     """
     df = actions_df.copy()
@@ -26,7 +26,7 @@ def isolate_cnq_anomaly_and_check_actions(
     isolated: list[dict[str, Any]] = []
 
     cnq_20220822_div = df[
-        (df["ticker"] == "CNQ.TO")
+        (df["symbol"] == "CNQ.TO")
         & (df["ex_date"] == "2022-08-22")
         & (df["action"] == "dividend")
     ]
@@ -35,7 +35,7 @@ def isolate_cnq_anomaly_and_check_actions(
     )
 
     for pos, (_, row) in enumerate(df.iterrows()):
-        ticker = str(row["ticker"])
+        ticker = str(row["symbol"])
         ex_date = str(row["ex_date"])
         action = str(row["action"])
         val = float(row["value"])
@@ -48,11 +48,11 @@ def isolate_cnq_anomaly_and_check_actions(
             note = (
                 "Isolated anomaly: Yahoo Finance reports a 1.021 split on 2022-08-22 on the same "
                 f"ex-date as a {coincident_div} CAD dividend (likely a special distribution "
-                "adjustment, not a share split). Splits are never re-applied to close or adj_close."
+                "adjustment, not a share split). Splits are never re-applied to close or adjclose."
             )
             notes[pos] = note
             isolated.append({
-                "ticker": ticker,
+                "symbol": ticker,
                 "exDate": ex_date,
                 "action": action,
                 "value": val,
@@ -77,25 +77,25 @@ def run_quality_checks(
 ) -> tuple[pd.DataFrame, dict[str, Any]]:
     """Exécute les contrôles qualité bloquants et construit le rapport qualité JSON (camelCase)."""
     # 1. Contrôles bloquants
-    if prices_df.duplicated(["date", "ticker"]).any():
+    if prices_df.duplicated(["date", "symbol"]).any():
         raise ValueError("Duplicate (date, ticker) rows detected in prices.")
 
-    universe_tickers = set(universe_df["ticker"].astype(str))
-    price_tickers = set(prices_df["ticker"].astype(str))
+    universe_tickers = set(universe_df["symbol"].astype(str))
+    price_tickers = set(prices_df["symbol"].astype(str))
     if universe_tickers != price_tickers:
         missing = sorted(universe_tickers - price_tickers)
         extra = sorted(price_tickers - universe_tickers)
         raise ValueError(f"Ticker mismatch between universe and prices: missing={missing}, extra={extra}")
 
     merged_ccy = (
-        prices_df[["ticker", "currency"]]
+        prices_df[["symbol", "currency"]]
         .drop_duplicates()
-        .merge(universe_df[["ticker", "currency"]], on="ticker", suffixes=("_price", "_univ"))
+        .merge(universe_df[["symbol", "currency"]], on="symbol", suffixes=("_price", "_univ"))
     )
     if not (merged_ccy["currency_price"] == merged_ccy["currency_univ"]).all():
         raise ValueError("Currency mismatch between universe and prices.")
 
-    for col in ("open", "high", "low", "close", "adj_close"):
+    for col in ("open", "high", "low", "close", "adjclose"):
         if prices_df[col].isna().any() or (prices_df[col] <= 0).any():
             raise ValueError(f"Null or non-positive values detected in prices.{col}.")
 
@@ -113,7 +113,7 @@ def run_quality_checks(
     calendar_gaps: list[dict[str, Any]] = []
     short_histories: list[dict[str, Any]] = []
 
-    for ticker, group in prices_df.groupby("ticker", sort=True):
+    for ticker, group in prices_df.groupby("symbol", sort=True):
         t_str = str(ticker)
         g = group.sort_values("date").reset_index(drop=True)
         first_d = str(g["date"].iloc[0])[:10]
@@ -121,30 +121,30 @@ def run_quality_checks(
 
         if first_d > requested_start[:8] + "20":
             short_histories.append({
-                "ticker": t_str,
+                "symbol": t_str,
                 "firstDate": first_d,
                 "lastDate": last_d,
                 "rows": int(len(g)),
                 "note": f"History starts {first_d} (later than requested start {requested_start}); never backfilled.",
             })
 
-        # Sauts suspects d'un jour (> 40 % sur adj_close)
-        pct = g["adj_close"].astype(float).pct_change()
+        # Sauts suspects d'un jour (> 40 % sur adjclose)
+        pct = g["adjclose"].astype(float).pct_change()
         big_moves = g.loc[pct.abs() > SUSPICIOUS_DAILY_MOVE_THRESHOLD]
         for idx, row in big_moves.iterrows():
             move_val = float(pct.loc[idx])
             suspicious_moves.append({
-                "ticker": t_str,
+                "symbol": t_str,
                 "date": str(row["date"])[:10],
                 "adjCloseReturnPct": round(move_val * 100.0, 2),
-                "adjClose": float(row["adj_close"]),
+                "adjClose": float(row["adjclose"]),
             })
 
         # Lignes à volume nul (hors crypto si applicable)
         zero_vol = g[g["volume"] == 0]
         for _, row in zero_vol.iterrows():
             zero_volume_rows.append({
-                "ticker": t_str,
+                "symbol": t_str,
                 "date": str(row["date"])[:10],
             })
 
@@ -153,7 +153,7 @@ def run_quality_checks(
         dt_diff = pd.to_datetime(g["date"]).diff().dt.days
         for idx in dt_diff[dt_diff > gap_threshold].index:
             calendar_gaps.append({
-                "ticker": t_str,
+                "symbol": t_str,
                 "date": str(g.loc[idx, "date"])[:10],
                 "gapCalendarDays": int(dt_diff.loc[idx]),
             })

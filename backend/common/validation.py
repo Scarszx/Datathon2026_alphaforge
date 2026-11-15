@@ -489,3 +489,15 @@ def session_id(event: dict[str, Any]) -> str:
     if parsed.version != 4 or parsed.variant != uuid.RFC_4122:
         raise _validation_error("sessionId doit être un UUID v4.")
     return str(parsed)
+
+
+SPEECH_LANGS = ("fr", "en")
+
+
+def validate_speech_session(body: dict[str, Any]) -> str:
+    """Corps facultatif de POST /v1/speech/session : `lang` ("fr" par défaut)."""
+    _reject_unknown_fields(body, ("lang",))
+    lang = body.get("lang", "fr")
+    if lang not in SPEECH_LANGS:
+        raise _validation_error("lang doit valoir 'fr' ou 'en'.")
+    return lang

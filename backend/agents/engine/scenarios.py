@@ -29,7 +29,7 @@ from backend.agents.rules.settings import risk_band, settings
 from backend.common.categories import get_category
 
 PORTFOLIO_METHOD = (
-    "Constant-weight portfolio (daily rebalanced) on adjusted close (adj_close) converted to CAD "
+    "Constant-weight portfolio (daily rebalanced) on adjusted close (adjclose) converted to CAD "
     "with the last known USD/CAD rate; common North American trading days of the holdings."
 )
 VOL_METHOD = "Standard deviation of daily returns x sqrt(252) (equities, ETFs) or sqrt(365) (crypto)."
@@ -443,7 +443,7 @@ def run_engine(
 
     sources = [
         {"id": "prices_daily", "dataset": store.source_label("prices"), "asOf": end.date().isoformat(),
-         "note": "adj_close for returns, close for valuation; listing currency converted to CAD"},
+         "note": "adjclose for returns, close for valuation; listing currency converted to CAD"},
         {"id": "fx_usdcad", "dataset": store.source_label("fx/usdcad.parquet"), "note": "last known rate carried forward"},
     ]
     if macro_usage:
@@ -490,12 +490,12 @@ def _record_asset_metrics(
         subject, note, key = f"{ticker} (listing currency)", "", f"asset:{ticker}"
     volatility_id = registry.add(
         kind="metric", label=f"Annualized volatility of {subject}", value=metrics["volatility"],
-        method=f"Standard deviation of daily returns x {root}, native calendar, adj_close.{note}", window=window,
+        method=f"Standard deviation of daily returns x {root}, native calendar, adjclose.{note}", window=window,
         currency=currency, source=source, caveats=PAST_CAVEATS, key=f"{key}:volatility",
     )
     drawdown_id = registry.add(
         kind="metric", label=f"Maximum drawdown of {subject}", value=metrics["maxDrawdown"],
-        method=f"Largest peak-to-trough decline of adj_close over the window, native calendar.{note}", window=window,
+        method=f"Largest peak-to-trough decline of adjclose over the window, native calendar.{note}", window=window,
         currency=currency, source=source, caveats=PAST_CAVEATS, key=f"{key}:maxDrawdown",
     )
     return {"volatility": volatility_id, "maxDrawdown": drawdown_id}

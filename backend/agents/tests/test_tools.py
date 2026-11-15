@@ -1,4 +1,4 @@
-"""Les 13 outils sur le mini-jeu : validation, plafonds du contrat, contexte jamais fourni par le modèle."""
+"""Les 14 outils sur le mini-jeu : validation, plafonds du contrat, contexte jamais fourni par le modèle."""
 
 from __future__ import annotations
 
@@ -27,6 +27,12 @@ def test_search_assets(ctx):
     assert all(i["assetClass"] == "crypto" for i in catalog.search_assets(ctx, "synthetic", "crypto")["items"])
     assert len(catalog.search_assets(ctx, "synthetic")["items"]) <= catalog.MAX_ASSETS
     assert "error" in catalog.search_assets(ctx, "  ")
+
+
+def test_search_assets_exclut_les_indices(ctx):
+    assert ctx.store.has_ticker("^GSPC") and not ctx.store.is_investable("^GSPC")
+    assert "^GSPC" not in {i["ticker"] for i in catalog.search_assets(ctx, "synthetic")["items"]}
+    assert not catalog.search_assets(ctx, "gspc").get("items")
 
 
 def test_search_assets_plusieurs_noms_en_un_appel(ctx):
@@ -85,6 +91,18 @@ def test_compute_metrics_sans_lignes_brutes(ctx):
     assert "error" in catalog.compute_metrics(ctx, ["SPY"], "2022-01-01", "2022-12-31", ["sharpe"])
 
 
+def test_market_stats_sans_lignes_brutes(ctx):
+    result = catalog.market_stats(ctx, ["NVDA", "RY.TO", "BTC-USD"], "2022-01-01", "2022-12-31")
+    assert result["benchmark"] == "^GSPC" and result["source"].startswith("prices@")
+    assert set(result["stats"]) == {"NVDA", "RY.TO", "BTC-USD"}
+    assert set(result["stats"]["NVDA"]) == {"annual_return", "variance", "std_dev", "beta", "market_correlation", "observations"}
+    assert result["stats"]["NVDA"]["beta"] > 0 and _size(result) < 3000
+    assert catalog.market_stats(ctx, ["^GSPC"], "2022-01-01", "2022-12-31")["stats"]["^GSPC"]["beta"] == 1.0
+    assert "error" in catalog.market_stats(ctx, ["ZZZ"], "2022-01-01", "2022-12-31")
+    assert "error" in catalog.market_stats(ctx, ["SPY"] * 21, "2022-01-01", "2022-12-31")
+    assert "error" in catalog.market_stats(ctx, ["SPY"], "pas-une-date", "2022-12-31")
+
+
 def test_propose_mandate_force_le_contexte(ctx):
     draft = {"portfolioId": "someone-else", "userLanguage": "de", "mode": "add_asset", "objective": "project",
              "horizonYears": 3, "riskTolerance": 3, "riskCapacity": 1,
@@ -99,6 +117,8 @@ def test_propose_mandate_force_le_contexte(ctx):
     ({"mode": "add_asset", "objective": "project", "horizonYears": 3, "riskTolerance": 9, "riskCapacity": 1}, "entre 1 et 5"),
     ({"mode": "add_asset", "objective": "project", "horizonYears": 3, "riskTolerance": 3, "riskCapacity": 1,
       "operations": [{"action": "add", "ticker": "ZZZ", "amount": 1}]}, "Unknown ticker"),
+    ({"mode": "add_asset", "objective": "project", "horizonYears": 3, "riskTolerance": 3, "riskCapacity": 1,
+      "operations": [{"action": "add", "ticker": "^GSPC", "amount": 1}]}, "Unknown ticker"),  # indice : non investissable
     ({"mode": "add_asset", "objective": "project", "horizonYears": 3, "riskTolerance": 3, "riskCapacity": 1}, "operations"),
     ({"mode": "diagnose", "objective": "growth", "horizonYears": 3, "riskTolerance": 3, "riskCapacity": 1}, "subjectTicker"),
 ])

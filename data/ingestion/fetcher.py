@@ -143,9 +143,9 @@ def _extract_ticker_frames(
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
     """Extrait les DataFrames de prix et d'actions pour un ticker depuis la réponse yfinance."""
     empty_prices = pd.DataFrame(
-        columns=["date", "ticker", "open", "high", "low", "close", "adj_close", "volume", "currency"]
+        columns=["date", "symbol", "open", "high", "low", "close", "adjclose", "volume", "currency"]
     )
-    empty_actions = pd.DataFrame(columns=["ex_date", "ticker", "action", "value", "unit"])
+    empty_actions = pd.DataFrame(columns=["ex_date", "symbol", "action", "value", "unit"])
 
     if raw_df is None or raw_df.empty:
         return empty_prices, empty_actions
@@ -169,12 +169,12 @@ def _extract_ticker_frames(
 
     p = pd.DataFrame({
         "date": d["date_str"],
-        "ticker": ticker,
+        "symbol": ticker,
         "open": pd.to_numeric(d["Open"], errors="coerce").round(6),
         "high": pd.to_numeric(d["High"], errors="coerce").round(6),
         "low": pd.to_numeric(d["Low"], errors="coerce").round(6),
         "close": pd.to_numeric(d["Close"], errors="coerce").round(6),
-        "adj_close": pd.to_numeric(d[adj_col], errors="coerce").round(6),
+        "adjclose": pd.to_numeric(d[adj_col], errors="coerce").round(6),
         "volume": vol_series,
         "currency": currency,
     })
@@ -187,14 +187,14 @@ def _extract_ticker_frames(
             for _, r in active.iterrows():
                 action_rows.append({
                     "ex_date": str(r["date_str"]),
-                    "ticker": ticker,
+                    "symbol": ticker,
                     "action": kind,
                     "value": round(float(r[col]), 6),
                     "unit": f"{currency} per share" if kind == "dividend" else "split ratio (new:old)",
                 })
 
     actions = (
-        pd.DataFrame(action_rows, columns=["ex_date", "ticker", "action", "value", "unit"])
+        pd.DataFrame(action_rows, columns=["ex_date", "symbol", "action", "value", "unit"])
         if action_rows
         else empty_actions
     )
@@ -221,8 +221,8 @@ def download_prices_in_batches(
     batches_dir = cache_dir / "batches"
     batches_dir.mkdir(parents=True, exist_ok=True)
     end_excl = (date.fromisoformat(end_date) + timedelta(days=1)).isoformat()
-    ccy_map = {c["ticker"]: c["currency"] for c in candidates}
-    tickers = [c["ticker"] for c in candidates]
+    ccy_map = {c["symbol"]: c["currency"] for c in candidates}
+    tickers = [c["symbol"] for c in candidates]
 
     prices_by_ticker: dict[str, pd.DataFrame] = {}
     all_actions: list[pd.DataFrame] = []
@@ -239,7 +239,7 @@ def download_prices_in_batches(
             if meta.get("tickers") == batch_tickers and meta.get("start") == start_date and meta.get("end") == end_date:
                 cached_p = pd.read_parquet(p_file)
                 cached_a = pd.read_parquet(a_file)
-                for t, grp in cached_p.groupby("ticker"):
+                for t, grp in cached_p.groupby("symbol"):
                     prices_by_ticker[str(t)] = grp.reset_index(drop=True)
                 if not cached_a.empty:
                     all_actions.append(cached_a)
@@ -251,7 +251,7 @@ def download_prices_in_batches(
             end=end_excl,
             auto_adjust=False,
             actions=True,
-            group_by="ticker",
+            group_by="symbol",
             progress=False,
             threads=True,
         )
@@ -281,7 +281,7 @@ def download_prices_in_batches(
                         end=end_excl,
                         auto_adjust=False,
                         actions=True,
-                        group_by="ticker",
+                        group_by="symbol",
                         progress=False,
                         threads=False,
                     )
@@ -300,12 +300,12 @@ def download_prices_in_batches(
         merged_p = (
             pd.concat(batch_prices, ignore_index=True)
             if batch_prices
-            else pd.DataFrame(columns=["date", "ticker", "open", "high", "low", "close", "adj_close", "volume", "currency"])
+            else pd.DataFrame(columns=["date", "symbol", "open", "high", "low", "close", "adjclose", "volume", "currency"])
         )
         merged_a = (
             pd.concat(batch_actions, ignore_index=True)
             if batch_actions
-            else pd.DataFrame(columns=["ex_date", "ticker", "action", "value", "unit"])
+            else pd.DataFrame(columns=["ex_date", "symbol", "action", "value", "unit"])
         )
         merged_p.to_parquet(p_file, index=False)
         merged_a.to_parquet(a_file, index=False)
@@ -320,49 +320,86 @@ def download_prices_in_batches(
             time.sleep(pause_seconds)
 
     actions_df = (
-        pd.concat(all_actions, ignore_index=True).sort_values(["ticker", "ex_date"]).reset_index(drop=True)
+        pd.concat(all_actions, ignore_index=True).sort_values(["symbol", "ex_date"]).reset_index(drop=True)
         if all_actions
-        else pd.DataFrame(columns=["ex_date", "ticker", "action", "value", "unit"])
+        else pd.DataFrame(columns=["ex_date", "symbol", "action", "value", "unit"])
     )
     return prices_by_ticker, actions_df
 
 
-def fetch_yfinance_sectors(
-    equity_tickers: list[str],
-    cache_dir: Path,
-    max_workers: int = 8,
-) -> dict[str, str]:
-    """Récupère le secteur des actions depuis `yf.Ticker(t).info['sector']` avec cache JSON."""
+def fetch_sp500_top(n: int, cache_dir: Path, max_workers: int = 8) -> list[str]:
+    """Les `n` plus grosses capitalisations du S&P 500 (Wikipédia + yfinance), symboles au format Yahoo.
+
+    Cache JSON : la liste classée est figée pour la version du jeu de données.
+    """
     import yfinance as yf
 
     cache_dir.mkdir(parents=True, exist_ok=True)
-    cache_file = cache_dir / "yfinance_sectors.json"
-    cached: dict[str, str] = {}
+    cache_file = cache_dir / f"sp500_top{n}.json"
+    if cache_file.exists():
+        try:
+            return list(json.loads(cache_file.read_text(encoding="utf-8")))
+        except Exception:  # noqa: BLE001
+            pass
+
+    html = _http_get_bytes("https://en.wikipedia.org/wiki/List_of_S%26P_500_companies").decode("utf-8")
+    table = pd.read_html(io.StringIO(html), attrs={"id": "constituents"})[0]
+    symbols = table["Symbol"].astype(str).str.replace(".", "-", regex=False).tolist()
+
+    def _cap(t: str) -> float:
+        try:
+            return float(yf.Ticker(t).fast_info.market_cap)
+        except Exception:  # noqa: BLE001
+            return float("nan")
+
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+        caps = dict(zip(symbols, pool.map(_cap, symbols)))
+    top = pd.Series(caps).dropna().nlargest(n).index.tolist()
+    cache_file.write_text(json.dumps(top, indent=2), encoding="utf-8")
+    return top
+
+
+def fetch_yfinance_info(
+    symbols: list[str],
+    cache_dir: Path,
+    max_workers: int = 8,
+) -> dict[str, dict[str, str]]:
+    """Métadonnées Yahoo (`name`, `sector`, `industry`, `country`) par symbole, avec cache JSON.
+
+    Le secteur est ramené à la nomenclature GICS (GICS_SECTOR_MAP). Les champs absents sont omis.
+    """
+    import yfinance as yf
+
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    cache_file = cache_dir / "yfinance_info.json"
+    cached: dict[str, dict[str, str]] = {}
     if cache_file.exists():
         try:
             cached = json.loads(cache_file.read_text(encoding="utf-8"))
         except Exception:  # noqa: BLE001
             cached = {}
 
-    missing = [t for t in equity_tickers if t not in cached]
-    if not missing:
-        return {k: v for k, v in cached.items() if v}
+    missing = [t for t in symbols if t not in cached]
 
-    def _fetch_one(t: str) -> tuple[str, str]:
+    def _fetch_one(t: str) -> tuple[str, dict[str, str]]:
         try:
             info = yf.Ticker(t).info or {}
-            raw_sec = str(info.get("sector") or "").strip()
-            if not raw_sec:
-                return t, ""
-            return t, GICS_SECTOR_MAP.get(raw_sec, raw_sec)
         except Exception:  # noqa: BLE001
-            return t, ""
+            return t, {}
+        raw_sec = str(info.get("sector") or "").strip()
+        out = {
+            "name": str(info.get("shortName") or "").strip(),
+            "sector": GICS_SECTOR_MAP.get(raw_sec, raw_sec),
+            "industry": str(info.get("industry") or "").strip(),
+            "country": str(info.get("country") or "").strip(),
+        }
+        return t, {k: v for k, v in out.items() if v}
 
-    with ThreadPoolExecutor(max_workers=max_workers) as pool:
-        futures = {pool.submit(_fetch_one, t): t for t in missing}
-        for fut in as_completed(futures):
-            t, sec = fut.result()
-            cached[t] = sec
-
-    cache_file.write_text(json.dumps(cached, indent=2, sort_keys=True), encoding="utf-8")
-    return {k: v for k, v in cached.items() if v}
+    if missing:
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            futures = [pool.submit(_fetch_one, t) for t in missing]
+            for fut in as_completed(futures):
+                t, meta = fut.result()
+                cached[t] = meta
+        cache_file.write_text(json.dumps(cached, indent=2, sort_keys=True), encoding="utf-8")
+    return {t: cached[t] for t in symbols if cached.get(t)}

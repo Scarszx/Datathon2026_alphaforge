@@ -37,9 +37,15 @@ def is_fund(asset_class: str | None) -> bool:
     return (asset_class or "").lower().startswith("etf")
 
 
-def _country_of(ticker: str, asset_class: str | None) -> str:
+_COUNTRY_CODES = {"canada": "CA", "united states": "US"}
+
+
+def _country_of(ticker: str, asset_class: str | None, country: str | None = None) -> str:
+    """Pays de cotation : colonne `country` du jeu (Yahoo) si présente, sinon règle du suffixe."""
     if is_crypto(ticker, asset_class):
         return "Crypto"
+    if country:
+        return _COUNTRY_CODES.get(country.strip().lower(), country.strip())
     return "CA" if ticker.endswith(".TO") else "US"
 
 
@@ -74,7 +80,7 @@ def concentration(store: DataStore, weights: dict[str, float]) -> dict[str, Any]
             single[ticker] += weight
             label = asset.get("sector") or "Unknown"
             sector[label] += weight
-            country[_country_of(ticker, asset_class)] += weight
+            country[_country_of(ticker, asset_class, asset.get("country"))] += weight
             if label == TECH_SECTOR:
                 tech += weight
             continue
@@ -82,7 +88,7 @@ def concentration(store: DataStore, weights: dict[str, float]) -> dict[str, Any]
         if not _has_composition(sheet):
             no_composition.append(ticker)
             sector[asset.get("sector") or "Fund (composition not available)"] += weight
-            country[_country_of(ticker, asset_class)] += weight
+            country[_country_of(ticker, asset_class, asset.get("country"))] += weight
             continue
         sources.append(f"{ticker}: {sheet.get('sourceUrl', 'issuer sheet')} (as of {sheet.get('asOfDate', 'n/a')})")
         sector_weights = sheet.get("sectorWeights") or {}
@@ -100,7 +106,7 @@ def concentration(store: DataStore, weights: dict[str, float]) -> dict[str, Any]
             for label, share in country_weights.items():
                 country[label] += weight * float(share) / total
         else:
-            country[_country_of(ticker, asset_class)] += weight
+            country[_country_of(ticker, asset_class, asset.get("country"))] += weight
         for holding in sheet.get("topHoldings") or []:
             held = holding.get("ticker")
             share = holding.get("weight")

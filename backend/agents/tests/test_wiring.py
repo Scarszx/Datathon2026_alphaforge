@@ -20,8 +20,8 @@ CONTRACT = yaml.safe_load((Path(__file__).resolve().parents[3] / "contract" / "k
 TOOL_NAME_BY_ID = {t["id"]: t["name"] for t in CONTRACT["tools"]}
 
 
-def test_les_13_outils_du_contrat_sont_enregistres():
-    assert set(TOOLBOX.tool_names()) == set(TOOL_NAME_BY_ID.values()) and len(TOOL_FUNCTIONS) == 13
+def test_les_14_outils_du_contrat_sont_enregistres():
+    assert set(TOOLBOX.tool_names()) == set(TOOL_NAME_BY_ID.values()) and len(TOOL_FUNCTIONS) == 14
 
 
 @pytest.mark.parametrize("component", [a for a in CONTRACT["agents"] if a.get("status") == "retenu"] + CONTRACT["modules"], ids=lambda c: c["id"])
