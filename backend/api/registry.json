@@ -19,8 +19,8 @@
     },
     {
       "id": "agent-auditor",
-      "name": "Auditeur de convenance",
-      "role": "Travaille en anglais (requêtes KB et motifs en anglais). Ne décide pas des verdicts (module-rules le fait). Ne lance pas lui-même les recherches : le code cherche dans la Knowledge Base, une recherche par sujet de chaque règle (filtre juridiction ∈ {CA, province}), et lui donne les passages. Pour chaque verdict, il désigne ceux qui fondent la règle (ou aucun), le code les inscrit au registre (KB-nn), et il formule le motif en une phrase (un pass garde sa phrase par défaut). Les verdicts sans objet (R7 sans cryptoactif, R8 sans préférence ESG) et R10 (aucun sujet) ne déclenchent aucune recherche : motif par défaut, sans citation.",
+      "name": "Vérificateur de citations",
+      "role": "Travaille en anglais (requêtes KB et motifs en anglais). Ne décide pas des verdicts (module-rules le fait). Ne lance pas lui-même les recherches : le code cherche dans la Knowledge Base, une recherche par sujet de chaque règle (filtre juridiction ∈ {CA, province}), et lui donne les passages. Pour chaque verdict, il désigne ceux qui fondent la règle (ou aucun), le code les inscrit au registre (KB-nn), et il formule le motif en une phrase. Seules les règles déclenchées (warn, fail) sont auditées : un pass ou un not_verified n'a ni recherche ni citation. Les verdicts sans objet (R7 sans cryptoactif, R8 sans préférence ESG) et R10 (aucun sujet) ne déclenchent aucune recherche : motif par défaut, sans citation.",
       "allowedTools": [],
       "delegatesTo": [],
       "limits": {
@@ -50,7 +50,7 @@
     },
     {
       "id": "module-rules",
-      "name": "Règles de convenance R1-R10",
+      "name": "Règles R1-R10",
       "role": "Applique R1 à R10 (voir rules_catalog) au mandat et aux scénarios; produit les verdicts sans citation. Seuils d'hypothèse dans un fichier de configuration."
     },
     {
