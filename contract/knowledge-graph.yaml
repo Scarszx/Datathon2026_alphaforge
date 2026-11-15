@@ -746,7 +746,7 @@ databases:
       - name: "Conversations"
         partition_key: "userId"
         sort_key: "sessionId"
-        attributes: ["title", "createdAt", "updatedAt"]
+        attributes: ["title", "createdAt", "updatedAt", "userLanguage"]
         notes: "Index local sur updatedAt pour trier par récence."
 
   - id: "db-messages"
@@ -755,7 +755,7 @@ databases:
       - name: "Messages"
         partition_key: "sessionId"
         sort_key: "messageId"
-        attributes: ["userId", "role", "content", "status", "createdAt", "explanation"]
+        attributes: ["userId", "role", "content", "status", "createdAt", "explanation", "quickReplies", "mandateDraft", "runId"]
         notes: "explanation est stocké avec le message de l'assistant. Si un item approche 400 Ko, déplacer explanation dans une table à part."
 
   - id: "db-portfolios"
