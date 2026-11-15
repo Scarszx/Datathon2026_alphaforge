@@ -136,7 +136,7 @@ Tous les modes passent par le même flux. Seuls changent les calculs lancés et 
 | **Et si…** | « Et si mon horizon était de 10 ans ? » | relance des étapes 3 à 5 | toutes | n'importe lequel |
 | **Hors cadre** | « Achète pour moi », « Garantis-moi 20 % » | aucun | Guardrails | refus expliqué et reformulation (« voulez-vous simuler cet ajout ? ») ; le message refusé n'entre pas dans l'historique |
 
-**Scénario vedette de la vidéo** : un utilisateur du Québec avec un portefeuille de 100 000 $ (XIU.TO 30 k, RY.TO 15 k, TD.TO 10 k, XBB.TO 30 k, ZST.TO 15 k) veut ajouter 15 000 $ de NVDA pour un condo dans 3 ans. Le déroulé : une question de cadrage, le mandat (capacité faible, donc profil faible), le scénario 1 en FAIL avec la citation de 31-368, l'alternative par catégorie en PASS, un clic sur une preuve, puis le curseur d'horizon passé à 10 ans qui fait basculer le verdict. Ensuite, un contraste avec Amira en mode B.
+**Scénario vedette de la vidéo** : un utilisateur du Québec avec un portefeuille de 93 000 $ (XIU.TO 30 k, RY.TO 8 k, TD.TO 10 k, XBB.TO 30 k, ZST.TO 15 k ; RY à 8 k pour que R6 reste sous 10 % dès l'état actuel) veut ajouter 15 000 $ de NVDA pour un condo dans 3 ans. Le déroulé : une question de cadrage, le mandat (capacité faible, donc profil faible), le scénario 1 en FAIL avec la citation de 31-368, l'alternative par catégorie en PASS, un clic sur une preuve, puis le curseur d'horizon passé à 10 ans qui fait basculer le verdict. Ensuite, un contraste avec Amira en mode B.
 
 ## 7. Composants
 
