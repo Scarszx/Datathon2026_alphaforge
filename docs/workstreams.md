@@ -526,7 +526,7 @@ Ce qui existe et se garde :
 - **mode démo sans API ni Cognito** (`npm run dev:demo`, `src/api/demo.ts`, données dans le `localStorage`). Il est utile pour la vidéo et pour développer sans backend : on le garde.
 
 Ce qu'il faut changer pour respecter le contrat v0.4.0 :
-1. **Emplacement :** déplacer le front de la racine vers `frontend/` (dossier attribué à WS6), avec `src/`, `index.html`, `package.json`, `package-lock.json`, `tsconfig.json`, `vite.config.ts`, `public/`. Mettre à jour les chemins du README et de `.gitignore`. `portefeuille-prototype/` peut rester tel quel, ou aller sous `frontend/` : à décider avec David.
+1. **Emplacement :** déplacer le front de la racine vers `frontend/` (dossier attribué à WS6), avec `src/`, `index.html`, `package.json`, `package-lock.json`, `tsconfig.json`, `vite.config.ts`, `public/`. Mettre à jour les chemins du README et de `.gitignore`. `portefeuille-prototype/` a été retiré du dépôt le 2026-11-15 (son questionnaire personnel est repris sur l'accueil).
 2. **Types et routes v0.4.0** dans `src/api/types.ts` et `src/api/endpoints.ts` :
    - `schema-mandate`, `schema-run`, `schema-evidence`, `schema-rule-verdict`, `schema-narrative`, `schema-verifier-report` ;
    - les champs `quickReplies`, `mandateDraft` et `runId` du message ;
