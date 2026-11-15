@@ -25,13 +25,16 @@ locals {
   # Lambda agents : jeu de données, modèles de l'auditeur et du rédacteur,
   # Knowledge Base et Guardrail (noms de backend/common/config.py, WS0b).
   agents_env_vars = merge(local.common_env_vars, {
-    DATASET_BUCKET    = local.dataset_bucket
-    DATASET_VERSION   = var.dataset_version
-    MODEL_AUDITOR     = var.model_auditor
-    MODEL_WRITER      = var.model_writer
-    KB_ID             = aws_bedrockagent_knowledge_base.regulation.id
-    GUARDRAIL_ID      = aws_bedrock_guardrail.this.guardrail_id
-    GUARDRAIL_VERSION = aws_bedrock_guardrail_version.this.version
+    DATASET_BUCKET        = local.dataset_bucket
+    DATASET_VERSION       = var.dataset_version
+    MODEL_AUDITOR         = var.model_auditor
+    MODEL_WRITER          = var.model_writer
+    KB_ID                 = aws_bedrockagent_knowledge_base.regulation.id
+    GUARDRAIL_ID          = aws_bedrock_guardrail.this.guardrail_id
+    GUARDRAIL_VERSION     = aws_bedrock_guardrail_version.this.version
+    LANGFUSE_PUBLIC_KEY   = var.langfuse_public_key
+    LANGFUSE_BASE_URL     = var.langfuse_base_url
+    LANGFUSE_SECRET_PARAM = var.langfuse_secret_param
   })
 }
 

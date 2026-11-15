@@ -11,6 +11,7 @@ from __future__ import annotations
 from pathlib import PurePosixPath
 from typing import Any
 
+from backend.agents import telemetry
 from backend.common import config
 
 KNOWN_SUBJECTS = (
@@ -81,31 +82,48 @@ def retrieve(query: str, jurisdictions: list[str], subjects: list[str] | None = 
     kb = config.kb_id()
     if not kb:
         raise RuntimeError("KB_ID is not configured")
-    response = (client or _client()).retrieve(
-        knowledgeBaseId=kb,
-        retrievalQuery={"text": query},
-        retrievalConfiguration={
-            "vectorSearchConfiguration": {
-                "numberOfResults": MAX_PASSAGES,
-                "filter": build_filter(jurisdictions, subjects),
-            }
-        },
-    )
-    passages = []
-    for result in response.get("retrievalResults", [])[:MAX_PASSAGES]:
-        metadata = result.get("metadata") or {}
-        uri = (result.get("location") or {}).get("s3Location", {}).get("uri") or metadata.get("x-amz-bedrock-kb-source-uri")
-        page = metadata.get("x-amz-bedrock-kb-document-page-number")
-        # Extrait fidèle (registre, jamais traduit) ; la version neutralisée est celle montrée au modèle.
-        excerpt = " ".join(((result.get("content") or {}).get("text", "")).split())[:MAX_EXCERPT_CHARS]
-        passages.append({
-            "document": document_title(uri),
-            "section": f"page {int(page)}" if isinstance(page, (int, float)) else None,
-            "excerpt": excerpt,
-            "jurisdiction": metadata.get("juridiction"),
-            "version": metadata.get("date_version"),
-            "url": metadata.get("source_url"),
-            "file": PurePosixPath(uri or "").name or None,
-            "score": round(float(result.get("score", 0.0)), 3),
-        })
-    return passages
+    with telemetry.trace_span(
+        "kb.retrieve",
+        observation_type="retriever",
+        input_data={"query": query, "jurisdictions": jurisdictions, "subjects": subjects},
+    ) as span:
+        response = (client or _client()).retrieve(
+            knowledgeBaseId=kb,
+            retrievalQuery={"text": query},
+            retrievalConfiguration={
+                "vectorSearchConfiguration": {
+                    "numberOfResults": MAX_PASSAGES,
+                    "filter": build_filter(jurisdictions, subjects),
+                }
+            },
+        )
+        passages = []
+        for result in response.get("retrievalResults", [])[:MAX_PASSAGES]:
+            metadata = result.get("metadata") or {}
+            uri = (result.get("location") or {}).get("s3Location", {}).get("uri") or metadata.get("x-amz-bedrock-kb-source-uri")
+            page = metadata.get("x-amz-bedrock-kb-document-page-number")
+            # Extrait fidèle (registre, jamais traduit) ; la version neutralisée est celle montrée au modèle.
+            excerpt = " ".join(((result.get("content") or {}).get("text", "")).split())[:MAX_EXCERPT_CHARS]
+            passages.append({
+                "document": document_title(uri),
+                "section": f"page {int(page)}" if isinstance(page, (int, float)) else None,
+                "excerpt": excerpt,
+                "jurisdiction": metadata.get("juridiction"),
+                "version": metadata.get("date_version"),
+                "url": metadata.get("source_url"),
+                "file": PurePosixPath(uri or "").name or None,
+                "score": round(float(result.get("score", 0.0)), 3),
+            })
+        telemetry.set_span_output(
+            span,
+            [
+                {
+                    "document": p["document"],
+                    "section": p["section"],
+                    "jurisdiction": p["jurisdiction"],
+                    "score": p["score"],
+                }
+                for p in passages
+            ],
+        )
+        return passages

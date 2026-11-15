@@ -19,7 +19,7 @@ from pydantic import BaseModel
 from strands import Agent
 from strands.hooks import BeforeInvocationEvent, BeforeToolCallEvent, HookProvider, HookRegistry
 
-from backend.agents import models
+from backend.agents import models, telemetry
 from backend.agents.observability import log_agent_usage
 from backend.agents.toolbox import MAX_TOOL_CALLS
 from backend.agents.tools.agent_tools import tools_for
@@ -64,8 +64,18 @@ class ToolCallLimit(HookProvider):
 
 def build_agent(agent_id: str, system_prompt: str, ctx: RequestContext, *, with_tools: bool = True,
                 messages: list[dict[str, Any]] | None = None, spec: models.AgentSpec | None = None) -> Agent:
+    telemetry.start_telemetry()
     tools = tools_for(agent_id) if with_tools else []
     model = models.create_model(agent_id, spec=spec) if MODEL_FACTORY is models.create_model else MODEL_FACTORY(agent_id)
+    trace_attrs: dict[str, Any] = {
+        "session.id": ctx.session_id,
+        "langfuse.session.id": ctx.session_id,
+        "agent.id": agent_id,
+        "langfuse.observation.type": "agent",
+    }
+    if ctx.user_id:
+        trace_attrs["user.id"] = ctx.user_id
+        trace_attrs["langfuse.user.id"] = ctx.user_id
     return Agent(
         model=model,
         name=agent_id,
@@ -74,7 +84,7 @@ def build_agent(agent_id: str, system_prompt: str, ctx: RequestContext, *, with_
         messages=messages or [],
         callback_handler=None,
         hooks=[ToolCallLimit(MAX_TOOL_CALLS.get(agent_id, 0))],
-        trace_attributes={"session.id": ctx.session_id, "agent.id": agent_id},
+        trace_attributes=trace_attrs,
     )
 
 

@@ -56,6 +56,9 @@ def test_variables_requises_presentes(monkeypatch):
         (config.guardrail_id, "GUARDRAIL_ID"),
         (config.guardrail_version, "GUARDRAIL_VERSION"),
         (config.rules_config_path, "RULES_CONFIG_PATH"),
+        (config.langfuse_public_key, "LANGFUSE_PUBLIC_KEY"),
+        (config.langfuse_secret_key, "LANGFUSE_SECRET_KEY"),
+        (config.langfuse_secret_param, "LANGFUSE_SECRET_PARAM"),
     ],
 )
 def test_variables_optionnelles(monkeypatch, fonction, nom):
@@ -79,3 +82,11 @@ def test_log_level_par_defaut(monkeypatch):
     assert config.log_level() == "INFO"
     monkeypatch.setenv("LOG_LEVEL", "DEBUG")
     assert config.log_level() == "DEBUG"
+
+
+def test_langfuse_base_url_par_defaut(monkeypatch):
+    monkeypatch.delenv("LANGFUSE_BASE_URL", raising=False)
+    assert config.langfuse_base_url() == "https://us.cloud.langfuse.com"
+    monkeypatch.setenv("LANGFUSE_BASE_URL", "https://cloud.langfuse.com")
+    assert config.langfuse_base_url() == "https://cloud.langfuse.com"
+

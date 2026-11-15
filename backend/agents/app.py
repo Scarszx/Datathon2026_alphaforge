@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-from backend.agents import pipeline
+from backend.agents import pipeline, telemetry
 from backend.agents.data.store import DataStore, default_store
 from backend.agents.observability import log_event
 from backend.agents.routes import market_search, messages, portfolio_summary, runs
@@ -62,12 +62,21 @@ def handle_internal(event: dict[str, Any], *, store: DataStore | None = None) ->
     if event.get("internal") != pipeline.INTERNAL_EVENT:
         log_event("internal.unknown", kind=str(event.get("internal")))
         return {"ok": False}
-    run = pipeline.complete_run(store or default_store(), event["userId"], event["sessionId"], event["runId"])
+    run = pipeline.complete_run(
+        store or default_store(),
+        event["userId"],
+        event["sessionId"],
+        event["runId"],
+        trace_context=event.get("traceContext"),
+    )
     return {"ok": True, "status": run.get("status")}
 
 
 def handler(event: dict[str, Any], context: Any = None) -> dict[str, Any]:
     """Entrée Lambda attendue par l'infra (backend/agents/app.handler)."""
-    if "internal" in event and "requestContext" not in event:
-        return handle_internal(event)
-    return handle_request(event)
+    try:
+        if "internal" in event and "requestContext" not in event:
+            return handle_internal(event)
+        return handle_request(event)
+    finally:
+        telemetry.flush_telemetry()

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-from backend.agents import pipeline
+from backend.agents import pipeline, telemetry
 from backend.agents.data.store import DataStore
 from backend.agents.observability import log_event
 from backend.agents.tools.context import RequestContext
@@ -31,21 +31,39 @@ def create_run(event: dict[str, Any], user_id: str, store: DataStore, dispatcher
     if isinstance(version, bool) or not isinstance(version, int) or version < 1:
         raise ApiError("VALIDATION_ERROR", "mandateVersion doit être un entier supérieur ou égal à 1.")
     _ensure_owner(user_id, session)
-    ctx = RequestContext(user_id=user_id, session_id=session, store=store)
-    run = pipeline.start_run(ctx, version)
-    payload = pipeline.completion_payload(user_id, session, run["runId"])
-    if dispatcher is None:
-        # Pas de Lambda (banc local) : complétion dans la requête, puis renvoi du run partiel.
-        pipeline.complete_run(store, user_id, session, run["runId"])
-    else:
-        try:
-            dispatcher(payload)
-        except Exception as exc:
-            # Auto-invocation impossible (droit IAM absent…) : la partie déterministe reste
-            # utilisable ; status = error arrête la relecture du front au lieu d'attendre « done ».
-            log_event("run.dispatch_failed", sessionId=session, runId=run["runId"], error=type(exc).__name__)
-            analyses_repo.update_run(session, user_id, run["runId"], {"status": "error"})
-    return json_response(201, run)
+    with telemetry.trace_span(
+        "analysis-run",
+        trace_name="analysis-run",
+        observation_type="chain",
+        session_id=session,
+        user_id=user_id,
+        tags=["feature:analysis-run"],
+        input_data={"mandateVersion": version},
+    ) as span:
+        ctx = RequestContext(user_id=user_id, session_id=session, store=store)
+        run = pipeline.start_run(ctx, version)
+        telemetry.set_span_output(
+            span,
+            {
+                "runId": run["runId"],
+                "status": run["status"],
+                "scenarioVerdicts": {str(s["index"]): s["verdict"] for s in run.get("scenarios", [])},
+            },
+        )
+        trace_ctx = telemetry.inject_trace_context()
+        payload = pipeline.completion_payload(user_id, session, run["runId"], trace_context=trace_ctx)
+        if dispatcher is None:
+            # Pas de Lambda (banc local) : complétion dans la requête, puis renvoi du run partiel.
+            pipeline.complete_run(store, user_id, session, run["runId"], trace_context=trace_ctx)
+        else:
+            try:
+                dispatcher(payload)
+            except Exception as exc:
+                # Auto-invocation impossible (droit IAM absent…) : la partie déterministe reste
+                # utilisable ; status = error arrête la relecture du front au lieu d'attendre « done ».
+                log_event("run.dispatch_failed", sessionId=session, runId=run["runId"], error=type(exc).__name__)
+                analyses_repo.update_run(session, user_id, run["runId"], {"status": "error"})
+        return json_response(201, run)
 
 
 def get_run(event: dict[str, Any], user_id: str) -> dict[str, Any]:

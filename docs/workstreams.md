@@ -75,7 +75,19 @@ Attention :
   - créer les comptes Cognito des personas ;
   - relever les fiches des 15 FNB clés dans `data/ingestion/etf_enriched.source.json`, puis relancer `python -m data.ingestion.build_dataset --mode full --strict-etf` (le cache local rend la relance rapide), puis renvoyer le jeu dans S3 (même version) ;
   - envoyer le build du front dans le bucket front après WS6 ;
-  - **lancer le banc de fumée de WS5** (`backend/agents/scripts/smoke.py`). Il appelle Bedrock, le Guardrail et la KB sans rien écrire en base. Il couvre les faux positifs du Guardrail, la recherche dans la KB et l'orchestrateur en français. Aucun vrai appel Bedrock n'a encore été fait ;
+  - ✅ **banc de fumée de WS5 lancé le 2026-11-14** (`backend/agents/scripts/smoke.py` et tests complémentaires, environ 0,03 $). Résultats :
+    - Lambdas déployées OK : `market/search` lit le jeu élargi dans S3 (XSP.TO trouvé, démarrage à froid d'environ 4,3 s) ; `/agents` renvoie le registre v0.4.0 ;
+    - KB OK : bons documents, et filtre de juridiction QC/ON fonctionnel. Passer `subjects` élimine le bruit ;
+    - traduction OK : emplacements conservés ;
+    - Guardrail : tous les cas interdits bloqués, aucun faux positif sur les textes de sortie, mais **3 faux positifs sur des demandes de démo** (« Et si j'ajoute… », « Compare XSP and ZEQT… » en anglais et en français) ;
+    - **orchestrateur en échec** : `MaxTokensReachedException` (1024 tokens trop justes pour la sortie structurée, exception non rattrapée) ;
+  - 🟠 **corrections en cours dans `ws/smoke-fixes`** (worktree `../alphaforge-smoke-fixes`, base `3cb7b70`) :
+    - faites (2 commits) : définitions des sujets du Guardrail ; blocage par sujet hors anglais confirmé sur `english_request` ;
+    - restantes : limites des agents (le contrat est déjà à jour, `3cb7b70` : orchestrateur 4096 tokens et 8 cycles, traduction 8192, auditeur 4096 et 16 recherches en 60 s, rédacteur 8192 et 4 appels en 60 s), rattraper `MaxTokensReachedException`, consigne contre la réponse en double, `subjects` systématiques pour l'auditeur, régénération de `registry.json` ;
+    - **à faire au début de la reprise : `git merge main`**. Il y a des conflits dans `guardrails.py` et `routes/messages.py` avec l'intégration Langfuse (`6b6176c`) : garder les deux ;
+    - prompt de reprise : `~/Downloads/prompt_reprise_smoke_fixes.md` ;
+  - ⬜ ensuite : vérifier et fusionner `ws/smoke-fixes`, `terraform apply` (nouvelle version du Guardrail, Lambdas, variables Langfuse), puis **rejouer le banc de fumée** ;
+  - ⬜ **Langfuse** (intégré sur `main`, `6b6176c`) : créer le paramètre SSM de la clé secrète avant l'`apply`, et trancher la règle du contrat sur le texte dans les traces ;
   - **mesurer la taille de la couche pandas** de la Lambda agents (non mesurée pendant WS5).
 
 **Points à traiter à l'intégration** (décision d'équipe) :

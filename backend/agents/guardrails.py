@@ -12,6 +12,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from backend.agents import telemetry
 from backend.agents.observability import log_event
 from backend.common import config
 
@@ -57,28 +58,44 @@ def apply(text: str, source: str, client=None) -> GuardrailResult:
     guardrail_id, version = config.guardrail_id(), config.guardrail_version()
     if not text or not guardrail_id or not version:
         return GuardrailResult(False, text, False)
-    try:
-        response = (client or _client()).apply_guardrail(
-            guardrailIdentifier=guardrail_id, guardrailVersion=version, source=source,
-            content=[{"text": {"text": text}}],
-        )
-    except Exception as exc:  # panne : fail-open, journalisée sans le texte
-        log_event("guardrail.error", source=source, error=type(exc).__name__)
-        return GuardrailResult(False, text, False)
-    outputs = response.get("outputs") or []
-    replacement = outputs[0].get("text") if outputs else None
-    if response.get("action") != "GUARDRAIL_INTERVENED":
-        return GuardrailResult(False, text, True)
-    assessments = response.get("assessments")
-    if _has_blocked_action(assessments):
-        by_pii = _policy_blocked(assessments, "sensitiveInformationPolicy")
-        by_topic = _policy_blocked(assessments, "topicPolicy")
-        log_event("guardrail.blocked", source=source, byPii=by_pii, byTopic=by_topic)
-        return GuardrailResult(
-            True,
-            replacement or "This request is outside what this simulation can do.",
-            True,
-            blocked_by_pii=by_pii,
-            blocked_by_topic=by_topic,
-        )
-    return GuardrailResult(False, replacement or text, True)
+    with telemetry.trace_span(
+        f"guardrail.{source.lower()}",
+        observation_type="guardrail",
+        input_data={"source": source, "textLength": len(text)},
+    ) as span:
+        try:
+            response = (client or _client()).apply_guardrail(
+                guardrailIdentifier=guardrail_id, guardrailVersion=version, source=source,
+                content=[{"text": {"text": text}}],
+            )
+        except Exception as exc:  # panne : fail-open, journalisée sans le texte
+            log_event("guardrail.error", source=source, error=type(exc).__name__)
+            res = GuardrailResult(False, text, False)
+            telemetry.set_span_output(span, {"blocked": res.blocked, "checked": res.checked, "error": type(exc).__name__})
+            return res
+        outputs = response.get("outputs") or []
+        replacement = outputs[0].get("text") if outputs else None
+        if response.get("action") != "GUARDRAIL_INTERVENED":
+            res = GuardrailResult(False, text, True)
+            telemetry.set_span_output(span, {"blocked": res.blocked, "checked": res.checked})
+            return res
+        assessments = response.get("assessments")
+        if _has_blocked_action(assessments):
+            by_pii = _policy_blocked(assessments, "sensitiveInformationPolicy")
+            by_topic = _policy_blocked(assessments, "topicPolicy")
+            log_event("guardrail.blocked", source=source, byPii=by_pii, byTopic=by_topic)
+            res = GuardrailResult(
+                True,
+                replacement or "This request is outside what this simulation can do.",
+                True,
+                blocked_by_pii=by_pii,
+                blocked_by_topic=by_topic,
+            )
+            telemetry.set_span_output(
+                span,
+                {"blocked": res.blocked, "checked": res.checked, "byPii": by_pii, "byTopic": by_topic},
+            )
+            return res
+        res = GuardrailResult(False, replacement or text, True)
+        telemetry.set_span_output(span, {"blocked": res.blocked, "checked": res.checked, "anonymized": True})
+        return res
