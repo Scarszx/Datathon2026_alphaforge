@@ -799,7 +799,7 @@ storage:
       - path: "dataset/{version}/corporate_actions.parquet"
         content: "dividendes et fractionnements par date ex"
       - path: "dataset/{version}/etf_enriched.json"
-        content: "pour les 9 FNB seulement : sectorWeights, topHoldings, countryWeights, merPct, exclusions (ESGV); chaque valeur avec sourceUrl et asOfDate (fiche émetteur). Aucun indicateur ESG inventé pour les actions."
+        content: "pour environ 15 FNB clés (les 9 du jeu de départ plus XSP.TO, ZEQT.TO, XEQT.TO, VFV.TO, ZAG.TO, XIC.TO) : sectorWeights, topHoldings, countryWeights, merPct, exclusions (ESGV); les autres FNB sont marqués « composition non disponible »; chaque valeur avec sourceUrl et asOfDate (fiche émetteur). Aucun indicateur ESG inventé pour les actions."
     read_by: ["srv-agent-runtime"]
     written_by: ["job-ingestion"]
     notes:

@@ -17,7 +17,7 @@ Les conséquences pour les chantiers :
 - **Modules de code sans LLM :** `module-engine`, `module-rules` et `module-verifier`.
 - **Nouvelles routes :** `GET/POST /v1/conversations/{sessionId}/mandates` (Lambda API) et `POST/GET /v1/conversations/{sessionId}/runs[/{runId}]` (Lambda agents).
 - **Nouvelle table :** `Analyses` (mandats et runs). **Nouveaux services :** Bedrock Knowledge Bases (corpus `docs/for_KB/`) et Bedrock Guardrails.
-- **Nouvelles données :** `etf_enriched.json` (composition des 9 FNB), et `publication_date` sur la macro mensuelle.
+- **Nouvelles données :** `etf_enriched.json` (composition d'environ 15 FNB clés), et `publication_date` sur la macro mensuelle.
 
 Les chantiers déjà terminés en v0.3.0 (✅) restent valables. Leurs compléments v0.4.0 sont des chantiers « b » ci-dessous.
 
