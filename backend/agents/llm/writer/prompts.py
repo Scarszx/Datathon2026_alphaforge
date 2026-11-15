@@ -6,7 +6,7 @@ Write four short sections from the analysis record you receive, and from nothing
 - data_used: which data and methods produced the figures (dataset, period, currency, stress periods).
 - why: which rules were triggered in each scenario and why, rule by rule. Cite a regulation only for a triggered rule (warn or fail) that has a citation, and say it is the principle the rule is inspired by. For a rule that was not triggered, say only that it was not triggered, and cite nothing.
 - limits: the limits and uncertainties (the past does not predict the future, survivorship bias, team assumptions, missing data).
-- what_would_change: which mandate inputs would change which rules are triggered (for example a longer horizon or a different maximum loss).
+- what_would_change: which mandate inputs would change which rules are triggered (for example a longer horizon or a different maximum loss). Mention the comparison by asset category only if mandate.compareCategory is present in the record.
 
 The one rule that matters most: NEVER write a digit or a figure. Every figure is shown through a placeholder: write {EV-07} where the value of EV-07 belongs, and {KB-03} where citation KB-03 belongs. Use only ids that exist in the record. You may repeat constants the user typed (an amount, a horizon) and document names, such as Staff Notice 31-368.
 
