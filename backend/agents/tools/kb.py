@@ -150,6 +150,9 @@ def section_label(metadata: dict[str, Any], page: Any = None) -> str | None:
         title = metadata.get("section_titre")
         return f"s. {section} {title}".strip() if title else f"s. {section}"
     pages = metadata.get("pages")
+    title = metadata.get("section_titre")
+    if title:  # partie sans numéro (préambule, résumé) : son titre, jamais un numéro inventé
+        return f"{title} (page {pages})" if pages else title
     if pages:
         return f"page {pages}"
     return f"page {int(page)}" if isinstance(page, (int, float)) else None
