@@ -1,12 +1,21 @@
 application:
   name: "AlphaForge"
-  version: "0.4.10"
+  version: "0.4.11"
   description: "Banc d'essai agentique et auto-explicatif pour l'investisseur autonome : il cadre l'intention, simule son impact sur le portefeuille et l'audite contre les textes réglementaires canadiens (simulation seulement). Datathon 2026."
-  status: "validé par l'équipe (0.4.0 le 2026-11-14, 0.4.1 le 2026-11-15) ; 0.4.2 et 0.4.3 validées par l'utilisateur le 2026-11-15, à relire par l'équipe ; 0.4.4 à 0.4.7 demandées par l'utilisateur le 2026-11-15 (lots A, B, C et E), à relire par l'équipe ; 0.4.8 demandée par l'utilisateur le 2026-11-15 (saisie vocale), à relire par l'équipe ; 0.4.9 demandée par l'utilisateur le 2026-11-15 (jeu de données aligné sur le script du collègue), à relire par l'équipe ; 0.4.10 demandée par l'utilisateur le 2026-11-15 (saisie vocale, détection de la langue), à relire par l'équipe"
+  status: "validé par l'équipe (0.4.0 le 2026-11-14, 0.4.1 le 2026-11-15) ; 0.4.2 et 0.4.3 validées par l'utilisateur le 2026-11-15, à relire par l'équipe ; 0.4.4 à 0.4.7 demandées par l'utilisateur le 2026-11-15 (lots A, B, C et E), à relire par l'équipe ; 0.4.8 demandée par l'utilisateur le 2026-11-15 (saisie vocale), à relire par l'équipe ; 0.4.9 demandée par l'utilisateur le 2026-11-15 (jeu de données aligné sur le script du collègue), à relire par l'équipe ; 0.4.10 demandée par l'utilisateur le 2026-11-15 (saisie vocale, détection de la langue), à relire par l'équipe; 0.4.11 demandée par l'utilisateur le 2026-11-15 (statistiques de marché), à relire par l'équipe"
   solution_ref: "SOLUTION.md (racine du dépôt) : décisions de produit et de conception détaillées"
   # Règle d'équipe : ce fichier est la référence. Toute modification passe par un accord de l'équipe.
   # Voir aussi : la page de présentation du contrat (même contenu, avec schémas).
   changelog:
+    - version: "0.4.11"
+      date: "2026-11-15"
+      status: "demandé par l'utilisateur le 2026-11-15 (code sur la branche ws/market-stats, pas encore déployé) ; à relire par l'équipe"
+      summary:
+        - "Nouvel outil tool-market-stats (market_stats), réservé à module-engine : modèle de marché à un facteur de l'équipe. Pour chaque titre, par rapport à ^GSPC : rendement annualisé, variance, écart-type, bêta (cov(titre, marché) / var(marché)) et corrélation au marché, sur les rendements quotidiens de adjclose dans la devise de cotation (aucune conversion : un titre .TO est comparé à un indice en USD)."
+        - "Annualisation 252 jours, 365 pour la crypto. Bêta et corrélation sur les jours de cotation communs au titre et à l'indice; moins de 30 jours communs : null. Aucun cours reporté."
+        - "Aucun appel de ce nouvel outil par les scénarios ni par les règles pour l'instant : disponible pour le moteur, intégration (preuves EV-nn, affichage) à décider par l'équipe. Aucune route, aucun schéma ni table ne change."
+      impacts_to_handle:
+        - "backend/agents : market_stats (engine/analytics.py, tools/catalog.py), droits de module-engine (toolbox.py). Aucun changement d'infra ni de front."
     - version: "0.4.10"
       date: "2026-11-15"
       status: "demandé par l'utilisateur le 2026-11-15 (saisie vocale, essai réel) ; à relire par l'équipe"
@@ -1088,7 +1097,7 @@ modules:
     name: "Moteur de calcul"
     runs_in: "srv-agent-runtime"
     role: "Construit les scénarios 0/1/2 et calcule : rendement, volatilité annualisée, pire baisse, tests de résistance (2022, krach COVID 2020 dérivé de SPY, hausse des taux dérivée de V39079/DFF, krach crypto dérivé de BTC-USD), concentration par titre, secteur, pays et devise (avec composition des FNB), corrélations. Chaque résultat est inscrit au registre (EV-nn)."
-    uses_tools: ["tool-get-prices", "tool-get-macro", "tool-compute-metrics", "tool-get-portfolio", "tool-portfolio-impact", "tool-stress-test", "tool-concentration"]
+    uses_tools: ["tool-get-prices", "tool-get-macro", "tool-compute-metrics", "tool-market-stats", "tool-get-portfolio", "tool-portfolio-impact", "tool-stress-test", "tool-concentration"]
     rules:
       - "adjclose, conversion en CAD avec report du dernier taux; devise native aussi affichée."
       - "Annualisation √252 (actions, FNB) et √365 (crypto); portefeuilles sur l'intersection des jours ouvrés nord-américains."
@@ -1164,6 +1173,21 @@ tools:
     behavior:
       - "Utilise adjclose. Les séries sont alignées sur les dates communes et la méthode est écrite dans assumptions."
       - "Rendements exprimés dans la devise de cotation, ou convertis si demandé."
+
+  - id: "tool-market-stats"
+    name: "market_stats"
+    description: "Statistiques de marché d'un ou plusieurs actifs par rapport à l'indice ^GSPC : rendement annualisé, variance, écart-type, bêta et corrélation au marché."
+    used_by: ["module-engine"]
+    params:
+      - { name: "tickers", type: "array", items_type: "string", required: true, validation: "20 maximum, tous dans l'univers" }
+      - { name: "start", type: "string", required: true, format: "YYYY-MM-DD" }
+      - { name: "end", type: "string", required: true, format: "YYYY-MM-DD" }
+    returns: "{ stats: { ticker: { annual_return (%), variance (décimal), std_dev (%), beta, market_correlation, observations } }, benchmark: \"^GSPC\", period, assumptions[], source }"
+    reads: ["storage-dataset: prices/{symbol}.parquet"]
+    behavior:
+      - "Rendements quotidiens de adjclose dans la devise de cotation, sans conversion ni report de cours. Annualisation 252 (365 pour la crypto)."
+      - "beta = cov(titre, marché) / var(marché) et la corrélation portent sur les jours de cotation communs (observations); moins de 30 jours communs : null. La méthode est écrite dans assumptions."
+      - "Erreur claire si ^GSPC est absent de la version du jeu (jeux antérieurs à 0.4.9)."
 
   - id: "tool-get-portfolio"
     name: "get_portfolio"
