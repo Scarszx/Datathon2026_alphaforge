@@ -8,7 +8,7 @@ from backend.common.http import HTTP_STATUS_BY_CODE
 from .conftest import body_of, event
 
 
-def test_routes_couvrent_les_douze_routes_du_contrat():
+def test_routes_couvrent_les_treize_routes_du_contrat():
     assert set(ROUTES) == {
         "GET /v1/me",
         "PUT /v1/me/profile",
@@ -22,6 +22,7 @@ def test_routes_couvrent_les_douze_routes_du_contrat():
         "GET /v1/portfolios",
         "PUT /v1/portfolios/{portfolioId}/holdings",
         "GET /v1/agents",
+        "POST /v1/speech/session",
     }
 
 

@@ -3,7 +3,7 @@ import { request } from "./client";
 import type {
   AgentsRegistry, Asset, Conversation, Holding, InvestorProfile, Mandate, MandateCreateRequest,
   Message, MessageCreateResponse, Page, Portfolio, PortfolioSummary, Run, RunCreateRequest,
-  SummaryRange, User,
+  SpeechSession, SummaryRange, User,
 } from "./types";
 
 const enc = encodeURIComponent;
@@ -46,3 +46,7 @@ export const createRun = (sessionId: string, mandateVersion: number) =>
   request<Run>(`/conversations/${enc(sessionId)}/runs`, { method: "POST", body: { mandateVersion } });
 export const getRun = (sessionId: string, runId: string) =>
   request<Run>(`/conversations/${enc(sessionId)}/runs/${enc(runId)}`);
+
+/* v0.4.8 : saisie vocale. URL WebSocket signée vers Amazon Transcribe Streaming (300 s). */
+export const startSpeechSession = (lang: "fr" | "en") =>
+  request<SpeechSession>("/speech/session", { method: "POST", body: { lang } });
