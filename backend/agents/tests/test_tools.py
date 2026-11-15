@@ -1,4 +1,4 @@
-"""Les 13 outils sur le mini-jeu : validation, plafonds du contrat, contexte jamais fourni par le modèle."""
+"""Les 14 outils sur le mini-jeu : validation, plafonds du contrat, contexte jamais fourni par le modèle."""
 
 from __future__ import annotations
 
@@ -89,6 +89,18 @@ def test_compute_metrics_sans_lignes_brutes(ctx):
     assert _size(result) < 2000
     assert "error" in catalog.compute_metrics(ctx, ["SPY"] * 21, "2022-01-01", "2022-12-31", ["volatility"])
     assert "error" in catalog.compute_metrics(ctx, ["SPY"], "2022-01-01", "2022-12-31", ["sharpe"])
+
+
+def test_market_stats_sans_lignes_brutes(ctx):
+    result = catalog.market_stats(ctx, ["NVDA", "RY.TO", "BTC-USD"], "2022-01-01", "2022-12-31")
+    assert result["benchmark"] == "^GSPC" and result["source"].startswith("prices@")
+    assert set(result["stats"]) == {"NVDA", "RY.TO", "BTC-USD"}
+    assert set(result["stats"]["NVDA"]) == {"annual_return", "variance", "std_dev", "beta", "market_correlation", "observations"}
+    assert result["stats"]["NVDA"]["beta"] > 0 and _size(result) < 3000
+    assert catalog.market_stats(ctx, ["^GSPC"], "2022-01-01", "2022-12-31")["stats"]["^GSPC"]["beta"] == 1.0
+    assert "error" in catalog.market_stats(ctx, ["ZZZ"], "2022-01-01", "2022-12-31")
+    assert "error" in catalog.market_stats(ctx, ["SPY"] * 21, "2022-01-01", "2022-12-31")
+    assert "error" in catalog.market_stats(ctx, ["SPY"], "pas-une-date", "2022-12-31")
 
 
 def test_propose_mandate_force_le_contexte(ctx):

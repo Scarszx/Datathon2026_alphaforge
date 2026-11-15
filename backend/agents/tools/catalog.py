@@ -1,4 +1,4 @@
-"""Les 13 outils du contrat (section tools), en fonctions pures du contexte.
+"""Les 14 outils du contrat (section tools), en fonctions pures du contexte.
 
 Chaque outil valide ses paramètres et construit lui-même sa lecture
 (rule-tool-validation). Une erreur attendue est renvoyée comme
@@ -349,6 +349,36 @@ def compute_metrics(ctx: RequestContext, tickers: list[str], start: str, end: st
     return result
 
 
+def market_stats(ctx: RequestContext, tickers: list[str], start: str, end: str) -> dict[str, Any]:
+    if not isinstance(tickers, list) or not tickers or len(tickers) > MAX_METRIC_TICKERS:
+        return _error(f"tickers must be a list of 1 to {MAX_METRIC_TICKERS} symbols.")
+    for ticker in tickers:
+        if not ctx.store.has_ticker(ticker):
+            return _unknown_ticker(ctx, ticker)
+    if not ctx.store.has_ticker(an.MARKET_INDEX):
+        return _error(f"Market index {an.MARKET_INDEX} is missing from this dataset version.")
+    start_ts, end_ts = _parse_date(start, "start"), _parse_date(end, "end")
+    for value in (start_ts, end_ts):
+        if isinstance(value, str):
+            return _error(value)
+    stats = an.market_stats(ctx.store, tickers, start_ts, end_ts)
+    rounded = {
+        ticker: {k: (None if v is None else round(v, 2 if k in ("annual_return", "std_dev") else 4))
+                 if k != "observations" else v for k, v in values.items()}
+        for ticker, values in stats.items()
+    }
+    return {
+        "stats": rounded, "benchmark": an.MARKET_INDEX, "period": f"{start}/{end}",
+        "assumptions": [
+            "Daily returns on adjclose in the listing currency, no currency conversion (a CAD listing is compared with the USD index) and no price carried forward.",
+            "annual_return = mean x periods, in %; std_dev = std x sqrt(periods), in %; variance = var x periods, as a decimal; periods = 252, or 365 for crypto.",
+            "beta = cov(asset, market) / var(market) and market_correlation use only the days both quote (observations); fewer than "
+            f"{an.MIN_MARKET_OBSERVATIONS} common days gives null.",
+        ],
+        "source": ctx.store.source_label("prices"),
+    }
+
+
 def _current_weights(ctx: RequestContext) -> dict[str, float] | dict[str, Any]:
     portfolio = portfolios_repo.get_portfolio(ctx.user_id, ctx.portfolio_id)
     if portfolio is None:
@@ -439,6 +469,7 @@ TOOL_FUNCTIONS = {
     "get_prices": get_prices,
     "get_macro": get_macro,
     "compute_metrics": compute_metrics,
+    "market_stats": market_stats,
     "get_portfolio": get_portfolio,
     "get_profile": get_profile,
     "propose_mandate": propose_mandate,
