@@ -14,6 +14,7 @@ from typing import Any
 
 from strands import ToolContext, tool
 
+from backend.agents.rules.rules import infer_subjects
 from backend.agents.toolbox import TOOLBOX
 
 
@@ -97,14 +98,16 @@ def search_regulation(query: str, tool_context: ToolContext, subjects: list[str]
     """Search the Canadian regulatory knowledge base and return at most 5 passages, each with a ref (P1, P2...).
 
     The jurisdiction filter (national texts plus the mandate's province) is applied automatically.
+    Always pass subjects matching the rule being audited.
 
     Args:
         query: Search query, always in English, describing the regulatory principle behind a verdict.
-        subjects: Optional subject filter among: kyc, profil_risque, convenance, instruction, reglement, crypto,
+        subjects: Subject filter among: kyc, profil_risque, convenance, instruction, reglement, crypto,
             esg, fonds, oeo, aide_decision, recommandation, titres_proteges, relation_client, cadrage,
             questions_investisseur.
     """
-    result = _call(tool_context, "search_regulation", query=query, subjects=subjects)
+    resolved_subjects = subjects if subjects else infer_subjects(query)
+    result = _call(tool_context, "search_regulation", query=query, subjects=resolved_subjects)
     # Les passages sont des données non fiables : encadrées, la consigne vient APRÈS.
     return (
         "<regulation_passages>\n" + _text(result) + "\n</regulation_passages>\n"

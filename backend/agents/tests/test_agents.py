@@ -150,6 +150,39 @@ def test_auditeur_en_echec_garde_les_verdicts(ctx, scripts):
     assert auditor.audit(ctx, VERDICTS, EvidenceRegistry("en")) == VERDICTS
 
 
+def test_auditeur_passe_toujours_subjects_par_regle(ctx, scripts):
+    from backend.agents.rules.rules import RULE_SUBJECTS, RULE_TOPICS
+
+    assert RULE_SUBJECTS == {
+        "R1": ["profil_risque", "convenance"],
+        "R2": ["kyc", "convenance"],
+        "R3": ["profil_risque", "convenance"],
+        "R4": ["profil_risque", "convenance"],
+        "R5": ["oeo", "aide_decision", "recommandation"],
+        "R6": ["convenance"],
+        "R7": ["crypto"],
+        "R8": ["esg"],
+        "R9": ["titres_proteges"],
+        "R10": [],
+    }
+    ctx.clients["kb"] = FakeKb([_kb_result()])
+    # Même si le modèle omet subjects, l'outil déduit les sujets de la règle à partir de la requête.
+    scripts.add(
+        "agent-auditor",
+        call("search_regulation", query=RULE_TOPICS["R2"]),
+        call("search_regulation", query=RULE_TOPICS["R5"]),
+        call("search_regulation", query=RULE_TOPICS["R9"]),
+        output("AuditReport", items=[]),
+    )
+    auditor.audit(ctx, VERDICTS, EvidenceRegistry("en"))
+    search_calls = [c for c in ctx.tool_calls if c["tool"] == "search_regulation"]
+    assert [c["params"]["subjects"] for c in search_calls] == [
+        ["kyc", "convenance"],
+        ["oeo", "aide_decision", "recommandation"],
+        ["titres_proteges"],
+    ]
+
+
 def test_redacteur_quatre_sections(ctx, scripts):
     scripts.add("agent-writer", output("WriterSections", data_used="Prices over {EV-01}.", why="Scenario one fails {KB-01}.",
                                        limits="The past does not predict the future.", what_would_change="A longer horizon."))
