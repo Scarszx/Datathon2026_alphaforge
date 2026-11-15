@@ -12,9 +12,7 @@ le back avec des données fictives marquées.
    la page de session. Les autres pages (Portefeuille, Marchés, Profil, inscription) restent en
    français uniquement, comme avant le chantier. Le contrat `language_policy` vise surtout la
    conversation ; étendre l'i18n aux autres pages reste à faire si l'équipe le décide.
-3. **`Run.explanation` non affichée.** Le run expose `explanation` (pas d'exécution d'agents), mais
-   aucun panneau de `/chat` ne la montre aujourd'hui : le panneau de simulation montre déjà les
-   verdicts, la KB et le vérificateur. À ajouter si l'équipe veut un onglet « traçabilité ».
+3. ✅ **`Run.explanation` affichée** (2026-11-15) : le panneau repliable « Comment AlphaForge arrive à cette conclusion » (`components/chat/Provenance.tsx`) sépare données, hypothèses, règles, sources, calcul du moteur et texte rédigé par l'IA ; la trace technique (`Explanation`) y est imbriquée. Les trois cartes en tête d'analyse (`SummaryCards.tsx`) restent factuelles : fait chiffré et seuil, sans jugement (GN-3200-26-001 §2.1, §3.1.1, §3.1.3, §3.3). Niveaux de langage (Simple / Investisseur / Analyste) : reportés.
 
 ## Hypothèses du mode démo (`src/api/demo.ts`)
 
