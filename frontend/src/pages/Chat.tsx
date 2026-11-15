@@ -12,7 +12,7 @@ import type { Conversation, Evidence, Mandate, MandateCreateRequest, Message, Ru
 import AppHeader from "./../components/AppHeader";
 import ConversationColumn from "./../components/chat/ConversationColumn";
 import SimulationPanel from "./../components/chat/SimulationPanel";
-import { LangContext, langOf, t, type Lang } from "./../lib/i18n";
+import { LangContext, t, useT } from "./../lib/i18n";
 
 const POLL_MS = 2000;
 const tmpId = () => `tmp-${Date.now()}`;
@@ -30,7 +30,7 @@ export default function Chat() {
   const [mandate, setMandate] = useState<Mandate | null>(null);
   const [run, setRun] = useState<Run | null>(null);
   const [runId, setRunId] = useState<string | null>(null);
-  const [lang, setLang] = useState<Lang>(langOf(navigator.language));
+  const { lang } = useT(); // langue de l'interface (bouton FR | EN) ; le chatbot répond dans la langue de l'utilisateur
   const [mobilePanel, setMobilePanel] = useState<"history" | "conversation" | "simulation">("conversation");
 
   const [loading, setLoading] = useState(false);
@@ -67,8 +67,6 @@ export default function Chat() {
       }
       if (activeRef.current !== sessionId) return;
       setMessages(all);
-      const conv = sessions.find((c) => c.sessionId === sessionId);
-      if (conv?.userLanguage) setLang(langOf(conv.userLanguage));
 
       await refreshMandate(sessionId);
 
@@ -182,12 +180,6 @@ export default function Chat() {
     } catch (e) { setError(errorText(e)); } finally { setBusy(false); }
   }, [busy]);
 
-  /* --- langue d'affichage : userLanguage de la conversation active --- */
-  useEffect(() => {
-    const conv = sessions.find((c) => c.sessionId === activeId);
-    if (conv?.userLanguage) setLang(langOf(conv.userLanguage));
-  }, [sessions, activeId]);
-
   const evidence: Evidence[] = run?.evidence ?? [];
   const filtered = sessions.filter((c) => (c.title ?? "").toLowerCase().includes(q.trim().toLowerCase()));
 
@@ -195,7 +187,7 @@ export default function Chat() {
     <LangContext.Provider value={lang}>
       <AppHeader />
       <main className={`chat-page mobile-${mobilePanel}`}>
-        <nav className="chat-mobile-tabs" aria-label={lang === "fr" ? "Panneaux de la session" : "Session panels"}>
+        <nav className="chat-mobile-tabs" aria-label={t("chat.panels", lang)}>
           {([
             ["history", t("chat.history", lang)],
             ["conversation", "Conversation"],
@@ -241,7 +233,7 @@ export default function Chat() {
             onCompare={(req) => void runCompare(req)}
             onRerun={run ? () => void rerunOld(run.mandateVersion) : undefined} />
         </div>
-        {loading && <p className="muted small chat-loading">Chargement…</p>}
+        {loading && <p className="muted small chat-loading">{lang === "en" ? "Loading…" : "Chargement…"}</p>}
         {error && <div className="chat-error" role="alert"><p className="error">{error}</p></div>}
       </main>
     </LangContext.Provider>

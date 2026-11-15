@@ -40,14 +40,14 @@ Remarques :
 | `aws_region` | Région (défaut `us-east-1`) |
 | `dataset_version` | Version du jeu de données téléversée sous `s3://<bucket>/dataset/<version>/` (obligatoire) |
 | `pandas_layer_arn` | Couche AWS SDK for pandas, runtime Python 3.12, architecture arm64 |
-| `model_orchestrator` / `model_auditor` / `model_writer` | Profils d'inférence Bedrock des 3 agents (défaut `global.anthropic.claude-sonnet-5-5`) |
+| `model_orchestrator` / `model_auditor` / `model_writer` | Profils d'inférence Bedrock des 3 agents (défaut `global.anthropic.claude-opus-5-5`) |
 | `kb_corpus_version` | Version du corpus sous `s3://<bucket>/kb/<version>/` (défaut `2026-11-14`)  ; seul ce préfixe est indexé |
 | `embedding_model_id` / `embedding_dimensions` | Modèle d'embeddings de la KB (défaut `amazon.titan-embed-text-v2:0`, 1024 dimensions) |
 | `cors_origins` | Origines du front en développement (l'URL CloudFront est ajoutée automatiquement) |
 
 **Trouver la couche pandas** : console AWS Lambda → « Layers » → onglet *AWS layers*, runtime *Python 3.12*, architecture *arm64* (`AWSSDKPandas-Python312-Arm64`), ou la table des couches de la documentation AWS SDK for pandas. Format : `arn:aws:lambda:us-east-1:336392948345:layer:AWSSDKPandas-Python312-Arm64:<version>`.
 
-**Modèles Bedrock** : l'invocation `bedrock-runtime` exige un profil d'inférence (l'ID nu `anthropic.claude-sonnet-5-5` est refusé en on-demand). Le défaut `global.…` route vers n'importe quelle région au prix liste ; l'alternative `us.anthropic.claude-sonnet-5-5` reste US/Canada (+10 %). L'IAM autorise déjà profil et modèle de fondation.
+**Modèles Bedrock** : l'invocation `bedrock-runtime` exige un profil d'inférence (l'ID nu `anthropic.claude-opus-5-5` est refusé en on-demand). Le défaut `global.…` route vers n'importe quelle région au prix liste ; l'alternative `us.anthropic.claude-opus-5-5` reste US/Canada (+10 %). L'IAM autorise déjà profil et modèle de fondation.
 
 ## Knowledge Base réglementaire (`bedrock_kb.tf`)
 
@@ -75,7 +75,7 @@ C'est l'option la plus rapide à créer sur le compte d'atelier, sans étape man
 ## Ce qui reste manuel après `apply`
 
 0. Lancer `infra/scripts/kb_sync.sh` (corpus + ingestion), puis suivre le job avec la commande qu'il affiche (statut `COMPLETE`, aucun document en échec).
-1. Modèles Bedrock : aucune activation manuelle. La page *Model access* est retirée : Bedrock active les modèles serverless (Claude Sonnet 5.5, Titan Text Embeddings V2) au premier appel. Pour Anthropic, une première utilisation sur un compte peut demander de décrire le cas d'usage ; Sonnet 5.5 est déjà testé sur ce compte.
+1. Modèles Bedrock : aucune activation manuelle. La page *Model access* est retirée : Bedrock active les modèles serverless (Claude Opus 5.5, Titan Text Embeddings V2) au premier appel. Pour Anthropic, une première utilisation sur un compte peut demander de décrire le cas d'usage ; Opus 5.5 est déjà testé sur ce compte.
 2. Créer les comptes Cognito des personas : `admin-create-user` puis `admin-set-user-password` avec `--permanent` (contrat : srv-cognito.notes, pas de changement de mot de passe temporaire).
 3. Exécuter l'ingestion (WS3) et téléverser le jeu de données : `data/output/<version>/` → `s3://<bucket>/dataset/<version>/` (bucket en output `dataset_bucket`).
 4. Déposer le build du front dans `s3://<front bucket>/` (output `front_bucket`).

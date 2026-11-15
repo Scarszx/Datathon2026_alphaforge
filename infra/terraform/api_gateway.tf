@@ -16,6 +16,7 @@ locals {
     holdings_put         = { method = "PUT", path = "/v1/portfolios/{portfolioId}/holdings", target = "api" }
     portfolio_summary    = { method = "GET", path = "/v1/portfolios/{portfolioId}/summary", target = "agents" }
     market_search        = { method = "GET", path = "/v1/market/search", target = "agents" }
+    market_asset_detail  = { method = "GET", path = "/v1/market/assets/{ticker}", target = "agents" }
     agents_registry      = { method = "GET", path = "/v1/agents", target = "api" }
     mandates_create      = { method = "POST", path = "/v1/conversations/{sessionId}/mandates", target = "api" }
     mandates_list        = { method = "GET", path = "/v1/conversations/{sessionId}/mandates", target = "api" }

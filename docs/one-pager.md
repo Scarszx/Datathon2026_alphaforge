@@ -7,7 +7,7 @@ Sur une plateforme de courtage autonome, l'investisseur voit ce qu'il possède, 
 
 ## Approche agentique
 Le code calcule, le modèle cadre et cite, un vérificateur contrôle.
-- **Orchestrateur** (Claude Sonnet 5.5, Bedrock) : comprend la demande dans la langue de l'utilisateur, pose au plus une étape de questions et propose un *mandat* à confirmer.
+- **Orchestrateur** (Claude Opus 5.5, Bedrock) : comprend la demande dans la langue de l'utilisateur, pose au plus une étape de questions et propose un *mandat* à confirmer.
 - **Moteur de calcul et règles R1 à R10** (code) : trois scénarios (actuel, idée, alternative par catégorie), volatilité, pire baisse, tests de résistance (2022, COVID 2020, taux, crypto), concentration. Les verdicts viennent du code, pas du modèle.
 - **Auditeur** : retrouve dans la Knowledge Base réglementaire (ACVM, OCRI, province) le passage qui fonde chaque verdict. **Rédacteur** : n'écrit jamais un chiffre. **Vérificateur** (code) : masque toute phrase qui déborde.
 - Un **Guardrail** filtre ordres, promesses de rendement, conseil personnalisé et données bancaires. 3 agents, 3 modules en code, 13 outils aux droits fermés.

@@ -7,7 +7,7 @@ Vérifie, sur le compte de l'événement :
 
 Prérequis (dans la même commande) :
     source scripts/aws-env.sh && \\
-    export KB_ID=... GUARDRAIL_ID=... GUARDRAIL_VERSION=... MODEL_ORCHESTRATOR=global.anthropic.claude-sonnet-5-5 && \\
+    export KB_ID=... GUARDRAIL_ID=... GUARDRAIL_VERSION=... MODEL_ORCHESTRATOR=global.anthropic.claude-opus-5-5 && \\
     python -m backend.agents.scripts.smoke <dossier_alphaforge_starter>
 Les identifiants viennent de `terraform output` (infra/terraform).
 

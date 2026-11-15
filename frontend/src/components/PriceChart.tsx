@@ -1,6 +1,7 @@
 import { useId, useState } from "react";
 import type { PointerEvent } from "react";
 import { fullDate, shortDate } from "../lib/format";
+import { useT } from "../lib/i18n";
 
 /* Courbe de prix épurée (aire dégradée, repère au survol). Reçoit des points déjà calculés par le back. */
 type P = { date: string; close: number };
@@ -9,9 +10,10 @@ const ts = (d: string) => Date.parse(`${d}T12:00:00Z`) / 1000;
 
 export default function PriceChart({ points, up, format }: { points: P[]; up: boolean; format: (v: number) => string }) {
   const gid = useId();
+  const { L } = useT();
   const [hover, setHover] = useState<number | null>(null);
   const n = points.length;
-  if (n < 2) return <div className="pc-empty">Historique insuffisant pour tracer la courbe.</div>;
+  if (n < 2) return <div className="pc-empty">{L("Historique insuffisant pour tracer la courbe.", "Not enough history to plot the curve.")}</div>;
   const vals = points.map((p) => p.close);
   const min = Math.min(...vals), max = Math.max(...vals);
   const span = max - min || 1;

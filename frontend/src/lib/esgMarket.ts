@@ -15,10 +15,14 @@ export type Market = (typeof MARKETS)[number];
 export type EsgMarketChoice = { esg: boolean; markets: Market[] };
 export const EMPTY_ESG_MARKET: EsgMarketChoice = { esg: false, markets: [] };
 
+const MARKET_EN: Record<Market, string> = { Canada: "Canada", "États-Unis": "United States" };
+/** Libellé d'un marché dans la langue d'affichage (la valeur stockée reste le libellé français). */
+export const marketName = (m: Market, lang: "fr" | "en") => (lang === "en" ? MARKET_EN[m] : m);
+
 /** Réponses à la question ESG : oui ajoute l'entrée « ESG » aux préférences. */
-export const ESG_ANSWERS: { value: boolean; label: string }[] = [
-  { value: true, label: "Oui" },
-  { value: false, label: "Non" },
+export const ESG_ANSWERS: { value: boolean; label: string; en: string }[] = [
+  { value: true, label: "Oui", en: "Yes" },
+  { value: false, label: "Non", en: "No" },
 ];
 
 const isMarket = (s: string): s is Market => (MARKETS as readonly string[]).includes(s);

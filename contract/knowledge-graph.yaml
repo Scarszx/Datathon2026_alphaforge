@@ -1,12 +1,31 @@
 application:
   name: "AlphaForge"
-  version: "0.4.13"
+  version: "0.4.15"
   description: "Banc d'essai agentique et auto-explicatif pour l'investisseur autonome : il cadre l'intention, simule son impact sur le portefeuille et l'audite contre les textes réglementaires canadiens (simulation seulement). Datathon 2026."
-  status: "validé par l'équipe (0.4.0 le 2026-11-14, 0.4.1 le 2026-11-15) ; 0.4.2 et 0.4.3 validées par l'utilisateur le 2026-11-15, à relire par l'équipe ; 0.4.4 à 0.4.7 demandées par l'utilisateur le 2026-11-15 (lots A, B, C et E), à relire par l'équipe ; 0.4.8 demandée par l'utilisateur le 2026-11-15 (saisie vocale), à relire par l'équipe ; 0.4.9 demandée par l'utilisateur le 2026-11-15 (jeu de données aligné sur le script du collègue), à relire par l'équipe ; 0.4.10 demandée par l'utilisateur le 2026-11-15 (saisie vocale, détection de la langue), à relire par l'équipe; 0.4.11 demandée par l'utilisateur le 2026-11-15 (statistiques de marché), à relire par l'équipe ; 0.4.12 demandée par l'utilisateur le 2026-11-15 (constructeur de portefeuille), à relire par l'équipe ; 0.4.13 demandée par l'utilisateur le 2026-11-15 (inscription sans code de confirmation), à relire par l'équipe"
+  status: "validé par l'équipe (0.4.0 le 2026-11-14, 0.4.1 le 2026-11-15) ; 0.4.2 et 0.4.3 validées par l'utilisateur le 2026-11-15, à relire par l'équipe ; 0.4.4 à 0.4.7 demandées par l'utilisateur le 2026-11-15 (lots A, B, C et E), à relire par l'équipe ; 0.4.8 demandée par l'utilisateur le 2026-11-15 (saisie vocale), à relire par l'équipe ; 0.4.9 demandée par l'utilisateur le 2026-11-15 (jeu de données aligné sur le script du collègue), à relire par l'équipe ; 0.4.10 demandée par l'utilisateur le 2026-11-15 (saisie vocale, détection de la langue), à relire par l'équipe; 0.4.11 demandée par l'utilisateur le 2026-11-15 (statistiques de marché), à relire par l'équipe ; 0.4.12 demandée par l'utilisateur le 2026-11-15 (constructeur de portefeuille), à relire par l'équipe ; 0.4.13 demandée par l'utilisateur le 2026-11-15 (inscription sans code de confirmation), à relire par l'équipe ; 0.4.14 demandée par l'utilisateur le 2026-11-15 (modèles des 3 agents passés à Claude Opus 5.5), à relire par l'équipe ; 0.4.15 demandée par l'utilisateur le 2026-11-15 (fiche d'un actif : route déjà codée sur main, ajoutée au contrat), à relire par l'équipe"
   solution_ref: "SOLUTION.md (racine du dépôt) : décisions de produit et de conception détaillées"
   # Règle d'équipe : ce fichier est la référence. Toute modification passe par un accord de l'équipe.
   # Voir aussi : la page de présentation du contrat (même contenu, avec schémas).
   changelog:
+    - version: "0.4.15"
+      date: "2026-11-15"
+      status: "demandé par l'utilisateur le 2026-11-15 (code sur main, déployé le 2026-11-15) ; à relire par l'équipe"
+      summary:
+        - "Ajout au contrat de la route GET /v1/market/assets/{ticker} (api-market-asset) et du schéma schema-asset-detail : fiche d'un actif de l'univers (page /marches/:ticker du front). Le code (backend/agents/routes/asset_detail.py) existait déjà sur main, sans entrée dans le contrat ni route dans API Gateway."
+        - "Contenu : profil (nom, classe, marché, devise, secteur, industrie, pays), dernier cours (close), variation du jour, variation sur la période demandée (range : 1m, 6m, 1y, 5y), courbe des prix (au plus 120 points), repères sur 1 an (haut et bas 52 semaines, volatilité annualisée, pire baisse, début de l'historique), description et site officiel si le jeu contient profiles.json. Lecture seule, déterministe, sans modèle."
+        - "Erreurs : ASSET_NOT_FOUND (404) pour un ticker hors de l'univers ou un indice de référence, VALIDATION_ERROR (400) si range est inconnu."
+      impacts_to_handle:
+        - "infra/terraform/api_gateway.tf : route market_asset_detail vers la Lambda agents (sans elle, la route répond 404 en ligne)."
+        - "frontend : langue unique de l'interface FR/EN, bulles « ? » et fiche de l'actif traduite (aucun changement de route)."
+    - version: "0.4.14"
+      date: "2026-11-15"
+      status: "demandé par l'utilisateur le 2026-11-15 (code sur main, déployé le 2026-11-15) ; à relire par l'équipe"
+      summary:
+        - "Modèle des 3 agents (agent-orchestrator, agent-auditor, agent-writer) passé de Claude Sonnet 5.5 à Claude Opus 5.5 (profil d'inférence global.anthropic.claude-opus-5-5, région us-east-1, accès vérifié sur le compte de l'événement)."
+        - "Aucune route, aucun schéma, aucune limite (max_tokens, timeouts, tours) ne change."
+      impacts_to_handle:
+        - "infra/terraform : défauts de model_orchestrator, model_auditor et model_writer dans variables.tf ; ARN IAM dérivés automatiquement."
+        - "backend/agents/models.py : identifiant du modèle inclus dans la clé de cache des clients Bedrock."
     - version: "0.4.13"
       date: "2026-11-15"
       status: "demandé par l'utilisateur le 2026-11-15 (code sur main, déployé le 2026-11-15) ; à relire par l'équipe"
@@ -240,6 +259,7 @@ services:
       - "api-portfolio-holdings-put"
       - "api-portfolio-summary"
       - "api-market-search"
+      - "api-market-asset"
       - "api-agents-registry"
       - "api-mandates-create"
       - "api-mandates-list"
@@ -268,7 +288,7 @@ services:
     description: "Porte d'entrée unique pour le front. Authorizer JWT natif relié à Cognito."
     routes_to:
       srv-api-light: ["/me", "/me/profile", "/conversations*", "/portfolios (GET, PUT holdings)", "/agents", "GET et POST /conversations/{sessionId}/mandates", "POST /speech/session"]
-      srv-agent-runtime: ["POST /conversations/{sessionId}/messages", "POST /conversations/{sessionId}/runs", "GET /conversations/{sessionId}/runs/{runId}", "GET /portfolios/{portfolioId}/summary", "GET /market/search"]
+      srv-agent-runtime: ["POST /conversations/{sessionId}/messages", "POST /conversations/{sessionId}/runs", "GET /conversations/{sessionId}/runs/{runId}", "GET /portfolios/{portfolioId}/summary", "GET /market/search", "GET /market/assets/{ticker}"]
     depends_on:
       - "srv-cognito"
     known_limit: "Délai maximal d'intégration d'environ 30 s : le chat reste synchrone au départ (voir open_questions)."
@@ -323,6 +343,7 @@ services:
       - "api-runs-get"
       - "api-portfolio-summary"
       - "api-market-search"
+      - "api-market-asset"
     access_to_dbs:
       - id: "db-conversations"
         mode: "read_update"      # met à jour updatedAt
@@ -582,6 +603,20 @@ apis:
     response_payload:
       schema_ref: "schema-asset-search-response"
 
+  - id: "api-market-asset"
+    provider: "srv-agent-runtime"
+    method: "GET"
+    path: "/v1/market/assets/{ticker}"
+    description: "Fiche d'un actif de l'univers (0.4.15) : profil, dernier cours, variation du jour et de la période, courbe des prix, repères sur 1 an (haut et bas 52 semaines, volatilité, pire baisse) et description. Calcul déterministe sur les prix du jeu de données, sans modèle."
+    auth: "jwt"
+    path_params:
+      - { name: "ticker", type: "string", required: true, description: "symbole exact de l'univers (ex. RY.TO)" }
+    query_params:
+      - { name: "range", type: "string", enum: ["1m", "6m", "1y", "5y"], default: "1y", description: "période de la courbe et de rangeChangePct" }
+    response_payload:
+      schema_ref: "schema-asset-detail"
+    errors: ["ASSET_NOT_FOUND", "VALIDATION_ERROR"]
+
   - id: "api-agents-registry"
     provider: "srv-api-light"
     method: "GET"
@@ -761,6 +796,28 @@ data_schemas:
       - { name: "market", type: "string" }
       - { name: "currency", type: "string" }
       - { name: "sector", type: "string" }
+
+  - id: "schema-asset-detail"
+    description: "Réponse de GET /market/assets/{ticker}. Montants dans la devise de cotation de l'actif."
+    fields:
+      - { name: "ticker", type: "string", required: true }
+      - { name: "name", type: "string", required: true }
+      - { name: "assetClass", type: "string", required: true }
+      - { name: "market", type: "string" }
+      - { name: "currency", type: "string" }
+      - { name: "sector", type: "string" }
+      - { name: "industry", type: "string" }
+      - { name: "country", type: "string" }
+      - { name: "asOf", type: "string", required: true, description: "date du dernier cours (YYYY-MM-DD)" }
+      - { name: "price", type: "number", required: true, description: "dernier cours de clôture (close)" }
+      - { name: "dayChangePct", type: "number", description: "variation du dernier jour, en %, sur adjclose" }
+      - { name: "range", type: "string", required: true, enum: ["1m", "6m", "1y", "5y"] }
+      - { name: "rangeChangePct", type: "number", description: "variation sur la période, en %, sur adjclose" }
+      - { name: "points", type: "array", required: true, description: "[{ date, close }], au plus 120 points, le dernier égal à price" }
+      - { name: "stats", type: "object", required: true, description: "{ high52w, low52w, volatility (annualisée, %), maxDrawdown (%), historyStart }" }
+      - { name: "description", type: "string", description: "présent seulement si le jeu contient profiles.json" }
+      - { name: "website", type: "string", description: "idem" }
+      - { name: "source", type: "string", description: "fichier du jeu de données et sa version" }
 
   - id: "schema-asset-search-response"
     fields:
@@ -1062,7 +1119,7 @@ agents:
     status: "retenu"
     role: "Seule voix face à l'utilisateur. Détecte userLanguage et traduit chaque message de l'utilisateur en anglais avant toute action; tout ce qu'il transmet aux outils et aux autres composants est en anglais; traduit dans userLanguage tout texte affiché (réponse, quickReplies, narrative, motifs de verdict, mentions), en conservant les emplacements {EV-nn}/{KB-nn} et sans traduire les extraits réglementaires. Lit la session (portefeuille, profil, province), détecte ce qui manque, pose au plus une étape de questions (quickReplies), propose le mandat, attend sa confirmation, puis lance l'analyse. Répond aux questions de suivi à partir du registre. Ne calcule jamais de tête et ne nomme jamais un titre comme recommandation."
     runs_in: "srv-agent-runtime"
-    model: "Claude Sonnet 5.5 via Bedrock, région us-east-1 (profil d'inférence global.anthropic.claude-sonnet-5-5, testé par l'équipe; lu dans la config)"
+    model: "Claude Opus 5.5 via Bedrock, région us-east-1 (profil d'inférence global.anthropic.claude-opus-5-5, testé par l'équipe; lu dans la config)"
     max_tokens: 4096  # conversation; traduction de la restitution : translation_max_tokens
     translation_max_tokens: 8192
     allowed_tools: ["tool-get-portfolio", "tool-get-profile", "tool-search-assets", "tool-propose-mandate", "tool-read-evidence"]
@@ -1081,7 +1138,7 @@ agents:
     system_prompt_language: "en"
     role: "Travaille en anglais (requêtes KB et motifs en anglais). Ne décide pas des verdicts (module-rules le fait). Ne lance pas lui-même les recherches : le code cherche dans la Knowledge Base, une recherche par sujet de chaque règle (filtre juridiction ∈ {CA, province}), et lui donne les passages. Seules les règles déclenchées (warn, fail) sont auditées (0.4.4) : un pass ou un not_verified n'a ni recherche ni citation. Pour chaque verdict déclenché, il désigne les passages qui énoncent le principe dont la règle s'inspire (ou aucun), le code les inscrit au registre (KB-nn), et il formule le motif en une phrase. Les verdicts sans objet (R7 sans cryptoactif, R8 sans préférence ESG) et R10 (aucun sujet) ne déclenchent aucune recherche : motif par défaut, sans citation."
     runs_in: "srv-agent-runtime"
-    model: "Claude Sonnet 5.5 via Bedrock, région us-east-1 (profil d'inférence global.anthropic.claude-sonnet-5-5, testé par l'équipe; lu dans la config)"
+    model: "Claude Opus 5.5 via Bedrock, région us-east-1 (profil d'inférence global.anthropic.claude-opus-5-5, testé par l'équipe; lu dans la config)"
     max_tokens: 4096
     allowed_tools: []  # 0.4.3 : les recherches (tool-search-regulation) sont lancées par le code de l'auditeur, pas par le modèle
     code_tools: ["tool-search-regulation"]  # appelés par le code de l'auditeur, une recherche par sujet de règle, 16 au plus, en parallèle
@@ -1096,7 +1153,7 @@ agents:
     system_prompt_language: "en"
     role: "Rédige en anglais (textEn) 4 sections (données utilisées, pourquoi ce verdict, limites, ce qui changerait la réponse) à partir du registre seulement; agent-orchestrator les traduit. N'écrit aucun chiffre : seulement des emplacements {EV-nn} et {KB-nn}."
     runs_in: "srv-agent-runtime"
-    model: "Claude Sonnet 5.5 via Bedrock, région us-east-1 (profil d'inférence global.anthropic.claude-sonnet-5-5, testé par l'équipe; lu dans la config)"
+    model: "Claude Opus 5.5 via Bedrock, région us-east-1 (profil d'inférence global.anthropic.claude-opus-5-5, testé par l'équipe; lu dans la config)"
     max_tokens: 8192
     allowed_tools: ["tool-read-evidence"]
     limits: { max_tool_calls: 4, timeout_seconds: 60 }  # partie asynchrone du run (Lambda 180 s)

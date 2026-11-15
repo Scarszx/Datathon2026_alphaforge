@@ -33,7 +33,7 @@ MODELS: dict[str, AgentSpec] = {
 # 8192 jetons, 1 tour, 30 s. Somme asynchrone : 60 s (auditeur) + 60 s (rédacteur) + 30 s (traduction) = 150 s < 180 s (Lambda).
 TRANSLATION_SPEC = AgentSpec(config.model_orchestrator, 8192, 30, 1)
 
-_CACHE: dict[tuple[str, int, int], object] = {}
+_CACHE: dict[tuple[str, str, int, int], object] = {}
 
 
 def model_id(agent_id: str) -> str:
@@ -46,13 +46,15 @@ def model_id(agent_id: str) -> str:
 def create_model(agent_id: str, *, spec: AgentSpec | None = None):
     """BedrockModel de l'agent, réutilisé entre invocations chaudes (l'Agent, lui, est recréé)."""
     active_spec = spec or MODELS[agent_id]
-    cache_key = (agent_id, active_spec.max_tokens, active_spec.timeout_seconds)
+    # L'identifiant du modèle fait partie de la clé : un MODEL_* changé en cours
+    # de processus (redeploy, test) ne réutilise pas un client de l'ancien modèle.
+    cache_key = (agent_id, model_id(agent_id), active_spec.max_tokens, active_spec.timeout_seconds)
     if cache_key not in _CACHE:
         from botocore.config import Config
         from strands.models.bedrock import BedrockModel
 
         _CACHE[cache_key] = BedrockModel(
-            model_id=model_id(agent_id),
+            model_id=cache_key[1],
             max_tokens=active_spec.max_tokens,
             region_name=REGION,  # explicite : sinon Strands retombe sur us-west-2
             boto_client_config=Config(read_timeout=active_spec.timeout_seconds + 5, retries={"max_attempts": 2, "mode": "standard"}),

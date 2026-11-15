@@ -67,9 +67,9 @@ def dataset_version() -> str:
     return _required("DATASET_VERSION")
 
 
-# --- Modèles Bedrock (contrat v0.4.0 : Claude Sonnet 5.5, région us-east-1) ---
+# --- Modèles Bedrock (déploiement : Claude Opus 5.5, région us-east-1) ---
 # Un modèle par agent, lu dans la config pour pouvoir en changer sans toucher au code.
-# Valeur attendue en déploiement : un profil d'inférence, ex. global.anthropic.claude-sonnet-5-5.
+# Valeur attendue en déploiement : un profil d'inférence, ex. global.anthropic.claude-opus-5-5.
 
 
 def model_orchestrator() -> str | None:

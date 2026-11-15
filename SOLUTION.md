@@ -9,7 +9,7 @@
 > - Les décisions de la section 18 (« Ce qu'on a écarté ») sont prises. Ne les rouvre pas sans demande explicite.
 > - Tout ce qui est marqué **hypothèse d'équipe** est un choix de l'équipe, pas une règle officielle. L'interface doit le présenter comme tel.
 > - **Décision technique ferme : les agents sont construits avec le SDK Strands Agents (Python) et les modèles d'Amazon Bedrock.** Pas d'autre framework d'agents (LangChain, LlamaIndex…), pas d'appel direct à un autre fournisseur de modèles.
-> - **Décision ferme : région AWS `us-east-1` et Claude Sonnet 5.5 pour les 3 agents** (accès testé par l'équipe). Le contrat v0.4.0 est **validé par l'équipe**.
+> - **Décision ferme : région AWS `us-east-1` et Claude Opus 5.5 pour les 3 agents** (accès testé par l'équipe ; initialement Sonnet 5.5, passé à Opus 5.5 en contrat 0.4.14). Le contrat v0.4.0 est **validé par l'équipe**.
 > - **Décision ferme : tout le système interne est en anglais** (prompts, descriptions d'outils, échanges entre agents, requêtes et corpus de la KB). Seuls les textes affichés à l'utilisateur sont dans sa langue. L'orchestrateur traduit à l'entrée et à la sortie. Voir section 7.0.
 > - Les commandes AWS et Terraform suivent `AGENTS.md` : `source scripts/aws-env.sh && ...`, le compte doit être `058264316309`, et aucun `terraform apply` ni aucune création de ressource sans demande explicite.
 
@@ -177,7 +177,7 @@ Le prompt système de l'orchestrateur, rédigé en anglais, contient donc explic
 
 **Repli si la latence pose problème en démo :** le rédacteur peut écrire directement dans `userLanguage` (paramètre transmis en anglais dans son contexte), ce qui évite l'étape de traduction. Le reste de la politique ne change pas.
 
-### 7.1 Orchestrateur — LLM (Claude Sonnet 5.5 via Bedrock)
+### 7.1 Orchestrateur — LLM (Claude Opus 5.5 via Bedrock)
 - **Rôle :** il est la seule voix qui parle à l'utilisateur.
   - Il détecte la langue de l'utilisateur et traduit sa demande en anglais (7.0).
   - Il lit la session (portefeuille, profil de base, province) et détecte ce qui manque pour le mandat.
@@ -204,7 +204,7 @@ Le prompt système de l'orchestrateur, rédigé en anglais, contient donc explic
   - `macro_regime(date)`.
 - **Comparaison par catégorie (scénario 2, lots B et E) :** une règle déterministe, construite seulement si le mandat porte `compareCategory` (l'utilisateur choisit la catégorie ; l'orchestrateur ne la met jamais). Elle garde le montant de l'idée et remplace chaque titre ajouté par la catégorie choisie, sans juger le titre. Aucun symbole n'apparaît dans le texte visible ; le FNB d'approximation n'est nommé que dans `method` et `source` de la preuve (« calculation only, not a selection »).
 
-### 7.3 Auditeur de convenance — LLM (Claude Sonnet 5.5) + KB + règles en code
+### 7.3 Auditeur de convenance — LLM (Claude Opus 5.5) + KB + règles en code
 - **Rôle :** les **verdicts viennent des règles R1 à R10, écrites en code** (section 9). L'auditeur ne décide pas du verdict. Il ne traite que les **règles déclenchées (warn, fail)** : un pass ou un not_verified n'a ni recherche ni citation, car un extrait du régulateur sous une règle « non déclenchée » se lirait comme un accord. Pour chaque règle déclenchée, il **cherche dans la Knowledge Base le passage dont la règle s'inspire**, l'inscrit au registre (`KB-xx` : document, section, extrait court, juridiction, version, URL) et formule le motif en une phrase.
 - **Outils :**
   - `check_rules(mandate, scenarios)` (code) ;
@@ -212,7 +212,7 @@ Le prompt système de l'orchestrateur, rédigé en anglais, contient donc explic
 - **Langue :** il travaille en anglais. Ses motifs de verdict sont en anglais, et l'orchestrateur les traduit pour l'affichage.
 - **Fail mode :** si aucun passage pertinent n'est trouvé, le verdict reste affiché avec la mention « fondement : hypothèse d'équipe » ou « non vérifié ». L'auditeur n'invente jamais de citation.
 
-### 7.4 Rédacteur — LLM (Claude Sonnet 5.5)
+### 7.4 Rédacteur — LLM (Claude Opus 5.5)
 - **Rôle :** rédiger **4 rubriques** à partir du registre seulement :
   1. Quelles données ont été utilisées
   2. Pourquoi ce verdict
@@ -419,7 +419,7 @@ Les seuils marqués « hypothèse » vivent dans un fichier de configuration (pa
 |---|---|
 | **S3 + CloudFront** | Hébergement de l'interface ; Parquet ; corpus de la KB |
 | **Lambda (ou AgentCore Runtime)** | Orchestrateur et pipeline. Réponse diffusée en continu (`RESPONSE_STREAM`, NDJSON, signal régulier pour garder la connexion ouverte). Garder la Lambda chaude pendant la démo |
-| **Bedrock + Strands** | **Claude Sonnet 5.5 pour les 3 agents**, région **us-east-1** (décision validée : accès testé par l'équipe ; profil d'inférence `global.anthropic.claude-sonnet-5-5`, lu dans la config par agent pour pouvoir en changer). Toutes les ressources AWS restent dans us-east-1 |
+| **Bedrock + Strands** | **Claude Opus 5.5 pour les 3 agents**, région **us-east-1** (décision validée : accès testé par l'équipe ; profil d'inférence `global.anthropic.claude-opus-5-5`, lu dans la config par agent pour pouvoir en changer). Toutes les ressources AWS restent dans us-east-1 |
 | **Bedrock Knowledge Bases** | Corpus réglementaire avec filtre de métadonnées par juridiction |
 | **Bedrock Guardrails** | Filtre d'entrée et de sortie |
 | **DynamoDB** | Sessions, portefeuilles, mandats versionnés, registres, résultats. Les sessions de démo peuvent être rejouées si Bedrock ou le réseau flanche |

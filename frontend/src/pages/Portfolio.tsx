@@ -5,15 +5,17 @@ import type { Asset, Holding, Jurisdiction, Portfolio, PortfolioSummary, Slice, 
 import AppHeader from "../components/AppHeader";
 import Chart from "../components/Chart";
 import Explanation from "../components/Explanation";
-import { t as tr } from "../lib/i18n";
+import InfoTip from "../components/InfoTip";
+import { assetClassName } from "../lib/assetClasses";
+import { t as tr, useT } from "../lib/i18n";
 import RiskForm from "../components/RiskForm";
-import { amount, money, pct, plainPct, shortDate, signedAmount, toSeconds } from "../lib/format";
+import { amount, colon, localeDateTime, money, pct, plainPct, shortDate, signedAmount, toSeconds } from "../lib/format";
 import { profileFromAnswers, saveRisk, type ProfileChoices } from "../lib/risk";
 import { useApp } from "../lib/store";
 import { TickerLabel } from "../components/TickerLogo";
 
-const RANGES: { key: SummaryRange; label: string }[] = [
-  { key: "1m", label: "1 M" }, { key: "6m", label: "6 M" }, { key: "1y", label: "1 A" }, { key: "5y", label: "5 A" },
+const RANGES: { key: SummaryRange; fr: string; en: string }[] = [
+  { key: "1m", fr: "1 M", en: "1M" }, { key: "6m", fr: "6 M", en: "6M" }, { key: "1y", fr: "1 A", en: "1Y" }, { key: "5y", fr: "5 A", en: "5Y" },
 ];
 const PALETTE = ["#143D30", "#1B5E45", "#3E8F68", "#C4A15A", "#D08A62", "#8E9892", "#D5DDD8"];
 
@@ -23,30 +25,32 @@ const toRows = (h: Holding[]): Row[] => h.map((x) => ({ key: ++rowKey, ticker: x
 const num = (s: string) => (s.trim() === "" ? NaN : Number(s.replace(",", ".")));
 
 /** Convertit les lignes saisies en positions du contrat (ou retourne un message d'erreur). */
-function parseRows(rows: Row[]): { holdings: Holding[] } | { error: string } {
+function parseRows(rows: Row[], L: (fr: string, en: string) => string): { holdings: Holding[] } | { error: string } {
   const seen = new Set<string>();
   const holdings: Holding[] = [];
   for (const [i, r] of rows.entries()) {
     const ticker = r.ticker.trim().toUpperCase(), quantity = num(r.quantity), avgCost = num(r.avgCost);
-    const n = `Ligne ${i + 1}`;
-    if (!ticker) return { error: `${n} : ticker requis.` };
-    if (seen.has(ticker)) return { error: `${n} : ${ticker} apparaît deux fois.` };
-    if (!(quantity > 0)) return { error: `${n} : la quantité doit être supérieure à 0.` };
-    if (!Number.isFinite(avgCost) || avgCost < 0) return { error: `${n} : prix de revient moyen invalide.` };
+    const n = L(`Ligne ${i + 1}`, `Row ${i + 1}`);
+    if (!ticker) return { error: L(`${n} : ticker requis.`, `${n}: ticker required.`) };
+    if (seen.has(ticker)) return { error: L(`${n} : ${ticker} apparaît deux fois.`, `${n}: ${ticker} appears twice.`) };
+    if (!(quantity > 0)) return { error: L(`${n} : la quantité doit être supérieure à 0.`, `${n}: quantity must be greater than 0.`) };
+    if (!Number.isFinite(avgCost) || avgCost < 0) return { error: L(`${n} : prix de revient moyen invalide.`, `${n}: invalid average cost.`) };
     seen.add(ticker);
     holdings.push({ ticker, quantity, avgCost });
   }
   return { holdings };
 }
 
-function Alloc({ title, items }: { title: string; items: Slice[] }) {
+function Alloc({ title, items, classes = false }: { title: string; items: Slice[]; classes?: boolean }) {
+  const { lang, L } = useT();
+  const name = (label: string) => (classes ? assetClassName(label, lang) : label);
   return (
     <section>
       <h2 className="section-title">{title}</h2>
-      {items.length === 0 ? <div className="empty"><strong>Aucune donnée</strong></div> : (
+      {items.length === 0 ? <div className="empty"><strong>{L("Aucune donnée", "No data")}</strong></div> : (
         <>
-          <div className="alloc-bar">{items.filter((a) => a.weight > 0).map((a, i) => <span key={a.label} style={{ width: `${a.weight}%`, background: PALETTE[i % PALETTE.length] }} title={`${a.label} ${plainPct(a.weight)}`} />)}</div>
-          <ul className="legend">{items.map((a, i) => <li key={a.label}><span className="dot" style={{ background: PALETTE[i % PALETTE.length] }} />{a.label}<span className="pct filled">{plainPct(a.weight)}</span></li>)}</ul>
+          <div className="alloc-bar">{items.filter((a) => a.weight > 0).map((a, i) => <span key={a.label} style={{ width: `${a.weight}%`, background: PALETTE[i % PALETTE.length] }} title={`${name(a.label)} ${plainPct(a.weight)}`} />)}</div>
+          <ul className="legend">{items.map((a, i) => <li key={a.label}><span className="dot" style={{ background: PALETTE[i % PALETTE.length] }} />{name(a.label)}<span className="pct filled">{plainPct(a.weight)}</span></li>)}</ul>
         </>
       )}
     </section>
@@ -54,6 +58,7 @@ function Alloc({ title, items }: { title: string; items: Slice[] }) {
 }
 
 export default function PortfolioPage() {
+  const { lang, L } = useT();
   const { user, saveProfile } = useApp();
   const [profileReady, setProfileReady] = useState(() => Boolean(user?.investorProfile));
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
@@ -80,7 +85,7 @@ export default function PortfolioPage() {
     listPortfolios()
       .then(({ items }) => {
         const p = items.find((x) => x.portfolioId === "main") ?? items[0];
-        if (!p) return setError("Aucun portefeuille.");
+        if (!p) return setError(L("Aucun portefeuille.", "No portfolio."));
         setPortfolio(p); setRows(toRows(p.holdings));
       })
       .catch((e) => setError(errorText(e)))
@@ -147,13 +152,13 @@ export default function PortfolioPage() {
     }, 250);
   }
 
-  const parsed = parseRows(rows);
+  const parsed = parseRows(rows, L);
   const norm = (h: Holding[]) => JSON.stringify(h.map((x) => [x.ticker, x.quantity, x.avgCost]));
   const dirty = portfolio ? !("holdings" in parsed) || norm(parsed.holdings) !== norm(portfolio.holdings) : false;
 
   async function save() {
     if (!portfolio) return;
-    const r = parseRows(rows);
+    const r = parseRows(rows, L);
     if ("error" in r) return setSaveErr(r.error);
     setSaving(true); setSaveErr("");
     try {
@@ -179,18 +184,18 @@ export default function PortfolioPage() {
           <section className="onboarding-card" aria-labelledby="onboarding-title">
             <header className="onboarding-head">
               <div className="eyebrow onboarding-kicker">
-                <span>Création du portefeuille</span>
-                <span className="tag">Étape 1</span>
+                <span>{L("Création du portefeuille", "Portfolio creation")}</span>
+                <span className="tag">{L("Étape 1", "Step 1")}</span>
               </div>
-              <h1 id="onboarding-title" className="auth-h">Quel investisseur êtes-vous&nbsp;?</h1>
+              <h1 id="onboarding-title" className="auth-h">{L("Quel investisseur êtes-vous\u00a0?", "What kind of investor are you?")}</h1>
               <p className="muted onboarding-intro">
-                Répondez à ces questions pour établir le profil utilisé par vos simulations. Votre portefeuille principal sera créé ensuite.
+                {L("Répondez à ces questions pour établir le profil utilisé par vos simulations. Votre portefeuille principal sera créé ensuite.", "Answer these questions to set the profile used by your simulations. Your main portfolio will be created afterwards.")}
               </p>
             </header>
             <RiskForm
               showPreferences
               busy={onboardingBusy}
-              submitLabel={onboardingBusy ? "Création…" : "Créer mon portefeuille"}
+              submitLabel={onboardingBusy ? L("Création…", "Creating…") : L("Créer mon portefeuille", "Create my portfolio")}
               onSubmit={createPortfolio}
             >
               {onboardingError && <p className="error" role="alert">{onboardingError}</p>}
@@ -200,7 +205,7 @@ export default function PortfolioPage() {
       </>
     );
   }
-  if (loading) return <><AppHeader /><main className="wrap"><p className="muted" style={{ padding: "48px 0" }}>Création du portefeuille…</p></main></>;
+  if (loading) return <><AppHeader /><main className="wrap"><p className="muted" style={{ padding: "48px 0" }}>{L("Création du portefeuille…", "Creating the portfolio…")}</p></main></>;
   if (!portfolio) return <><AppHeader /><main className="wrap"><p className="error" role="alert" style={{ padding: "48px 0" }}>{error}</p></main></>;
 
   const cur = summary?.baseCurrency ?? portfolio.baseCurrency;
@@ -212,54 +217,55 @@ export default function PortfolioPage() {
       <main className="wrap">
         <section className="hero">
           <div>
-            <div className="eyebrow">{portfolio.name}<span className="tag">Simulation seulement</span></div>
+            <div className="eyebrow">{portfolio.name}<span className="tag">{L("Simulation seulement", "Simulation only")}</span></div>
             <div className="big filled">{t ? money(t.value) : "—"}<small>{cur}</small></div>
-            {t && <div className={`sub ${t.dayChange >= 0 ? "up" : "down"}`}>{signedAmount(t.dayChange, cur)} ({pct(t.dayChangePct)}) <span>jour · au {summary!.asOf}</span></div>}
+            {t && <div className={`sub ${t.dayChange >= 0 ? "up" : "down"}`}>{signedAmount(t.dayChange, cur)} ({pct(t.dayChangePct)}) <span>{L("jour", "day")} · {L("au", "as of")} {summary!.asOf}</span></div>}
           </div>
           <div className="controls">
-            <div className="segmented" role="group" aria-label="Période">
-              {RANGES.map((r) => <button key={r.key} type="button" className={r.key === range ? "on" : undefined} aria-pressed={r.key === range} onClick={() => setRange(r.key)}>{r.label}</button>)}
+            <div className="segmented" role="group" aria-label={L("Période", "Period")}>
+              {RANGES.map((r) => <button key={r.key} type="button" className={r.key === range ? "on" : undefined} aria-pressed={r.key === range} onClick={() => setRange(r.key)}>{r[lang]}</button>)}
             </div>
           </div>
         </section>
 
         {sumError && <p className="error" role="alert" style={{ marginBottom: 16 }}>{sumError}</p>}
-        {sumLoading && <p className="muted small">Calcul en cours…</p>}
+        {sumLoading && <p className="muted small">{L("Calcul en cours…", "Calculating…")}</p>}
         {!!summary?.warnings?.length && <div className="banner warn" role="status">{summary.warnings.map((w, i) => <p key={i}>{w}</p>)}</div>}
 
         {summary && (
           <>
-            <section className="chart" aria-label="Évolution de la valeur">
+            <section className="chart" aria-label={L("Évolution de la valeur", "Value over time")}>
+              <div className="muted small" style={{ marginBottom: 4 }}>{L("Évolution de la valeur", "Value over time")}<InfoTip text={tr("info.performance", lang)} /></div>
               {chart
                 ? <Chart key={range} values={chart.values} timestamps={chart.timestamps} axisLabel={(ts) => shortDate(ts, range === "1y" || range === "5y")} format={(v) => amount(v, cur)} />
-                : <div className="chart-empty"><p>Pas assez de points pour tracer la performance.</p></div>}
+                : <div className="chart-empty"><p>{L("Pas assez de points pour tracer la performance.", "Not enough points to plot performance.")}</p></div>}
             </section>
-            <p className="muted small chart-note">{tr("chart.adjusted", "fr")}</p>
+            <p className="muted small chart-note">{tr("chart.adjusted", lang)}</p>
             <section className="stats">
-              <div className="stat"><div className="stat-label">Valeur investie (coût)</div><div className="stat-value filled">{amount(summary.totals.cost, cur, 0)}</div></div>
-              <div className="stat"><div className="stat-label">Gain / perte</div><div className={`stat-value filled ${summary.totals.pnl >= 0 ? "up" : "down"}`}>{signedAmount(summary.totals.pnl, cur)}</div><div className="stat-sub">{pct(summary.totals.pnlPct)}</div></div>
-              <div className="stat"><div className="stat-label">Volatilité annualisée</div><div className="stat-value filled">{plainPct(summary.risk.volatility, 2)}</div></div>
-              <div className="stat"><div className="stat-label">Baisse maximale ({summary.performance.range})</div><div className="stat-value filled">{plainPct(summary.risk.maxDrawdown, 2)}</div></div>
+              <div className="stat"><div className="stat-label">{L("Valeur investie (coût)", "Amount invested (cost)")}</div><div className="stat-value filled">{amount(summary.totals.cost, cur, 0)}</div></div>
+              <div className="stat"><div className="stat-label">{L("Gain / perte", "Gain / loss")}</div><div className={`stat-value filled ${summary.totals.pnl >= 0 ? "up" : "down"}`}>{signedAmount(summary.totals.pnl, cur)}</div><div className="stat-sub">{pct(summary.totals.pnlPct)}</div></div>
+              <div className="stat"><div className="stat-label">{L("Volatilité annualisée", "Annualised volatility")}<InfoTip text={tr("info.volatility", lang)} /></div><div className="stat-value filled">{plainPct(summary.risk.volatility, 2)}</div></div>
+              <div className="stat"><div className="stat-label">{L("Baisse maximale", "Maximum drawdown")} ({summary.performance.range})<InfoTip text={tr("info.drawdown", lang)} /></div><div className="stat-value filled">{plainPct(summary.risk.maxDrawdown, 2)}</div></div>
             </section>
 
             <div className="grid2">
-              <Alloc title="Classes d'actifs" items={summary.allocation.byAssetClass} />
-              <Alloc title="Secteurs" items={summary.allocation.bySector} />
+              <Alloc title={L("Classes d'actifs", "Asset classes")} items={summary.allocation.byAssetClass} classes />
+              <Alloc title={L("Secteurs", "Sectors")} items={summary.allocation.bySector} />
             </div>
             <div className="grid2" style={{ paddingTop: 0 }}>
-              <Alloc title="Devises" items={summary.allocation.byCurrency} />
+              <Alloc title={L("Devises", "Currencies")} items={summary.allocation.byCurrency} />
               <div />
             </div>
 
             <section style={{ padding: "8px 0 32px" }}>
-              <h2 className="section-title">Positions enrichies</h2>
+              <h2 className="section-title">{L("Positions enrichies", "Positions in detail")}<InfoTip text={tr("info.portfolio", lang)} /></h2>
               <div className="table-wrap">
                 <table className="tbl">
-                  <thead><tr><th>Titre</th><th>Quantité</th><th>Prix</th><th>Valeur ({cur})</th><th>Poids</th><th>Gain / perte</th><th>Jour</th></tr></thead>
+                  <thead><tr><th>{L("Titre", "Holding")}</th><th>{L("Quantité", "Quantity")}</th><th>{L("Prix", "Price")}</th><th>{L("Valeur", "Value")} ({cur})</th><th>{L("Poids", "Weight")}</th><th>{L("Gain / perte", "Gain / loss")}</th><th>{L("Jour", "Day")}</th></tr></thead>
                   <tbody>
                     {summary.holdings.map((h) => (
                       <tr key={h.ticker}>
-                        <td><TickerLabel ticker={h.ticker} name={`${h.name} · ${h.assetClass}${h.sector ? ` · ${h.sector}` : ""}`} /> {h.stale && <span className="badge warn" title="Dernier cours connu utilisé">cours ancien</span>}</td>
+                        <td><TickerLabel ticker={h.ticker} name={`${h.name} · ${h.assetClass}${h.sector ? ` · ${h.sector}` : ""}`} /> {h.stale && <span className="badge warn" title={L("Dernier cours connu utilisé", "Latest known price used")}>{L("cours ancien", "stale price")}</span>}</td>
                         <td>{money(h.quantity, 4).replace(/,?0+$/, "")}</td>
                         <td>{amount(h.price, h.currency)}</td>
                         <td>{money(h.value)}</td>
@@ -278,37 +284,37 @@ export default function PortfolioPage() {
         )}
 
         <section style={{ padding: "8px 0 48px" }}>
-          <div className="section-row"><h2 className="section-title">Modifier mes positions</h2><span className="muted small">Mis à jour : {new Date(portfolio.updatedAt).toLocaleString("fr-CA")}</span></div>
-          <p className="muted small" style={{ marginBottom: 12 }}>Le prix de revient moyen est exprimé dans la devise de cotation de l'actif (.TO = CAD, les autres = USD). Enregistrer remplace toute la liste. Aucun ordre n'est exécuté.</p>
+          <div className="section-row"><h2 className="section-title">{L("Modifier mes positions", "Edit my positions")}</h2><span className="muted small">{L("Mis à jour", "Updated")}{colon()} {localeDateTime(portfolio.updatedAt)}</span></div>
+          <p className="muted small" style={{ marginBottom: 12 }}>{L("Le prix de revient moyen est exprimé dans la devise de cotation de l'actif (.TO = CAD, les autres = USD). Enregistrer remplace toute la liste. Aucun ordre n'est exécuté.", "The average cost is expressed in the asset's listing currency (.TO = CAD, others = USD). Saving replaces the whole list. No order is executed.")}</p>
           <datalist id="tickers">{suggestions.map((a) => <option key={a.ticker} value={a.ticker}>{a.name}</option>)}</datalist>
           <div className="table-wrap">
             <table className="tbl edit">
-              <thead><tr><th>Ticker</th><th>Quantité</th><th>Prix de revient moyen</th><th /></tr></thead>
+              <thead><tr><th>Ticker</th><th>{L("Quantité", "Quantity")}</th><th>{L("Prix de revient moyen", "Average cost")}</th><th /></tr></thead>
               <tbody>
                 {rows.map((r) => {
                   const k = r.ticker.trim().toUpperCase();
                   return (
                     <tr key={r.key}>
-                      <td><input className="cell" list="tickers" aria-label="Ticker" value={r.ticker} onChange={(e) => onTicker(r.key, e.target.value)} placeholder="ex. RY.TO" autoComplete="off" /><span className="muted small">{info[k]?.name ?? summary?.holdings.find((h) => h.ticker === k)?.name ?? ""}</span></td>
-                      <td><input className="cell" inputMode="decimal" aria-label="Quantité" value={r.quantity} onChange={(e) => setRows((rs) => rs.map((x) => (x.key === r.key ? { ...x, quantity: e.target.value } : x)))} /></td>
-                      <td><input className="cell" inputMode="decimal" aria-label="Prix de revient moyen" value={r.avgCost} onChange={(e) => setRows((rs) => rs.map((x) => (x.key === r.key ? { ...x, avgCost: e.target.value } : x)))} /> <span className="muted small">{currencyOf[k] ?? ""}</span></td>
-                      <td><button type="button" className="link" onClick={() => setRows((rs) => rs.filter((x) => x.key !== r.key))}>Retirer</button></td>
+                      <td><input className="cell" list="tickers" aria-label="Ticker" value={r.ticker} onChange={(e) => onTicker(r.key, e.target.value)} placeholder={L("ex. RY.TO", "e.g. RY.TO")} autoComplete="off" /><span className="muted small">{info[k]?.name ?? summary?.holdings.find((h) => h.ticker === k)?.name ?? ""}</span></td>
+                      <td><input className="cell" inputMode="decimal" aria-label={L("Quantité", "Quantity")} value={r.quantity} onChange={(e) => setRows((rs) => rs.map((x) => (x.key === r.key ? { ...x, quantity: e.target.value } : x)))} /></td>
+                      <td><input className="cell" inputMode="decimal" aria-label={L("Prix de revient moyen", "Average cost")} value={r.avgCost} onChange={(e) => setRows((rs) => rs.map((x) => (x.key === r.key ? { ...x, avgCost: e.target.value } : x)))} /> <span className="muted small">{currencyOf[k] ?? ""}</span></td>
+                      <td><button type="button" className="link" onClick={() => setRows((rs) => rs.filter((x) => x.key !== r.key))}>{L("Retirer", "Remove")}</button></td>
                     </tr>
                   );
                 })}
-                {rows.length === 0 && <tr><td colSpan={4} className="muted">Aucune position.</td></tr>}
+                {rows.length === 0 && <tr><td colSpan={4} className="muted">{L("Aucune position.", "No positions.")}</td></tr>}
               </tbody>
             </table>
           </div>
           {saveErr && <p className="error" role="alert" style={{ marginTop: 12 }}>{saveErr}</p>}
           <div className="actions-row" style={{ marginTop: 16 }}>
-            <button type="button" className="btn-ghost" onClick={() => setRows((rs) => [...rs, { key: ++rowKey, ticker: "", quantity: "", avgCost: "" }])}>+ Ajouter une position</button>
-            <button type="button" className="btn" disabled={!dirty || saving} onClick={() => void save()}>{saving ? "Enregistrement…" : "Enregistrer"}</button>
-            {dirty && <button type="button" className="link" onClick={() => { setRows(toRows(portfolio.holdings)); setSaveErr(""); }}>Annuler les changements</button>}
+            <button type="button" className="btn-ghost" onClick={() => setRows((rs) => [...rs, { key: ++rowKey, ticker: "", quantity: "", avgCost: "" }])}>{L("+ Ajouter une position", "+ Add a position")}</button>
+            <button type="button" className="btn" disabled={!dirty || saving} onClick={() => void save()}>{saving ? L("Enregistrement…", "Saving…") : L("Enregistrer", "Save")}</button>
+            {dirty && <button type="button" className="link" onClick={() => { setRows(toRows(portfolio.holdings)); setSaveErr(""); }}>{L("Annuler les changements", "Discard changes")}</button>}
           </div>
         </section>
       </main>
-      <footer className="footer"><div className="wrap footer-row"><span>Simulation seulement : aucune transaction n'est exécutée et rien ici ne constitue un conseil financier personnalisé. Le rendement passé ne prédit pas le futur. Tous les chiffres sont calculés par le serveur.</span></div></footer>
+      <footer className="footer"><div className="wrap footer-row"><span>{L("Simulation seulement : aucune transaction n'est exécutée et rien ici ne constitue un conseil financier personnalisé. Le rendement passé ne prédit pas le futur.", "Simulation only: no transaction is executed and nothing here is personalised financial advice. Past performance does not predict the future.")}</span></div></footer>
     </>
   );
 }

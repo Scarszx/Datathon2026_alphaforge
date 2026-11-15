@@ -1,7 +1,8 @@
 /* Libellés fixes de l'interface : clés stables traduites côté front (contrat conventions.language_policy).
  * Les textes générés (narrative, motifs de verdict, quickReplies) arrivent déjà dans userLanguage :
  * ils ne passent pas par ce module. Les extraits réglementaires s'affichent en anglais (mention « extrait original »). */
-import { createContext, useContext } from "react";
+import { createContext, createElement, useCallback, useContext, useState, type ReactNode } from "react";
+import { setFormatLang } from "./format";
 
 export type Lang = "fr" | "en";
 
@@ -12,8 +13,24 @@ export const FR: Record<string, string> = {
   "app.unresolved": "Preuve introuvable dans le registre — aucun chiffre affiché.",
   "app.showMore": "Voir plus",
   "app.showLess": "Voir moins",
+  "nav.aria": "Navigation principale",
+  "nav.session": "Session",
+  "nav.portfolio": "Portefeuille",
+  "nav.markets": "Marchés",
+  "nav.profile": "Profil",
+  "nav.logout": "Déconnexion",
+  "nav.login": "Connexion",
+  "nav.signup": "Créer un compte",
+  "info.label": "Comment est-ce calculé ?",
+  "info.portfolio": "Valeur = quantité × dernier cours de clôture, convertie en CAD au dernier taux de change connu. Poids = valeur d'une position ÷ valeur totale du portefeuille.",
+  "info.performance": "Évolution de la valeur du portefeuille sur la période choisie, à partir des prix quotidiens ajustés (dividendes et fractionnements inclus).",
+  "info.volatility": "Écart-type annualisé des rendements quotidiens, sur prix ajustés. Plus il est élevé, plus la valeur varie fortement.",
+  "info.drawdown": "Plus forte baisse entre un sommet et le creux qui suit, sur la période. Ce n'est pas une prévision.",
+  "info.return": "Variation du prix ajusté entre le début et la fin de la période (dividendes inclus). Un rendement observé sur une période antérieure ne garantit pas les rendements à venir.",
+  "info.marketStats": "Prix, valeur, poids et mesures de risque sont calculés à partir de l'historique de prix du jeu de données, pas estimés.",
 
   "chat.history": "Historique",
+  "chat.panels": "Panneaux de la session",
   "chat.new": "Nouvelle session",
   "chat.search": "Rechercher",
   "chat.untitled": "Session sans titre",
@@ -30,7 +47,7 @@ export const FR: Record<string, string> = {
   "chat.runError": "L'analyse a échoué.",
 
   "col.portfolio": "Portefeuille",
-  "col.portfolioSub": "Positions, valeur et répartition (calculées par le back).",
+  "col.portfolioSub": "Positions, valeur et répartition de votre portefeuille.",
   "col.mandate": "Mandat",
   "col.mandateVersion": "Version",
   "col.mandateNone": "Aucun mandat confirmé pour l'instant. Proposez une idée dans la conversation.",
@@ -227,7 +244,7 @@ export const FR: Record<string, string> = {
   "sim.built.beta": "bêta",
   "sim.built.expected": "rendement espéré",
   "sim.built.parameters": "Paramètres utilisés",
-  "sim.built.riskAversion": "Aversion au risque A = {value} (déduite du profil de risque {riskProfile})",
+  "sim.built.riskAversion": "Aversion au risque A = {value}, déduite de votre profil : {riskProfile}",
   "sim.built.maxWeight": "Poids maximum par titre : {value} %",
   "sim.built.industryCap": "Plafond par industrie : {value} %",
   "sim.built.preferredIndustryCap": "Plafond d'une industrie préférée : {value} %",
@@ -262,8 +279,24 @@ export const EN: Record<string, string> = {
   "app.unresolved": "Evidence not found in the registry — no number displayed.",
   "app.showMore": "Show more",
   "app.showLess": "Show less",
+  "nav.aria": "Main navigation",
+  "nav.session": "Session",
+  "nav.portfolio": "Portfolio",
+  "nav.markets": "Markets",
+  "nav.profile": "Profile",
+  "nav.logout": "Log out",
+  "nav.login": "Log in",
+  "nav.signup": "Create an account",
+  "info.label": "How is this calculated?",
+  "info.portfolio": "Value = quantity × latest closing price, converted to CAD at the latest known exchange rate. Weight = a position's value ÷ the portfolio's total value.",
+  "info.performance": "Change in portfolio value over the chosen period, from daily adjusted prices (dividends and splits included).",
+  "info.volatility": "Annualised standard deviation of daily returns, on adjusted prices. The higher it is, the more the value swings.",
+  "info.drawdown": "Largest fall from a peak to the following trough over the period. It is not a forecast.",
+  "info.return": "Change in the adjusted price between the start and the end of the period (dividends included). Past returns do not guarantee future returns.",
+  "info.marketStats": "Prices, values, weights and risk measures are computed from the dataset's price history, not estimated.",
 
   "chat.history": "History",
+  "chat.panels": "Session panels",
   "chat.new": "New session",
   "chat.search": "Search",
   "chat.untitled": "Untitled session",
@@ -280,7 +313,7 @@ export const EN: Record<string, string> = {
   "chat.runError": "The analysis failed.",
 
   "col.portfolio": "Portfolio",
-  "col.portfolioSub": "Positions, value and allocation (computed by the backend).",
+  "col.portfolioSub": "Positions, value and allocation of your portfolio.",
   "col.mandate": "Mandate",
   "col.mandateVersion": "Version",
   "col.mandateNone": "No confirmed mandate yet. Propose an idea in the conversation.",
@@ -476,7 +509,7 @@ export const EN: Record<string, string> = {
   "sim.built.beta": "beta",
   "sim.built.expected": "expected return",
   "sim.built.parameters": "Parameters used",
-  "sim.built.riskAversion": "Risk aversion A = {value} (derived from risk profile {riskProfile})",
+  "sim.built.riskAversion": "Risk aversion A = {value}, derived from your profile: {riskProfile}",
   "sim.built.maxWeight": "Maximum weight per stock: {value}%",
   "sim.built.industryCap": "Cap per industry: {value}%",
   "sim.built.preferredIndustryCap": "Cap for a preferred industry: {value}%",
@@ -529,10 +562,37 @@ export function warningText(w: string | { code: string; message: string; params?
   return template.replace(/\{(\w+)\}/g, (m, name: string) => (w.params && name in w.params ? String(w.params[name]) : m));
 }
 
-/** Hook pratique dans l'arbre sous LangContext. */
+const LangSetterContext = createContext<(l: Lang) => void>(() => {});
+const LANG_KEY = "af.lang";
+
+/** Langue d'affichage initiale : choix mémorisé, sinon langue du navigateur. */
+function initialLang(): Lang {
+  try {
+    const v = localStorage.getItem(LANG_KEY);
+    if (v === "fr" || v === "en") return v;
+  } catch { /* stockage indisponible */ }
+  return langOf(typeof navigator !== "undefined" ? navigator.language : "fr");
+}
+
+/** Langue de toute l'interface (bouton FR | EN de l'en-tête). Elle ne pilote pas la langue du chatbot,
+ *  qui répond dans la langue de l'utilisateur. */
+export function LangProvider({ children }: { children: ReactNode }) {
+  const [lang, setLangState] = useState<Lang>(initialLang);
+  setFormatLang(lang); // formats de nombres et de dates, lus pendant le rendu
+  const setLang = useCallback((l: Lang) => {
+    setLangState(l);
+    try { localStorage.setItem(LANG_KEY, l); } catch { /* stockage indisponible */ }
+    if (typeof document !== "undefined") document.documentElement.lang = l;
+  }, []);
+  return createElement(LangSetterContext.Provider, { value: setLang }, createElement(LangContext.Provider, { value: lang }, children));
+}
+
+/** Hook pratique dans l'arbre sous LangContext.
+ *  `L(fr, en)` : texte propre à un écran, écrit à côté de sa traduction (sans clé du dictionnaire). */
 export function useT() {
   const lang = useContext(LangContext);
-  return { lang, t: (key: string) => t(key, lang) };
+  const setLang = useContext(LangSetterContext);
+  return { lang, setLang, t: (key: string) => t(key, lang), L: (fr: string, en: string) => (lang === "en" ? en : fr) };
 }
 
 /** Détecte la langue d'affichage d'une conversation : userLanguage si reconnu, sinon fr. */
