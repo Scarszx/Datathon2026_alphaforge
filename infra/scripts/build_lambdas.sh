@@ -7,7 +7,8 @@
 # pandas, pyarrow et numpy sont exclus de la Lambda agents : fournis par la
 # couche AWS SDK for pandas (variable pandas_layer_arn).
 #
-# Usage : infra/scripts/build_lambdas.sh   (aucun appel AWS)
+# Usage : infra/scripts/build_lambdas.sh [api|agents]   (aucun appel AWS)
+#         sans argument : construit les deux zips ; avec un nom : celui-là seulement.
 
 set -euo pipefail
 
@@ -92,6 +93,10 @@ build_lambda() {
     fi
 }
 
-build_lambda api
-build_lambda agents
+target="${1:-all}"
+case "$target" in
+    all) build_lambda api; build_lambda agents ;;
+    api|agents) build_lambda "$target" ;;
+    *) echo "Usage : $0 [api|agents]" >&2; exit 2 ;;
+esac
 echo "=== Zips prêts dans $build_dir ==="
