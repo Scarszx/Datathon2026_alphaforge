@@ -9,7 +9,7 @@ Hypothèses et écarts trouvés en mettant l'infra au niveau du contrat v0.4.0.
 
 ## Écarts et points à suivre
 
-- **`MODEL_ANALYST` et `MODEL_GOVERNANCE` retirés de l'infra.** Les variables Terraform sont remplacées par `model_auditor` et `model_writer`. Les fonctions dépréciées `model_analyst()` et `model_governance()` de `backend/common/config.py` (avec leurs cas dans `test_config.py`) peuvent maintenant être supprimées. Cela sort de `infra/` et reste à faire sur `main`.
+- **`MODEL_ANALYST` et `MODEL_GOVERNANCE` retirés de l'infra.** Les variables Terraform sont remplacées par `model_auditor` et `model_writer`. Les fonctions dépréciées `model_analyst()` et `model_governance()` ont été retirées de `backend/common/config.py` sur `main` après la fusion.
 - **`date_recuperation`** figure dans les `.metadata.json` et dans le contrat (`storage-kb-corpus`), mais pas dans la liste d'attributs du chantier WS1b. Il est ingéré comme les autres, rien à faire.
 - **Faux positifs du Guardrail à tester tôt** (SOLUTION.md 7.6), en particulier :
   - le sujet « Personalized investment recommendation » face à une demande de simulation (« what if I add 10 % XIU ») ;

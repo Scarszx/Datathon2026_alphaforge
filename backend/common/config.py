@@ -87,22 +87,6 @@ def model_writer() -> str | None:
     return os.environ.get("MODEL_WRITER")
 
 
-def model_analyst() -> str | None:
-    """DÉPRÉCIÉ (contrat v0.4.0 : agent-analyst retiré, remplacé par module-engine).
-
-    Conservé tant que l'infra (WS1) définit encore MODEL_ANALYST. Ne pas l'utiliser.
-    """
-    return os.environ.get("MODEL_ANALYST")
-
-
-def model_governance() -> str | None:
-    """DÉPRÉCIÉ (contrat v0.4.0 : agent-governance remplacé par agent-auditor).
-
-    Conservé tant que l'infra (WS1) définit encore MODEL_GOVERNANCE. Ne pas l'utiliser.
-    """
-    return os.environ.get("MODEL_GOVERNANCE")
-
-
 # --- Knowledge Base et Guardrails Bedrock (contrat : srv-bedrock-kb, srv-bedrock-guardrails) ---
 
 

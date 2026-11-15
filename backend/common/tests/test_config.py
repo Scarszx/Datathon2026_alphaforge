@@ -52,8 +52,6 @@ def test_variables_requises_presentes(monkeypatch):
         (config.model_orchestrator, "MODEL_ORCHESTRATOR"),
         (config.model_auditor, "MODEL_AUDITOR"),
         (config.model_writer, "MODEL_WRITER"),
-        (config.model_analyst, "MODEL_ANALYST"),  # déprécié, conservé pour l'infra v0.3
-        (config.model_governance, "MODEL_GOVERNANCE"),  # déprécié, conservé pour l'infra v0.3
         (config.kb_id, "KB_ID"),
         (config.guardrail_id, "GUARDRAIL_ID"),
         (config.guardrail_version, "GUARDRAIL_VERSION"),
