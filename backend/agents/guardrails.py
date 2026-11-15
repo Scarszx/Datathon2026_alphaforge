@@ -23,6 +23,8 @@ class GuardrailResult:
     blocked: bool
     text: str  # texte d'origine, ou masqué, ou message de refus si blocked
     checked: bool  # False si le Guardrail n'a pas pu s'exécuter (fail-open)
+    blocked_by_pii: bool = False
+    blocked_by_topic: bool = False
 
 
 def _client():
@@ -44,6 +46,12 @@ def _has_blocked_action(node: Any) -> bool:
     return False
 
 
+def _policy_blocked(assessments: Any, policy_key: str) -> bool:
+    if not isinstance(assessments, list):
+        return False
+    return any(_has_blocked_action(a.get(policy_key)) for a in assessments if isinstance(a, dict))
+
+
 def apply(text: str, source: str, client=None) -> GuardrailResult:
     """source = 'INPUT' (message utilisateur) ou 'OUTPUT' (texte affiché)."""
     guardrail_id, version = config.guardrail_id(), config.guardrail_version()
@@ -61,7 +69,16 @@ def apply(text: str, source: str, client=None) -> GuardrailResult:
     replacement = outputs[0].get("text") if outputs else None
     if response.get("action") != "GUARDRAIL_INTERVENED":
         return GuardrailResult(False, text, True)
-    if _has_blocked_action(response.get("assessments")):
-        log_event("guardrail.blocked", source=source)
-        return GuardrailResult(True, replacement or "This request is outside what this simulation can do.", True)
+    assessments = response.get("assessments")
+    if _has_blocked_action(assessments):
+        by_pii = _policy_blocked(assessments, "sensitiveInformationPolicy")
+        by_topic = _policy_blocked(assessments, "topicPolicy")
+        log_event("guardrail.blocked", source=source, byPii=by_pii, byTopic=by_topic)
+        return GuardrailResult(
+            True,
+            replacement or "This request is outside what this simulation can do.",
+            True,
+            blocked_by_pii=by_pii,
+            blocked_by_topic=by_topic,
+        )
     return GuardrailResult(False, replacement or text, True)

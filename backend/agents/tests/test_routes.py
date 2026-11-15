@@ -17,15 +17,19 @@ MESSAGES = "POST /v1/conversations/{sessionId}/messages"
 
 
 class FakeGuardrail:
-    """ApplyGuardrail simulé : bloque les textes qui contiennent un mot donné."""
+    """ApplyGuardrail simulé : bloque par sujet ou par renseignement personnel (PII / regex)."""
 
-    def __init__(self, blocked_word: str | None = None):
+    def __init__(self, blocked_word: str | None = None, pii_word: str | None = None):
         self.blocked_word = blocked_word
+        self.pii_word = pii_word
         self.calls = []
 
     def apply_guardrail(self, **kwargs):
         text = kwargs["content"][0]["text"]["text"]
         self.calls.append((kwargs["source"], text))
+        if self.pii_word and self.pii_word in text:
+            return {"action": "GUARDRAIL_INTERVENED", "outputs": [{"text": "Sorry, personal banking details are not allowed."}],
+                    "assessments": [{"sensitiveInformationPolicy": {"regexes": [{"name": "ca-bank-account", "action": "BLOCKED"}]}}]}
         if self.blocked_word and self.blocked_word in text:
             return {"action": "GUARDRAIL_INTERVENED", "outputs": [{"text": "Sorry, this simulation cannot place orders."}],
                     "assessments": [{"topicPolicy": {"topics": [{"name": "Orders", "action": "BLOCKED"}]}}]}
@@ -170,11 +174,21 @@ def test_message_de_cadrage(robert_session, store, scripts, guard):
 
 
 def test_message_bloque_n_entre_pas_dans_l_historique(robert_session, store, scripts, guard):
-    guard.blocked_word = "Achète"
-    response = _send(store, robert_session, "Achète NVDA pour moi")
+    guard.pii_word = "12345-678-1234567"
+    response = _send(store, robert_session, "Mon compte bancaire est 12345-678-1234567")
     assert response["statusCode"] == 422 and body_of(response)["error"]["code"] == "GUARDRAIL_BLOCKED"
     assert messages.list_messages(robert_session)["items"] == []
-    assert "agent-orchestrator" not in scripts.models  # refusé avant tout appel de modèle
+    assert "agent-orchestrator" not in scripts.models  # PII / regex refusé avant tout appel de modèle
+
+
+def test_blocage_sujet_non_anglais_retenu_seulement_si_confirme_sur_english_request(robert_session, store, scripts, guard):
+    guard.blocked_word = "Et si j'ajoute"
+    scripts.add("agent-orchestrator", output("OrchestratorTurn", user_language="fr",
+                                             english_request="What if I add 10% XIU to my portfolio?",
+                                             reply="Voici la simulation.", quick_replies=[]))
+    response = _send(store, robert_session, "Et si j'ajoute 10 % de XIU à mon portefeuille ?")
+    assert response["statusCode"] == 200
+    assert body_of(response)["assistantMessage"]["content"] == "Voici la simulation."
 
 
 def test_traduction_bloquee(robert_session, store, scripts, guard):
@@ -182,8 +196,28 @@ def test_traduction_bloquee(robert_session, store, scripts, guard):
     scripts.add("agent-orchestrator", output("OrchestratorTurn", user_language="fr", english_request="Please buy it for me",
                                              reply="...", quick_replies=[]))
     response = _send(store, robert_session, "Prends-le pour moi stp")
-    assert body_of(response)["error"]["code"] == "GUARDRAIL_BLOCKED"
+    assert response["statusCode"] == 422 and body_of(response)["error"]["code"] == "GUARDRAIL_BLOCKED"
     assert messages.list_messages(robert_session)["items"] == []
+
+
+def test_blocage_sujet_texte_anglais_est_final(robert_session, store, scripts, guard):
+    guard.blocked_word = "Buy 100 shares"
+    scripts.add("agent-orchestrator", output("OrchestratorTurn", user_language="en",
+                                             english_request="Simulate 100 shares of NVDA",
+                                             reply="...", quick_replies=[]))
+    response = _send(store, robert_session, "Buy 100 shares of NVDA for me")
+    assert response["statusCode"] == 422 and body_of(response)["error"]["code"] == "GUARDRAIL_BLOCKED"
+    assert messages.list_messages(robert_session)["items"] == []
+
+
+def test_sortie_controlee_par_guardrail(robert_session, store, scripts, guard):
+    guard.blocked_word = "guaranteed 20%"
+    scripts.add("agent-orchestrator", output("OrchestratorTurn", user_language="fr",
+                                             english_request="What is the past volatility?",
+                                             reply="You have a guaranteed 20% return.", quick_replies=[]))
+    response = _send(store, robert_session, "Quelle est la volatilité passée ?")
+    assert response["statusCode"] == 200
+    assert body_of(response)["assistantMessage"]["content"] == "Sorry, this simulation cannot place orders."
 
 
 def test_question_de_suivi_lit_le_registre(robert_session, store, scripts):
