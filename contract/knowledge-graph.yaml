@@ -1,12 +1,21 @@
 application:
   name: "AlphaForge"
-  version: "0.4.12"
+  version: "0.4.13"
   description: "Banc d'essai agentique et auto-explicatif pour l'investisseur autonome : il cadre l'intention, simule son impact sur le portefeuille et l'audite contre les textes réglementaires canadiens (simulation seulement). Datathon 2026."
-  status: "validé par l'équipe (0.4.0 le 2026-11-14, 0.4.1 le 2026-11-15) ; 0.4.2 et 0.4.3 validées par l'utilisateur le 2026-11-15, à relire par l'équipe ; 0.4.4 à 0.4.7 demandées par l'utilisateur le 2026-11-15 (lots A, B, C et E), à relire par l'équipe ; 0.4.8 demandée par l'utilisateur le 2026-11-15 (saisie vocale), à relire par l'équipe ; 0.4.9 demandée par l'utilisateur le 2026-11-15 (jeu de données aligné sur le script du collègue), à relire par l'équipe ; 0.4.10 demandée par l'utilisateur le 2026-11-15 (saisie vocale, détection de la langue), à relire par l'équipe; 0.4.11 demandée par l'utilisateur le 2026-11-15 (statistiques de marché), à relire par l'équipe ; 0.4.12 demandée par l'utilisateur le 2026-11-15 (constructeur de portefeuille), à relire par l'équipe"
+  status: "validé par l'équipe (0.4.0 le 2026-11-14, 0.4.1 le 2026-11-15) ; 0.4.2 et 0.4.3 validées par l'utilisateur le 2026-11-15, à relire par l'équipe ; 0.4.4 à 0.4.7 demandées par l'utilisateur le 2026-11-15 (lots A, B, C et E), à relire par l'équipe ; 0.4.8 demandée par l'utilisateur le 2026-11-15 (saisie vocale), à relire par l'équipe ; 0.4.9 demandée par l'utilisateur le 2026-11-15 (jeu de données aligné sur le script du collègue), à relire par l'équipe ; 0.4.10 demandée par l'utilisateur le 2026-11-15 (saisie vocale, détection de la langue), à relire par l'équipe; 0.4.11 demandée par l'utilisateur le 2026-11-15 (statistiques de marché), à relire par l'équipe ; 0.4.12 demandée par l'utilisateur le 2026-11-15 (constructeur de portefeuille), à relire par l'équipe ; 0.4.13 demandée par l'utilisateur le 2026-11-15 (inscription sans code de confirmation), à relire par l'équipe"
   solution_ref: "SOLUTION.md (racine du dépôt) : décisions de produit et de conception détaillées"
   # Règle d'équipe : ce fichier est la référence. Toute modification passe par un accord de l'équipe.
   # Voir aussi : la page de présentation du contrat (même contenu, avec schémas).
   changelog:
+    - version: "0.4.13"
+      date: "2026-11-15"
+      status: "demandé par l'utilisateur le 2026-11-15 (code sur main, déployé le 2026-11-15) ; à relire par l'équipe"
+      summary:
+        - "Inscription sans code de confirmation : un déclencheur Cognito pre sign-up (Lambda alphaforge-presignup, backend/presignup/handler.py) confirme le compte à l'inscription. Aucun code n'est envoyé par courriel; SignUp renvoie UserConfirmed = true et le front connecte l'utilisateur tout de suite."
+        - "Le courriel n'est pas marqué comme vérifié (pas d'autoVerifyEmail) : il n'est pas prouvé que l'utilisateur en est titulaire. Acceptable pour la démo du datathon."
+      impacts_to_handle:
+        - "infra/terraform : lambda_config.pre_sign_up sur le user pool, Lambda presignup, rôle (journaux seulement) et permission d'invocation pour cognito-idp; build dans infra/scripts/build_lambdas.sh (cible presignup)."
+        - "frontend : étape « code de confirmation » retirée de Register.tsx; confirmSignUp et resendCode retirés de api/auth.ts."
     - version: "0.4.12"
       date: "2026-11-15"
       status: "demandé par l'utilisateur le 2026-11-15 (code sur la branche ws/optimizer, pas encore déployé) ; à relire par l'équipe"
@@ -251,6 +260,7 @@ services:
     notes:
       - "Client d'application sans secret; flux SRP ou USER_PASSWORD_AUTH activé."
       - "Comptes créés à la main pour le datathon, avec mot de passe définitif (admin-set-user-password --permanent) pour éviter le changement de mot de passe temporaire."
+      - "Inscription libre depuis le front (SignUp) confirmée d'office par un déclencheur pre sign-up (Lambda alphaforge-presignup) : aucun code de confirmation par courriel, courriel non vérifié (0.4.13)."
 
   - id: "srv-api-gateway"
     name: "API Gateway (HTTP API)"
