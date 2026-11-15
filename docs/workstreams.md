@@ -27,7 +27,7 @@ Les chantiers déjà terminés en v0.3.0 (✅) restent valables. Leurs compléme
 ✅ WS0 socle ─► ✅ WS0b socle v0.4 (séquentiel, court, sur main)
                       │
                       ├──► ✅ WS1 infra  + WS1b infra v0.4 (Analyses, KB, Guardrail, IAM, routes)  ─┐
-                      ├──► ✅ WS2 db     + WS2b db v0.4 (repository analyses)                       ─┤
+                      ├──► ✅ WS2 db     + ✅ WS2b db v0.4 (repository analyses)                    ─┤
                       ├──►    WS3 data   (inclut publication_date et etf_enriched.json)              ─┼──► intégration (humain)
                       ├──► ✅ WS4 api    + WS4b api v0.4 (mandats, registre)                         ─┤
                       ├──►    WS5 agents (orchestrateur, auditeur, rédacteur, modules, runs)         ─┤
@@ -45,11 +45,11 @@ Les chantiers déjà terminés en v0.3.0 (✅) restent valables. Leurs compléme
 | ✅ WS1 infra | `ws/infra` | `infra/` | WS0 |
 | WS1b infra v0.4 | `ws/infra-v4` | `infra/` | WS0b |
 | ✅ WS2 db | `ws/db` | `backend/common/repositories/`, `backend/common/tests/` | WS0 |
-| WS2b db v0.4 | `ws/db-v4` | `backend/common/repositories/analyses.py`, `backend/common/tests/test_repo_analyses.py` | WS0b |
+| ✅ WS2b db v0.4 | `ws/db-v4` | `backend/common/repositories/analyses.py`, `backend/common/tests/test_repo_analyses.py` | WS0b |
 | WS3 data | `ws/data` | `data/` | contrat (storage) |
 | ✅ WS4 api | `ws/api` | `backend/api/` | WS0, WS2 |
-| WS4b api v0.4 | `ws/api-v4` | `backend/api/` | WS0b, signatures WS2b |
-| WS5 agents | `ws/agents` | `backend/agents/` | WS0b, signatures WS2b, disposition WS3 |
+| WS4b api v0.4 | `ws/api-v4` | `backend/api/` | WS0b, WS2b (fusionné) |
+| WS5 agents | `ws/agents` | `backend/agents/` | WS0b, WS2b (fusionné), disposition WS3 |
 | WS6 front | `ws/frontend` | `frontend/` | contrat (apis, schémas) |
 
 ## Lancer un chantier
@@ -57,7 +57,6 @@ Les chantiers déjà terminés en v0.3.0 (✅) restent valables. Leurs compléme
 ```bash
 cd /home/rr-djk/Documents/hackathons/Datathon2026_alphaforge
 git worktree add ../alphaforge-infra-v4 -b ws/infra-v4
-git worktree add ../alphaforge-db-v4    -b ws/db-v4
 git worktree add ../alphaforge-data     -b ws/data
 git worktree add ../alphaforge-api-v4   -b ws/api-v4
 git worktree add ../alphaforge-agents   -b ws/agents
@@ -188,7 +187,16 @@ Définition de fini : terraform fmt et terraform validate passent sans identifia
 
 Les repositories `users`, `conversations`, `messages` et `portfolios` sont implémentés et testés avec moto.
 
-## WS2b db v0.4
+## ✅ WS2b db v0.4 — terminé
+
+Fusionné dans `main` (`e96f6e8`), worktree supprimé. Le repository `analyses` est implémenté et testé avec moto (22 tests). Les hypothèses sont dans `backend/common/repositories/NOTES-db.md`, points 13 à 21. À retenir pour les autres chantiers :
+- **WS4b et WS5** : vérifier la propriété de la conversation (`conversations.get_conversation`) **avant** `put_mandate` ou `put_run` (la version d'un mandat est partagée par la session).
+- **WS1b** : table `Analyses`, avec `sessionId` (S) en partition et `itemKey` (S) en tri, sans index, à la demande.
+- **Tests** : le `conftest` partagé ne crée pas la table `Analyses` ; `test_repo_analyses.py` la crée dans sa propre fixture.
+- **Contrat** : la liste des attributs de `Analyses` est complétée (`userLanguage`, `explanation`) au commit `727dbe3`.
+
+Prompt d'origine :
+
 
 ```text
 Chantier : repository de la table Analyses. Dossiers attribués : backend/common/repositories/analyses.py et backend/common/tests/test_repo_analyses.py uniquement.
