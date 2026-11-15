@@ -1,0 +1,156 @@
+"""module-verifier : contrôle non bloquant de chaque phrase du texte affiché.
+
+Contrôles (contrat module-verifier, SOLUTION.md 7.5) :
+1. chaque {EV-nn}/{KB-nn} existe dans le registre du run ;
+2. aucun nombre écrit à la main (%, $, points de base, ratio, décimal, entier
+   significatif) hors constantes du mandat, années, numéros de règle et de document ;
+3. aucune formule de recommandation ou de promesse (motifs EN et FR) ;
+4. mêmes emplacements dans textEn et text (la traduction n'en perd ni n'en ajoute).
+Une phrase fautive est retirée et listée dans hiddenSentences ; jamais de
+nouvelle tentative. Les motifs sont des expressions fixes écrites ici, jamais
+construites depuis une sortie de modèle (pas de ReDoS).
+"""
+
+from __future__ import annotations
+
+import re
+from collections import Counter
+from typing import Any
+
+PLACEHOLDER_RE = re.compile(r"\{((?:EV|KB)-\d{2,})\}")
+SECTION_KEYS = ("data_used", "why", "limits", "what_would_change")
+
+# Références autorisées sans emplacement : numéros de documents réglementaires et règles.
+DOCUMENT_REF_RE = re.compile(
+    r"\b(?:NI|CSA|CIRO|IIROC|Notice|Avis|Regulation|Règlement|Policy|Instruction|GN|Rule|Règle|R)?[\s-]?"
+    r"(?:\d{2}-\d{3}(?:CP)?|GN-\d{4}-\d{2}-\d{3}|\d{4}-\d{3}|R(?:10|[1-9]))\b"
+)
+YEAR_RE = re.compile(r"\b(19[5-9]\d|20[0-4]\d)\b")
+SENTENCE_RE = re.compile(r"(?<=[.!?])\s+(?=[A-ZÀ-ÖØ-Þ{«\"(])")
+
+# Nombre « écrit à la main » : décimal, pourcentage, montant, points de base, ratio.
+NUMBER_RE = re.compile(
+    r"(?P<num>[-+−]?\d[\d\s  ]*(?:[.,]\d+)?)"
+    r"\s?(?P<unit>%|\$|\$\s?US|bps?|pb|points? de base|basis points?|x\b|×|fois)?",
+    re.IGNORECASE,
+)
+
+FORBIDDEN_PATTERNS = [
+    r"\byou should (?:buy|sell|invest|hold|add)\b", r"\bwe recommend\b", r"\bi recommend\b", r"\brecommended\b",
+    r"\bguarantee(?:d|s)?\b", r"\brisk[- ]free\b", r"\bsure (?:bet|thing|win)\b", r"\bwill (?:certainly|definitely) (?:rise|grow|gain)\b",
+    r"\bbuy now\b", r"\bmust (?:buy|sell)\b", r"\bbest investment\b",
+    r"\bvous devriez (?:acheter|vendre|investir|conserver|ajouter)\b", r"\bje (?:vous )?recommande\b",
+    r"\bnous (?:vous )?recommandons\b", r"\brecommand[ée]e?s?\b", r"\bgaranti(?:e|es|s)?\b", r"\bsans risque\b",
+    r"\bachetez\b", r"\bvendez\b", r"\bmeilleur placement\b", r"\bva (?:certainement|forcément) (?:monter|augmenter)\b",
+    r"\bconseiller financier\b", r"\bplanificateur financier\b", r"\bfinancial (?:advisor|adviser|planner)\b",
+]
+_FORBIDDEN = [re.compile(p, re.IGNORECASE) for p in FORBIDDEN_PATTERNS]
+
+
+def placeholders(text: str) -> list[str]:
+    return PLACEHOLDER_RE.findall(text or "")
+
+
+def split_sentences(text: str) -> list[str]:
+    parts = [p.strip() for p in SENTENCE_RE.split((text or "").strip())]
+    return [p for p in parts if p]
+
+
+def _normalize_number(raw: str) -> float | None:
+    cleaned = raw.replace(" ", "").replace(" ", "").replace(" ", "").replace("−", "-")
+    # « 15,000 » (séparateur de milliers anglais) vs « 15,2 » (virgule décimale française).
+    if re.fullmatch(r"[-+]?\d{1,3}(?:,\d{3})+", cleaned):
+        cleaned = cleaned.replace(",", "")
+    elif "," in cleaned and "." not in cleaned:
+        cleaned = cleaned.replace(",", ".")
+    else:
+        cleaned = cleaned.replace(",", "")
+    try:
+        return float(cleaned)
+    except ValueError:
+        return None
+
+
+def mandate_constants(mandate: dict[str, Any]) -> set[float]:
+    """Constantes saisies par l'utilisateur et répétables sans emplacement (« 3 ans », « 15 000 $ »)."""
+    values: set[float] = set()
+    for key in ("horizonYears", "maxAcceptableLossPct", "riskTolerance", "riskCapacity"):
+        if isinstance(mandate.get(key), (int, float)):
+            values.add(float(mandate[key]))
+    for op in mandate.get("operations") or []:
+        for key in ("amount", "weight"):
+            if isinstance(op.get(key), (int, float)):
+                values.add(float(op[key]))
+    return values
+
+
+def handwritten_numbers(sentence: str, constants: set[float]) -> list[str]:
+    """Nombres non autorisés d'une phrase (après retrait des emplacements et références)."""
+    text = PLACEHOLDER_RE.sub(" ", sentence)
+    text = DOCUMENT_REF_RE.sub(" ", text)
+    text = YEAR_RE.sub(" ", text)
+    found = []
+    for match in NUMBER_RE.finditer(text):
+        raw = match.group("num").strip()
+        if not any(ch.isdigit() for ch in raw):
+            continue
+        value = _normalize_number(raw)
+        unit = match.group("unit")
+        if value is None:
+            found.append(match.group(0).strip())
+            continue
+        if value in constants or abs(value) in constants:
+            continue
+        is_decimal = bool(re.search(r"\d[.,]\d", raw))
+        if unit or is_decimal or abs(value) > 10:
+            found.append(match.group(0).strip())
+    return found
+
+
+def forbidden_phrases(sentence: str) -> list[str]:
+    return [m.group(0) for pattern in _FORBIDDEN for m in [pattern.search(sentence)] if m]
+
+
+def verify_narrative(
+    sections: list[dict[str, Any]], evidence_ids: set[str], mandate: dict[str, Any]
+) -> tuple[list[dict[str, Any]], list[dict[str, str]], dict[str, Any]]:
+    """Contrôle les sections { key, textEn, text } ; renvoie (sections nettoyées, phrases masquées, rapport)."""
+    constants = mandate_constants(mandate)
+    hidden: list[dict[str, str]] = []
+    cleaned: list[dict[str, Any]] = []
+    total = resolved = numbers = forbidden = 0
+    placeholders_match = True
+
+    for section in sections:
+        text_en = section.get("textEn") or ""
+        text = section.get("text") if section.get("text") is not None else text_en
+        if Counter(placeholders(text_en)) != Counter(placeholders(text)):
+            placeholders_match = False
+        kept: list[str] = []
+        for sentence in split_sentences(text):
+            ids = placeholders(sentence)
+            total += len(ids)
+            unknown = [i for i in ids if i not in evidence_ids]
+            resolved += len(ids) - len(unknown)
+            bad_numbers = handwritten_numbers(sentence, constants)
+            bad_phrases = forbidden_phrases(sentence)
+            numbers += len(bad_numbers)
+            forbidden += len(bad_phrases)
+            if unknown:
+                hidden.append({"section": section["key"], "reason": "unknown_placeholder"})
+            elif bad_numbers:
+                hidden.append({"section": section["key"], "reason": "handwritten_number"})
+            elif bad_phrases:
+                hidden.append({"section": section["key"], "reason": "forbidden_phrase"})
+            else:
+                kept.append(sentence)
+        cleaned.append({**section, "text": " ".join(kept)})
+
+    report = {
+        "placeholdersResolved": resolved,
+        "placeholdersTotal": total,
+        "handwrittenNumbers": numbers,
+        "forbiddenPhrases": forbidden,
+        "placeholdersMatch": placeholders_match,
+    }
+    return cleaned, hidden, report
