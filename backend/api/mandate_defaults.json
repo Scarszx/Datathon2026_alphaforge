@@ -1,0 +1,15 @@
+{
+  "maxAcceptableLossPctByHorizon": [
+    {
+      "maxHorizonYearsExclusive": 3,
+      "maxAcceptableLossPct": 10
+    },
+    {
+      "maxHorizonYearsInclusive": 8,
+      "maxAcceptableLossPct": 20
+    },
+    {
+      "defaultMaxAcceptableLossPct": 35
+    }
+  ]
+}

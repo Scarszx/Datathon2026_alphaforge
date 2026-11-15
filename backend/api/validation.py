@@ -22,6 +22,47 @@ MAX_LIMIT = 100
 
 RISK_LEVELS = ("low", "low_moderate", "moderate", "high")
 
+# Juridictions provinciales/territoriales du contrat (conventions.jurisdictions hors CA).
+PROVINCES = (
+    "QC",
+    "ON",
+    "BC",
+    "AB",
+    "SK",
+    "MB",
+    "NB",
+    "NS",
+    "PE",
+    "NL",
+    "YT",
+    "NT",
+    "NU",
+)
+
+MANDATE_MODES = ("add_asset", "rebalance", "diagnose")
+MANDATE_OBJECTIVES = ("growth", "income", "preservation", "project", "retirement")
+OPERATION_ACTIONS = ("add", "remove", "set_weight")
+CURRENCIES = ("CAD", "USD")
+FIELD_SOURCES = ("persona", "user_answer", "team_assumption", "slider")
+
+MANDATE_FIELDS = (
+    "portfolioId",
+    "mode",
+    "objective",
+    "objectiveDetail",
+    "horizonYears",
+    "riskTolerance",
+    "riskCapacity",
+    "maxAcceptableLossPct",
+    "constraints",
+    "preferences",
+    "province",
+    "userLanguage",
+    "operations",
+    "subjectTicker",
+    "fieldSources",
+)
+
 
 def _validation_error(message: str) -> ApiError:
     return ApiError("VALIDATION_ERROR", message)
@@ -96,9 +137,13 @@ def _integer(body: dict[str, Any], key: str, *, required: bool = True) -> int | 
     return value
 
 
-def _number(body: dict[str, Any], key: str) -> int | float:
+def _number(
+    body: dict[str, Any], key: str, *, required: bool = True
+) -> int | float | None:
     if key not in body:
-        raise _validation_error(f"Champ requis : {key}.")
+        if required:
+            raise _validation_error(f"Champ requis : {key}.")
+        return None
     value = body[key]
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise _validation_error(f"{key} doit être un nombre.")
@@ -116,12 +161,43 @@ def _array_of_strings(body: dict[str, Any], key: str) -> list[str] | None:
     return value
 
 
+def _validate_risk_score(value: int, key: str) -> int:
+    if value < 1 or value > 5:
+        raise _validation_error(f"{key} doit être compris entre 1 et 5.")
+    return value
+
+
+def _validate_province(value: str) -> str:
+    if value not in PROVINCES:
+        values = ", ".join(PROVINCES)
+        raise _validation_error(
+            f"province doit être une province ou un territoire canadien ({values})."
+        )
+    return value
+
+
+def _validate_iso_639_1(value: str) -> str:
+    if not (
+        len(value) == 2
+        and value.isascii()
+        and value.isalpha()
+        and value.islower()
+    ):
+        raise _validation_error(
+            "userLanguage doit être un code ISO 639-1 à 2 lettres minuscules (ex. fr, en)."
+        )
+    return value
+
+
 def validate_investor_profile(body: dict[str, Any]) -> dict[str, Any]:
     """Valide schema-investor-profile et retourne les champs autorisés."""
     _reject_unknown_fields(
         body,
         (
             "riskLevel",
+            "riskTolerance",
+            "riskCapacity",
+            "province",
             "horizonMinYears",
             "horizonMaxYears",
             "objective",
@@ -134,6 +210,15 @@ def validate_investor_profile(body: dict[str, Any]) -> dict[str, Any]:
     if risk_level not in RISK_LEVELS:
         values = ", ".join(RISK_LEVELS)
         raise _validation_error(f"riskLevel doit être l'un de : {values}.")
+    risk_tolerance = _integer(body, "riskTolerance", required=False)
+    if risk_tolerance is not None:
+        _validate_risk_score(risk_tolerance, "riskTolerance")
+    risk_capacity = _integer(body, "riskCapacity", required=False)
+    if risk_capacity is not None:
+        _validate_risk_score(risk_capacity, "riskCapacity")
+    province = _string(body, "province", required=False)
+    if province is not None:
+        _validate_province(province)
     horizon_min = _integer(body, "horizonMinYears")
     horizon_max = _integer(body, "horizonMaxYears", required=False)
     objective = _string(body, "objective")
@@ -142,6 +227,12 @@ def validate_investor_profile(body: dict[str, Any]) -> dict[str, Any]:
         "horizonMinYears": horizon_min,
         "objective": objective,
     }
+    if risk_tolerance is not None:
+        profile["riskTolerance"] = risk_tolerance
+    if risk_capacity is not None:
+        profile["riskCapacity"] = risk_capacity
+    if province is not None:
+        profile["province"] = province
     if horizon_max is not None:
         profile["horizonMaxYears"] = horizon_max
     for key in ("constraints", "preferences", "excludedAssetClasses"):
@@ -149,6 +240,161 @@ def validate_investor_profile(body: dict[str, Any]) -> dict[str, Any]:
         if value is not None:
             profile[key] = value
     return profile
+
+
+def _validate_mandate_preferences(raw: Any) -> dict[str, Any]:
+    if not isinstance(raw, dict):
+        raise _validation_error("preferences doit être un objet.")
+    _reject_unknown_fields(
+        raw, ("esg", "excludedSectors", "excludedAssetClasses")
+    )
+    preferences: dict[str, Any] = {}
+    if "esg" in raw:
+        esg = raw["esg"]
+        if not isinstance(esg, bool):
+            raise _validation_error("preferences.esg doit être un booléen.")
+        preferences["esg"] = esg
+    for key in ("excludedSectors", "excludedAssetClasses"):
+        values = _array_of_strings(raw, key)
+        if values is not None:
+            preferences[key] = values
+    return preferences
+
+
+def _validate_operation(raw: Any) -> dict[str, Any]:
+    if not isinstance(raw, dict):
+        raise _validation_error("Chaque opération doit être un objet.")
+    _reject_unknown_fields(
+        raw, ("action", "ticker", "amount", "weight", "currency")
+    )
+    action = _string(raw, "action")
+    if action not in OPERATION_ACTIONS:
+        values = ", ".join(OPERATION_ACTIONS)
+        raise _validation_error(f"action doit être l'un de : {values}.")
+    ticker = _string(raw, "ticker")
+    if not ticker:
+        raise _validation_error("ticker ne peut pas être vide.")
+    operation: dict[str, Any] = {"action": action, "ticker": ticker}
+    amount = _number(raw, "amount", required=False)
+    if amount is not None:
+        if amount <= 0:
+            raise _validation_error("amount doit être supérieur à 0.")
+        operation["amount"] = amount
+    weight = _number(raw, "weight", required=False)
+    if weight is not None:
+        if weight < 0 or weight > 100:
+            raise _validation_error("weight doit être compris entre 0 et 100.")
+        operation["weight"] = weight
+    currency = _string(raw, "currency", required=False)
+    if currency is not None:
+        if currency not in CURRENCIES:
+            values = ", ".join(CURRENCIES)
+            raise _validation_error(f"currency doit être l'un de : {values}.")
+        operation["currency"] = currency
+    return operation
+
+
+def _validate_field_sources(raw: Any) -> dict[str, str]:
+    if not isinstance(raw, dict):
+        raise _validation_error("fieldSources doit être un objet.")
+    sources: dict[str, str] = {}
+    for key, value in raw.items():
+        if not isinstance(key, str) or not key:
+            raise _validation_error("Chaque clé de fieldSources doit être une chaîne.")
+        if not isinstance(value, str) or value not in FIELD_SOURCES:
+            values = ", ".join(FIELD_SOURCES)
+            raise _validation_error(
+                f"fieldSources[{key}] doit être l'un de : {values}."
+            )
+        sources[key] = value
+    return sources
+
+
+def validate_mandate_create(body: dict[str, Any]) -> dict[str, Any]:
+    """Valide schema-mandate-create-request et retourne le mandat normalisé."""
+    _reject_unknown_fields(body, MANDATE_FIELDS)
+
+    portfolio_id = _string(body, "portfolioId")
+    if not portfolio_id:
+        raise _validation_error("portfolioId ne peut pas être vide.")
+
+    mode = _string(body, "mode")
+    if mode not in MANDATE_MODES:
+        values = ", ".join(MANDATE_MODES)
+        raise _validation_error(f"mode doit être l'un de : {values}.")
+
+    objective = _string(body, "objective")
+    if objective not in MANDATE_OBJECTIVES:
+        values = ", ".join(MANDATE_OBJECTIVES)
+        raise _validation_error(f"objective doit être l'un de : {values}.")
+
+    horizon_years = _number(body, "horizonYears")
+    assert horizon_years is not None
+    if horizon_years <= 0:
+        raise _validation_error("horizonYears doit être supérieur à 0.")
+
+    risk_tolerance = _integer(body, "riskTolerance")
+    assert risk_tolerance is not None
+    _validate_risk_score(risk_tolerance, "riskTolerance")
+
+    risk_capacity = _integer(body, "riskCapacity")
+    assert risk_capacity is not None
+    _validate_risk_score(risk_capacity, "riskCapacity")
+
+    province = _string(body, "province")
+    assert province is not None
+    _validate_province(province)
+
+    user_language = _string(body, "userLanguage")
+    assert user_language is not None
+    _validate_iso_639_1(user_language)
+
+    mandate: dict[str, Any] = {
+        "portfolioId": portfolio_id,
+        "mode": mode,
+        "objective": objective,
+        "horizonYears": horizon_years,
+        "riskTolerance": risk_tolerance,
+        "riskCapacity": risk_capacity,
+        "province": province,
+        "userLanguage": user_language,
+    }
+
+    objective_detail = _string(body, "objectiveDetail", required=False)
+    if objective_detail is not None:
+        mandate["objectiveDetail"] = objective_detail
+
+    max_loss = _number(body, "maxAcceptableLossPct", required=False)
+    if max_loss is not None:
+        if max_loss <= 0 or max_loss > 100:
+            raise _validation_error(
+                "maxAcceptableLossPct doit être compris entre 0 (exclu) et 100."
+            )
+        mandate["maxAcceptableLossPct"] = max_loss
+
+    constraints = _array_of_strings(body, "constraints")
+    if constraints is not None:
+        mandate["constraints"] = constraints
+
+    if "preferences" in body:
+        mandate["preferences"] = _validate_mandate_preferences(body["preferences"])
+
+    if "operations" in body:
+        raw_ops = body["operations"]
+        if not isinstance(raw_ops, list):
+            raise _validation_error("operations doit être un tableau.")
+        mandate["operations"] = [_validate_operation(op) for op in raw_ops]
+
+    subject_ticker = _string(body, "subjectTicker", required=False)
+    if subject_ticker is not None:
+        if not subject_ticker:
+            raise _validation_error("subjectTicker ne peut pas être vide.")
+        mandate["subjectTicker"] = subject_ticker
+
+    if "fieldSources" in body:
+        mandate["fieldSources"] = _validate_field_sources(body["fieldSources"])
+
+    return mandate
 
 
 def validate_conversation_create(body: dict[str, Any]) -> str | None:
@@ -176,6 +422,7 @@ def validate_holdings(body: dict[str, Any]) -> list[dict[str, Any]]:
         _reject_unknown_fields(holding, ("ticker", "quantity", "avgCost"))
         ticker = _string(holding, "ticker")
         quantity = _number(holding, "quantity")
+        assert quantity is not None
         if quantity <= 0:
             raise _validation_error("quantity doit être supérieur à 0.")
         avg_cost = _number(holding, "avgCost")

@@ -2,8 +2,8 @@
 
 Le handler reçoit un événement API Gateway HTTP API payload v2, extrait
 l'identité du JWT et route selon `routeKey`. Les routes de srv-agent-runtime
-(POST /messages, /summary, /market/search) appartiennent à WS5 et ne sont
-pas ici.
+(POST /messages, POST/GET /runs, /summary, /market/search) appartiennent à WS5
+et ne sont pas ici.
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import Any, Callable
 
 from backend.api import universe
-from backend.api.routes import agents, conversations, portfolios, users
+from backend.api.routes import agents, conversations, mandates, portfolios, users
 from backend.common.auth import get_user_id
 from backend.common.http import ApiError, error_response, request_id_from_event
 
@@ -24,6 +24,8 @@ ROUTES: dict[str, Callable[..., dict[str, Any]]] = {
     "PATCH /v1/conversations/{sessionId}": conversations.rename_conversation,
     "DELETE /v1/conversations/{sessionId}": conversations.delete_conversation,
     "GET /v1/conversations/{sessionId}/messages": conversations.list_messages,
+    "POST /v1/conversations/{sessionId}/mandates": mandates.create_mandate,
+    "GET /v1/conversations/{sessionId}/mandates": mandates.list_mandates,
     "GET /v1/portfolios": portfolios.list_portfolios,
     "PUT /v1/portfolios/{portfolioId}/holdings": portfolios.put_holdings,
     "GET /v1/agents": agents.get_registry,
@@ -44,7 +46,7 @@ def handle_request(
                 "Route ou méthode non prise en charge.",
                 request_id,
             )
-        if route is portfolios.put_holdings:
+        if route in (portfolios.put_holdings, mandates.create_mandate):
             return route(
                 event, user_id, ticker_validator or universe.validate_tickers
             )

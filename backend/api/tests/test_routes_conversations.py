@@ -140,12 +140,18 @@ def test_session_id_doit_etre_un_uuid_v4(fake_conversations, path):
     assert fake_conversations["rename"] == []
 
 
-def test_delete_conversation_supprime_messages_puis_conversation(
+def test_delete_conversation_supprime_messages_analyses_puis_conversation(
     fake_conversations, monkeypatch
 ):
     deleted_messages: list[str] = []
+    deleted_analyses: list[tuple[str, str]] = []
     monkeypatch.setattr(
         conversations.messages_repo, "delete_messages", deleted_messages.append
+    )
+    monkeypatch.setattr(
+        conversations.analyses_repo,
+        "delete_analyses",
+        lambda session_id, user_id: deleted_analyses.append((session_id, user_id)),
     )
     path = {"sessionId": CONVERSATION["sessionId"]}
     response = handle_request(
@@ -154,6 +160,7 @@ def test_delete_conversation_supprime_messages_puis_conversation(
     assert response["statusCode"] == 204
     assert response["body"] == ""
     assert deleted_messages == [CONVERSATION["sessionId"]]
+    assert deleted_analyses == [(CONVERSATION["sessionId"], "user-1")]
     assert fake_conversations["delete"] == [
         {"userId": "user-1", "sessionId": CONVERSATION["sessionId"]}
     ]
@@ -182,8 +189,14 @@ def test_deux_404_successifs_recoivent_leur_request_id(fake_conversations):
 
 def test_delete_conversation_etrangere_est_invisible(fake_conversations, monkeypatch):
     deleted_messages: list[str] = []
+    deleted_analyses: list[tuple[str, str]] = []
     monkeypatch.setattr(
         conversations.messages_repo, "delete_messages", deleted_messages.append
+    )
+    monkeypatch.setattr(
+        conversations.analyses_repo,
+        "delete_analyses",
+        lambda session_id, user_id: deleted_analyses.append((session_id, user_id)),
     )
     path = {"sessionId": CONVERSATION["sessionId"]}
     response = handle_request(
@@ -192,6 +205,7 @@ def test_delete_conversation_etrangere_est_invisible(fake_conversations, monkeyp
     assert response["statusCode"] == 404
     assert body_of(response)["error"]["code"] == "CONVERSATION_NOT_FOUND"
     assert deleted_messages == []
+    assert deleted_analyses == []
     assert fake_conversations["delete"] == []
 
 

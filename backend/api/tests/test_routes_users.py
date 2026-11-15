@@ -86,6 +86,9 @@ def test_get_me_sans_claim_username_replie_sur_sub(fake_users, monkeypatch):
 def test_put_profile_valide_et_remplace_le_profil(fake_users):
     profile = {
         "riskLevel": "high",
+        "riskTolerance": 5,
+        "riskCapacity": 4,
+        "province": "QC",
         "horizonMinYears": 15,
         "horizonMaxYears": 30,
         "objective": "croissance à long terme",
@@ -120,6 +123,30 @@ def test_put_profile_valide_et_remplace_le_profil(fake_users):
             "horizonMinYears": 15,
             "objective": "x",
             "constraints": ["ok", 12],
+        },
+        {
+            "riskLevel": "high",
+            "riskTolerance": 0,
+            "horizonMinYears": 15,
+            "objective": "x",
+        },
+        {
+            "riskLevel": "high",
+            "riskCapacity": 6,
+            "horizonMinYears": 15,
+            "objective": "x",
+        },
+        {
+            "riskLevel": "high",
+            "province": "CA",
+            "horizonMinYears": 15,
+            "objective": "x",
+        },
+        {
+            "riskLevel": "high",
+            "province": "US",
+            "horizonMinYears": 15,
+            "objective": "x",
         },
     ],
 )
