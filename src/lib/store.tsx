@@ -10,7 +10,7 @@ type Status = "loading" | "anon" | "authed";
 type Ctx = {
   status: Status;
   user: User | null;
-  login(username: string, password: string): Promise<void>;
+  login(username: string, password: string): Promise<User>;
   logout(): void;
   saveProfile(p: InvestorProfile): Promise<void>;
 };
@@ -34,13 +34,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     status, user, logout,
     async login(username, password) {
       await signIn(username.trim(), password);
+      let me: User;
       try {
-        setUser(await getMe());
+        me = await getMe();
       } catch (e) {
         signOut();
         throw e;
       }
+      setUser(me);
       setStatus("authed");
+      return me;
     },
     async saveProfile(p) {
       setUser(await putProfile(p));

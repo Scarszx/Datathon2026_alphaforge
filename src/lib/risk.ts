@@ -1,4 +1,5 @@
 /* Questionnaire de profil de risque : chaque réponse vaut de 1 à 5 points (score total : 5 à 25). */
+import type { InvestorProfile, RiskLevel } from "../api/types";
 
 export type Question = { id: string; label: string; options: string[] }; // options[i] vaut i + 1 point
 
@@ -46,11 +47,66 @@ export function loadRisk(userId: string): Record<string, PortfolioRisk> {
   } catch { return {}; }
 }
 
+const latestKey = (userId: string) => `af.risk.latest.${userId}`;
+
+/** Dernier résultat de l'utilisateur, consultable sur /profil même sans portefeuille. */
+export function loadLatestRisk(userId: string): PortfolioRisk | null {
+  try {
+    const v = JSON.parse(localStorage.getItem(latestKey(userId)) ?? "null");
+    return v && typeof v === "object" && v.answers && isComplete(v.answers) ? v : null;
+  } catch { return null; }
+}
+
+/** Calcule le résultat, le garde comme dernier résultat et l'enregistre pour chaque portefeuille donné. */
 export function saveRisk(userId: string, portfolioIds: string[], answers: Record<string, number>): PortfolioRisk {
   const score = totalScore(answers);
   const result: PortfolioRisk = { score, value: riskCalc(score), answers, computedAt: new Date().toISOString() };
   const all = loadRisk(userId);
   for (const id of portfolioIds) all[id] = result;
   localStorage.setItem(key(userId), JSON.stringify(all));
+  localStorage.setItem(latestKey(userId), JSON.stringify(result));
   return result;
+}
+
+/** Applique le dernier résultat aux portefeuilles qui n'en ont pas encore (ex. créés après l'inscription). */
+export function syncRisk(userId: string, portfolioIds: string[]): Record<string, PortfolioRisk> {
+  const all = loadRisk(userId);
+  const latest = loadLatestRisk(userId);
+  const missing = portfolioIds.filter((id) => !all[id]);
+  if (latest && missing.length) {
+    for (const id of missing) all[id] = latest;
+    localStorage.setItem(key(userId), JSON.stringify(all));
+  }
+  return all;
+}
+
+/* ---- Conversion vers le profil investisseur du contrat (PUT /v1/me/profile) ---- */
+
+/** Score 5–25 → niveau du contrat : 5–9 faible, 10–14 faible à modéré, 15–19 modéré, 20–25 élevé. */
+export function riskLevelOf(score: number): RiskLevel {
+  return score < 10 ? "low" : score < 15 ? "low_moderate" : score < 20 ? "moderate" : "high";
+}
+
+export const RISK_LABELS: Record<RiskLevel, string> = {
+  low: "Faible", low_moderate: "Faible à modéré", moderate: "Modéré", high: "Élevé",
+};
+
+/** Horizon (index de réponse) → [min, max] en années; max null = sans borne. */
+const HORIZONS: [number, number | null][] = [[0, 2], [2, 5], [5, 10], [10, 20], [20, null]];
+
+export function isComplete(answers: Record<string, number>) {
+  return QUESTIONS.every((q) => answers[q.id] !== undefined);
+}
+
+/** Profil investisseur déduit du questionnaire (contraintes, préférences et exclusions laissées vides). */
+export function profileFromAnswers(answers: Record<string, number>): InvestorProfile {
+  const [min, max] = HORIZONS[answers.horizon];
+  const goal = QUESTIONS.find((q) => q.id === "goal")!.options[answers.goal];
+  return {
+    riskLevel: riskLevelOf(totalScore(answers)),
+    horizonMinYears: min,
+    ...(max !== null ? { horizonMaxYears: max } : {}),
+    objective: goal,
+    constraints: [], preferences: [], excludedAssetClasses: [],
+  };
 }

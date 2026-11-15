@@ -1,4 +1,5 @@
 import { getAccessToken, signOut } from "./auth";
+import { DEMO, demoRequest } from "./demo";
 import { ApiError } from "./errors";
 import type { ErrorCode } from "./types";
 
@@ -31,6 +32,12 @@ async function send(path: string, o: Opts, token: string): Promise<Response> {
 }
 
 export async function request<T>(path: string, o: Opts = {}): Promise<T> {
+  if (DEMO) {
+    try { return (await demoRequest(path, o, await getAccessToken())) as T; } catch (e) {
+      if (e instanceof ApiError && e.code === "UNAUTHORIZED") throw sessionLost();
+      throw e;
+    }
+  }
   let res = await send(path, o, await getAccessToken());
   if (res.status === 401) res = await send(path, o, await getAccessToken(true).catch(() => { throw sessionLost(); }));
   if (res.status === 401) throw sessionLost();

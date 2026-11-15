@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
+import { Link, Navigate, useNavigate } from "react-router-dom";
+import { DEMO } from "../api/demo";
 import { errorText } from "../api/errors";
+import { AuthShell } from "../components/PublicHeader";
 import { useApp } from "../lib/store";
 
 export default function Login() {
@@ -29,24 +31,19 @@ export default function Login() {
   }
 
   return (
-    <>
-      <header className="header"><div className="wrap"><span className="logo"><span className="logo-mark" aria-hidden="true" />AlphaForge</span></div></header>
-      <main className="auth">
-        <div className="auth-card">
-          <h1>Connexion</h1>
-          <form onSubmit={submit} className="stack" noValidate>
-            <div className="field"><label htmlFor="u">Nom d'utilisateur</label><input id="u" autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} /></div>
-            <div className="field">
-              <label htmlFor="pw">Mot de passe</label>
-              <input id="pw" type={show ? "text" : "password"} autoComplete="current-password" value={pw} onChange={(e) => setPw(e.target.value)} />
-              <button type="button" className="link show-pw" onClick={() => setShow(!show)}>{show ? "Masquer" : "Afficher"}</button>
-            </div>
-            {err && <p className="error" role="alert">{err}</p>}
-            <button className="btn" disabled={busy}>{busy ? "Connexion…" : "Se connecter"}</button>
-            <p className="notice">Simulation seulement : aucune transaction réelle, aucun conseil financier personnalisé. Les comptes sont créés par l'équipe.</p>
-          </form>
+    <AuthShell title="Connexion">
+      <form onSubmit={submit} className="stack" noValidate>
+        <div className="field"><label htmlFor="u">Nom d'utilisateur</label><input id="u" autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} /></div>
+        <div className="field">
+          <label htmlFor="pw">Mot de passe</label>
+          <input id="pw" type={show ? "text" : "password"} autoComplete="current-password" value={pw} onChange={(e) => setPw(e.target.value)} />
+          <button type="button" className="link show-pw" onClick={() => setShow(!show)}>{show ? "Masquer" : "Afficher"}</button>
         </div>
-      </main>
-    </>
+        {err && <p className="error" role="alert">{err}</p>}
+        <button className="btn" disabled={busy}>{busy ? "Connexion…" : "Se connecter"}</button>
+        <div className="auth-links"><Link to="/" className="link">← Accueil</Link><Link to="/inscription" className="link">Créer un compte</Link></div>
+        {DEMO && <p className="notice">Mode démo (sans Cognito ni API) : <strong>demo</strong> / <strong>demo1234</strong></p>}
+      </form>
+    </AuthShell>
   );
 }

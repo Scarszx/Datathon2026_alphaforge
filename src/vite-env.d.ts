@@ -7,4 +7,6 @@ interface ImportMetaEnv {
   readonly VITE_COGNITO_REGION: string;
   /** Client d'application Cognito (sans secret) */
   readonly VITE_COGNITO_CLIENT_ID: string;
+  /** « 1 » : mode démo local (src/api/demo.ts), sans Cognito ni API */
+  readonly VITE_DEMO?: string;
 }
