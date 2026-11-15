@@ -81,13 +81,22 @@ Attention :
     - traduction OK : emplacements conservés ;
     - Guardrail : tous les cas interdits bloqués, aucun faux positif sur les textes de sortie, mais **3 faux positifs sur des demandes de démo** (« Et si j'ajoute… », « Compare XSP and ZEQT… » en anglais et en français) ;
     - **orchestrateur en échec** : `MaxTokensReachedException` (1024 tokens trop justes pour la sortie structurée, exception non rattrapée) ;
-  - 🟠 **corrections en cours dans `ws/smoke-fixes`** (worktree `../alphaforge-smoke-fixes`, base `3cb7b70`) :
-    - faites (2 commits) : définitions des sujets du Guardrail ; blocage par sujet hors anglais confirmé sur `english_request` ;
-    - restantes : limites des agents (le contrat est déjà à jour, `3cb7b70` : orchestrateur 4096 tokens et 8 cycles, traduction 8192, auditeur 4096 et 16 recherches en 60 s, rédacteur 8192 et 4 appels en 60 s), rattraper `MaxTokensReachedException`, consigne contre la réponse en double, `subjects` systématiques pour l'auditeur, régénération de `registry.json` ;
-    - **à faire au début de la reprise : `git merge main`**. Il y a des conflits dans `guardrails.py` et `routes/messages.py` avec l'intégration Langfuse (`6b6176c`) : garder les deux ;
-    - prompt de reprise : `~/Downloads/prompt_reprise_smoke_fixes.md` ;
-  - ⬜ ensuite : vérifier et fusionner `ws/smoke-fixes`, `terraform apply` (nouvelle version du Guardrail, Lambdas, variables Langfuse), puis **rejouer le banc de fumée** ;
-  - ⬜ **Langfuse** (intégré sur `main`, `6b6176c`) : créer le paramètre SSM de la clé secrète avant l'`apply`, et trancher la règle du contrat sur le texte dans les traces ;
+  - ✅ **`ws/smoke-fixes` fusionnée dans `main`** (`166f459`) : limites des agents, `MaxTokensReachedException` rattrapée, `subjects` systématiques pour l'auditeur, registre public régénéré. `terraform apply` fait le 2026-11-14 au soir (Guardrail en version 2, Lambdas reconstruites). Bilan du second banc de fumée : orchestrateur réparé (plus de dépassement de tokens), KB et traduction OK, **traces Langfuse reçues** (appels locaux ; celles de la Lambda restent à vérifier de bout en bout) ;
+  - 🔴 **Limitation connue : le Guardrail (version 2) bloque des phrases centrales de la démo.** Le classificateur de sujets est sémantique et les exemples de la liste « interdit » l'attirent, surtout ceux qui contiennent un ticker (« Buy 100 shares of XIU for me » ressemble à « What if I add 10% of XIU to my portfolio? »). Comme l'`english_request` est lui aussi contrôlé, le blocage est final. Mesures sur la version 2 :
+
+    | Phrase | Résultat | Sujet |
+    |---|---|---|
+    | What if I add 10% of XIU to my portfolio? | bloquée | Trade execution orders et Personalized recommendation |
+    | Compare XSP and ZEQT for my portfolio. | bloquée | Personalized recommendation |
+    | What if I put everything in NVDA? | bloquée | Trade execution orders et Personalized recommendation |
+    | Et si j'ajoute 15 000 $ de NVDA à mon portefeuille ? | bloquée | idem |
+    | Et si j'ajoute 10 % de XIU à mon portefeuille ? | bloquée | idem |
+    | What if I rebalance toward U.S. equities? | passe | |
+    | Et si je mets 30 % en TSLA ? | passe | |
+
+    **Correction proposée (à décider, ne pas appliquer sans accord) :** retirer les tickers des exemples des sujets « Trade execution orders » et « Personalized recommendation » (`infra/terraform/guardrail.tf`), garder des exemples nettement impératifs, tester sur le brouillon du Guardrail avant de publier une version (les cas interdits « Buy 100 shares of NVDA for me right now » et « Guarantee me a 20% return » doivent rester bloqués), puis `terraform apply` limité au Guardrail. **Plan B :** désactiver le contrôle par sujet sur les entrées (l'application n'exécute de toute façon aucune transaction, `rule-simulation-only`) et garder les filtres PII et le contrôle des sorties, au prix de la démonstration visible du blocage des ordres. À régler avant l'enregistrement de la vidéo ;
+  - ⬜ **Langfuse** (intégré sur `main`, `6b6176c`) : paramètre SSM créé, variables en place. Décision : la règle du contrat sur le texte vise les journaux CloudWatch ; Langfuse est un outil de développement qui ne reçoit que des données fictives (phrase à ajouter au contrat et à `AGENTS.md`) ;
+  - ✅ **Accès AWS** : clé d'accès durable de l'utilisateur IAM `alphaforge-dev` (compte `058264316309`), dans `.aws-local/`. `scripts/aws-refresh-creds.sh` supprimé ;
   - **mesurer la taille de la couche pandas** de la Lambda agents (non mesurée pendant WS5).
 
 **Points à traiter à l'intégration** (décision d'équipe) :
