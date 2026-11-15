@@ -8,6 +8,6 @@
   "preferredIndustryCap": 0.35,
   "preferredBonus": 0.02,
   "minPositionWeight": 0.005,
-  "universeMarkets": ["US"],
+  "universeCurrencies": ["USD"],
   "aversionByProfile": {"1": 10, "2": 6, "3": 4, "4": 2, "5": 1}
 }

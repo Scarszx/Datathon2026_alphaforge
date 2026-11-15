@@ -454,7 +454,7 @@ def _build_scenario(
         })
     scenario.notes.append(
         f"The model was estimated on {result.observations} common trading days over {result.universe_size} stocks "
-        f"({window}); candidates are U.S.-listed equities with an industry in the dataset."
+        f"({window}); candidates are USD-listed equities with an industry in the dataset."
     )
     return scenario, None
 

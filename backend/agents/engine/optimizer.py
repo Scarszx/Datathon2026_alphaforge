@@ -157,13 +157,13 @@ def _clean_preferences(excluded: list[str] | None, preferred: list[dict[str, Any
 
 
 def candidate_universe(universe: pd.DataFrame, config: dict[str, Any]) -> pd.DataFrame:
-    """Actions avec industrie, cotées sur les marchés de la configuration (même devise : USD par défaut)."""
+    """Actions avec industrie, cotées dans la devise de la configuration (une seule devise : USD par défaut, rendements sans conversion)."""
     if "industry" not in universe.columns:
         return universe.iloc[0:0]
     return universe[
         (universe["asset_class"].astype(str).str.lower() == "equity")
         & universe["industry"].notna()
-        & universe["market"].isin(config["universeMarkets"])
+        & universe["currency"].isin(config["universeCurrencies"])
     ]
 
 

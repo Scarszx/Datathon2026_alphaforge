@@ -430,7 +430,7 @@ def optimize_portfolio(ctx: RequestContext, risk_profile: int, excluded_industri
         "assumptions": [
             "Mean-variance model: mu from the CAPM against ^GSPC, Ledoit-Wolf covariance, daily adjclose returns in the listing currency.",
             "Expected returns are a model of the observed window, not a forecast.",
-            f"Candidates: U.S.-listed equities with an industry in the dataset ({result.universe_size} stocks).",
+            f"Candidates: USD-listed equities with an industry in the dataset ({result.universe_size} stocks).",
         ],
         "source": ctx.store.source_label("prices"),
     }

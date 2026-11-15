@@ -237,3 +237,75 @@ def test_market_stats_jours_communs_et_seuil(store, monkeypatch):
     stats = an.market_stats(store, ["RY.TO"], days[0], days[-1])["RY.TO"]
     assert stats["beta"] is None and stats["market_correlation"] is None
     assert stats["std_dev"] is not None and stats["observations"] == 9  # rendement et risque restent calculés
+
+
+# --- mode build (constructeur de portefeuille) --------------------------------
+
+
+@pytest.fixture
+def build_config(monkeypatch):
+    """Le mini-jeu n'a que deux actions américaines : plafonds relevés pour que le problème reste faisable."""
+    from backend.agents.engine import optimizer
+
+    config = {**optimizer.load_config(), "maxWeight": 0.6, "industryCap": 1.0, "preferredIndustryCap": 1.0, "minPositionWeight": 0.0}
+    monkeypatch.setattr(optimizer, "load_config", lambda: config)
+    return config
+
+
+def _build_item(**preferences):
+    mandate = robert_mandate(mode="build", preferences=preferences)
+    mandate.pop("operations")
+    return {"mandate": mandate, **evaluate_mandate(mandate)}
+
+
+def test_mode_build_scenario_construit_et_preuves(store, build_config):
+    registry = EvidenceRegistry("fr")
+    result = run_engine(store, _build_item(), {"holdings": robert_holdings(store), "baseCurrency": "CAD"}, registry)
+    assert [s.index for s in result.scenarios] == [0, 1] and not result.warnings
+    built = result.scenarios[1]
+    assert set(built.positions_cad) == {"NVDA", "AAPL"} and sum(built.weights.values()) == pytest.approx(100.0)
+    # montant = valeur actuelle du portefeuille, répartie selon les poids construits
+    assert sum(built.positions_cad.values()) == pytest.approx(sum(ROBERT_AMOUNTS.values()), rel=1e-6)
+    for key in ("expectedReturn", "beta", "utility", "volatility", "maxDrawdown"):
+        assert registry.get(built.evidence[key])["scenario"] == 1
+    assert registry.get(built.evidence["beta"])["formatted"].count(",") == 1  # décimale française
+    assert {h["symbol"] for h in built.holdings} == {"NVDA", "AAPL"}
+    for holding in built.holdings:
+        assert all(registry.get(evidence_id) for evidence_id in holding["evidence"].values())
+        assert holding["industry"].startswith("Information Technology")
+    keys = {p["key"] for p in built.parameters}
+    assert {"riskAversion", "maxWeight", "industryCap", "windowYears"} <= keys
+    assert "excludedIndustries" not in keys and "preferredIndustries" not in keys  # facultatifs : absents par défaut
+    # les libellés visibles ne nomment aucun symbole (les symboles ne sont que dans la liste du scénario)
+    labels = " ".join([built.label, built.description or ""] + [i["label"] for i in registry.items if not i["label"].startswith("Holding ")])
+    assert "NVDA" not in labels and "AAPL" not in labels
+
+
+def test_mode_build_portefeuille_vide_utilise_un_montant_notionnel(store, build_config):
+    result = run_engine(store, _build_item(), {"holdings": [], "baseCurrency": "CAD"}, EvidenceRegistry("en"))
+    assert [s.index for s in result.scenarios] == [0, 1] and result.scenarios[1].weights
+
+
+def test_mode_build_impossible_ne_casse_pas_le_run(store, build_config):
+    result = run_engine(store, _build_item(excludedIndustries=["Information Technology (synthetic)"]),
+                        {"holdings": robert_holdings(store), "baseCurrency": "CAD"}, EvidenceRegistry("en"))
+    assert [s.index for s in result.scenarios] == [0]
+    assert any("could not be constructed" in w for w in result.warnings)
+
+
+def test_mode_build_regles_r5_et_verificateur(store, build_config):
+    from backend.agents.rules.rules import check_rules
+    from backend.agents.verifier.verifier import verify_narrative
+
+    registry = EvidenceRegistry("en")
+    item = _build_item()
+    result = run_engine(store, item, {"holdings": robert_holdings(store), "baseCurrency": "CAD"}, registry)
+    verdicts = check_rules(store, item, result)
+    r5 = next(v for v in verdicts if v["rule"] == "R5")
+    assert r5["status"] == "pass"  # les symboles construits ne sont pas des « titres nommés »
+    universe = set(store.universe().index)
+    sections = [{"key": "why", "textEn": "Scenario one contains NVDA {EV-01}.", "text": "Scenario one contains NVDA {EV-01}."}]
+    _, hidden, _ = verify_narrative(sections, registry.ids(), item["mandate"], universe, set(), built=None)
+    assert hidden  # sans exception, le récit ne peut pas nommer un titre
+    _, hidden, _ = verify_narrative(sections, registry.ids(), item["mandate"], universe, set(), built={"NVDA", "AAPL"})
+    assert not hidden  # le contrôle du récit n'est assoupli que pour les titres construits (et jamais le prompt du rédacteur)
