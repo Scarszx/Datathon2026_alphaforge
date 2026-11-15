@@ -1,8 +1,8 @@
 """Routes /conversations et /conversations/{sessionId}/messages.
 
 Une ressource d'un autre utilisateur est invisible : elle produit le 404 du
-contrat et jamais ses données. La suppression enchaîne messages puis
-conversation (la couche WS2 n'est pas atomique ; voir NOTES-db.md).
+contrat et jamais ses données. La suppression enchaîne messages, analyses puis
+conversation (la couche WS2/WS2b n'est pas atomique ; voir NOTES-db.md).
 """
 
 from __future__ import annotations
@@ -17,8 +17,10 @@ from backend.api.validation import (
     validate_conversation_update,
 )
 from backend.common.http import ApiError, CORS_HEADERS, json_response
+from backend.common.repositories import analyses as analyses_repo
 from backend.common.repositories import conversations as repo
 from backend.common.repositories import messages as messages_repo
+
 
 def _not_found() -> ApiError:
     """Nouvelle erreur à chaque appel : ne pas partager le requestId."""
@@ -60,10 +62,11 @@ def rename_conversation(event: dict[str, Any], user_id: str) -> dict[str, Any]:
 
 
 def delete_conversation(event: dict[str, Any], user_id: str) -> dict[str, Any]:
-    """DELETE /v1/conversations/{sessionId} : supprime messages puis conversation."""
+    """DELETE /v1/conversations/{sessionId} : supprime messages, analyses puis conversation."""
     session_id_value = session_id(event)
     _ensure_owner(user_id, session_id_value)
     messages_repo.delete_messages(session_id_value)
+    analyses_repo.delete_analyses(session_id_value, user_id)
     repo.delete_conversation(user_id, session_id_value)
     return _no_content()
 

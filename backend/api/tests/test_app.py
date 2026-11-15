@@ -8,7 +8,7 @@ from backend.common.http import HTTP_STATUS_BY_CODE
 from .conftest import body_of, event
 
 
-def test_routes_couvrivent_les_dix_routes_du_contrat():
+def test_routes_couvrent_les_douze_routes_du_contrat():
     assert set(ROUTES) == {
         "GET /v1/me",
         "PUT /v1/me/profile",
@@ -17,6 +17,8 @@ def test_routes_couvrivent_les_dix_routes_du_contrat():
         "PATCH /v1/conversations/{sessionId}",
         "DELETE /v1/conversations/{sessionId}",
         "GET /v1/conversations/{sessionId}/messages",
+        "POST /v1/conversations/{sessionId}/mandates",
+        "GET /v1/conversations/{sessionId}/mandates",
         "GET /v1/portfolios",
         "PUT /v1/portfolios/{portfolioId}/holdings",
         "GET /v1/agents",
@@ -46,3 +48,4 @@ def test_corps_json_invalide_est_une_erreur_de_validation():
 def test_les_codes_restent_ceux_du_contrat():
     assert HTTP_STATUS_BY_CODE["ASSET_NOT_FOUND"] == 404
     assert HTTP_STATUS_BY_CODE["PORTFOLIO_NOT_FOUND"] == 404
+    assert HTTP_STATUS_BY_CODE["MANDATE_NOT_FOUND"] == 404

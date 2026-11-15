@@ -1,7 +1,7 @@
 # Lambda API (CRUD léger)
 
-Chantier WS4, branche `ws/api` : implémente les routes du contrat dont le
-provider est `srv-api-light`. N'écris que dans ce dossier.
+Chantier WS4 / WS4b (`ws/api`, `ws/api-v4`) : implémente les routes du contrat
+v0.4.0 dont le provider est `srv-api-light`. N'écris que dans ce dossier.
 
 ## Routes implémentées
 
@@ -12,12 +12,14 @@ provider est `srv-api-light`. N'écris que dans ce dossier.
 - `PATCH /v1/conversations/{sessionId}`
 - `DELETE /v1/conversations/{sessionId}`
 - `GET /v1/conversations/{sessionId}/messages`
+- `POST /v1/conversations/{sessionId}/mandates`
+- `GET /v1/conversations/{sessionId}/mandates`
 - `GET /v1/portfolios`
 - `PUT /v1/portfolios/{portfolioId}/holdings`
 - `GET /v1/agents`
 
-Les routes de `srv-agent-runtime` (POST messages, résumé de portefeuille et
-recherche de marché) appartiennent à `backend/agents/` (WS5).
+Les routes de `srv-agent-runtime` (POST messages, POST/GET runs, résumé de
+portefeuille et recherche de marché) appartiennent à `backend/agents/` (WS5).
 
 ## Exécution
 
@@ -48,8 +50,10 @@ passe les deux dossiers explicitement jusqu'à sa mise à jour par l'intégratio
   ni pyarrow à l'exécution, conformément au contrat pour la Lambda légère.
 - Les variables d'environnement de tables sont celles de
   `backend/common/config.py`.
-- `PUT /holdings` valide les tickers contre la copie embarquée
-  `tickers.json`, autorisée par le contrat pour `srv-api-light`.
+- `PUT /holdings` et `POST /mandates` valident les tickers contre la copie
+  embarquée `tickers.json`, autorisée par le contrat pour `srv-api-light`.
+- `POST /mandates` lit les seuils de perte maximale par défaut selon l'horizon
+  dans `mandate_defaults.json` (ou via `RULES_CONFIG_PATH` si défini).
 
 Voir `NOTES-api.md` pour les hypothèses et les points à coordonner avec
 l'équipe.
