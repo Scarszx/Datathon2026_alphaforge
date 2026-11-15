@@ -26,17 +26,22 @@ from backend.agents.rules.rules import jurisdiction_notices, scenario_verdicts
 from backend.agents.rules.settings import settings
 from backend.agents.toolbox import TOOLBOX
 from backend.agents.tools.context import RequestContext
-from backend.agents.verifier.verifier import verify_narrative
+from backend.agents.verifier.verifier import forbidden_phrases, verify_narrative
 from backend.common.http import ApiError
 from backend.common.ids import new_run_id
 from backend.common.repositories import analyses as analyses_repo
 
 INTERNAL_EVENT = "complete_run"
 
+# Version du vocabulaire des règles (lot A) : 2 = citations réservées aux règles déclenchées, motifs sans approbation.
+# Un run sans rulesVersion date d'avant ; l'interface le signale et propose de le relancer.
+RULES_VERSION = 2
+
 GENERAL_LIMITATIONS = [
     "Past performance describes the past; it does not predict future returns.",
     "Survivorship bias: the asset universe was selected in 2026.",
     "Educational simulation only: no order is placed and nothing here is personalized financial advice.",
+    "The result would be the same for anyone who gives the same answers; AlphaForge takes no position on what is suitable for the user.",
 ]
 
 
@@ -66,7 +71,8 @@ def build_explanation(ctx: RequestContext, sources: list[dict[str, Any]], verdic
     ]
     checks = [
         {"agentId": "agent-auditor" if v.get("citations") else "module-rules", "rule": v["rule"], "status": v["status"],
-         "message": v.get("messageEn", ""), "citations": v.get("citations", [])}
+         "message": v.get("messageEn", ""), "citations": v.get("citations", []), "reasonCode": v["reasonCode"],
+         **({"scenario": v["scenario"]} if v.get("scenario") is not None else {})}
         for v in verdicts or []
     ]
     return {"sources": sources, "assumptions": assumptions, "limitations": limitations, "steps": steps, "checks": checks}
@@ -116,6 +122,7 @@ def start_run(ctx: RequestContext, mandate_version: int) -> dict[str, Any]:
         "sessionId": ctx.session_id,
         "mandateVersion": mandate_version,
         "status": "partial",
+        "rulesVersion": RULES_VERSION,
         "datasetVersion": ctx.store.version,
         "userLanguage": mandate["userLanguage"],
         "scenarios": scenarios,
@@ -146,7 +153,12 @@ def _translate_run_texts(ctx: RequestContext, sections: list[dict[str, Any]], ve
         translated_sections.append({**section, "text": shown})
     unique_messages = sorted({v["messageEn"] for v in verdicts})
     message_texts = orchestrator.translate(ctx, unique_messages + list(notices), language)
-    by_message = dict(zip(unique_messages, message_texts[: len(unique_messages)]))
+    # Un motif traduit qui affirme une conformité ou une convenance est remplacé par la phrase anglaise de départ :
+    # ces textes ne passent pas par le récit, le vérificateur ne les a pas vus.
+    by_message = {
+        english: (translated if not forbidden_phrases(translated) else english)
+        for english, translated in zip(unique_messages, message_texts[: len(unique_messages)])
+    }
     translated_verdicts = [{**v, "message": by_message.get(v["messageEn"], v["messageEn"])} for v in verdicts]
     return translated_sections, translated_verdicts, message_texts[len(unique_messages):], match
 

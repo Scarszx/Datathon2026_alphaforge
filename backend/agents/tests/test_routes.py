@@ -62,7 +62,7 @@ def _start_run(store, session, version=1):
 def _script_completion(scripts, *, writer_ok=True):
     scripts.add("agent-auditor",
                 call("search_regulation", query="risk profile is the lower of risk tolerance and risk capacity", subjects=["profil_risque"]),
-                output("AuditReport", items=[{"key": "R1:fail", "passage_refs": ["P1"],
+                output("AuditReport", items=[{"key": "R1:fail", "passage_refs": [f"P{i}" for i in range(1, 10)],  # seules les références des candidats de R1 comptent
                                               "message_en": "The idea implies a higher risk profile than the retained one."}]))
     if writer_ok:
         scripts.add("agent-writer", output(
@@ -88,6 +88,7 @@ def test_cycle_d_un_run_partial_puis_done(robert_session, store, scripts, kb_fak
     assert response["statusCode"] == 201
     run = body_of(response)
     assert run["status"] == "partial" and run["mandateVersion"] == 1 and run["datasetVersion"] == "fixture-synthetic"
+    assert run["rulesVersion"] == 2
     assert [s["index"] for s in run["scenarios"]] == [0, 1, 2]
     assert run["scenarios"][1]["verdict"] == "fail" and run["scenarios"][2]["verdict"] != "fail"
     assert all(v["citations"] == [] for v in run["verdicts"]) and "narrative" not in run
@@ -284,3 +285,23 @@ def test_auto_invocation_en_echec(robert_session, store):
                                   store=store, dispatcher=broken)
     assert response["statusCode"] == 201 and body_of(response)["scenarios"]
     assert analyses.get_run(robert_session, USER, body_of(response)["runId"])["status"] == "error"
+
+
+def test_les_controles_de_l_explication_portent_le_motif_et_le_scenario(robert_session, store):
+    response, _ = _start_run(store, robert_session)
+    checks = body_of(response)["explanation"]["checks"]
+    assert all("reasonCode" in c for c in checks)
+    assert any(c["rule"] == "R1" and c.get("scenario") == 1 and c["reasonCode"] == "IDEA_EXCEEDS_RISK_PROFILE" for c in checks)
+    assert any(c["rule"] == "R5" and "scenario" not in c for c in checks)
+
+
+def test_un_motif_traduit_qui_approuve_retombe_sur_l_anglais(monkeypatch):
+    from backend.agents import pipeline
+
+    verdicts = [{"rule": "R1", "status": "warn", "reasonCode": "X", "messageEn": "The rule was triggered."},
+                {"rule": "R2", "status": "warn", "reasonCode": "X", "messageEn": "Threshold reached."}]
+    monkeypatch.setattr(pipeline.orchestrator, "translate", lambda c, texts, lang: [
+        "Le scénario est conforme." if t == "The rule was triggered." else "Seuil atteint." if t == "Threshold reached." else t
+        for t in texts])
+    _, shown, _, _ = pipeline._translate_run_texts(None, [], verdicts, [], "fr")
+    assert [v["message"] for v in shown] == ["The rule was triggered.", "Seuil atteint."]

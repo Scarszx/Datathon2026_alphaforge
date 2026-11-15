@@ -172,3 +172,25 @@ def test_messages_par_defaut_en_anglais_sans_chiffre(store):
     item, result = _engine(store)
     for verdict in rules.check_rules(store, item, result):
         assert verdict["messageEn"] and not any(ch.isdigit() for ch in verdict["messageEn"])
+
+
+def test_seules_les_regles_declenchees_ont_besoin_d_une_citation():
+    for rule, subjects in rules.RULE_SUBJECTS.items():
+        for status in ("pass", "not_verified"):
+            assert rules.needs_regulation(rule, "X", status) is False
+        if subjects:
+            assert rules.needs_regulation(rule, "X", "warn") and rules.needs_regulation(rule, "X", "fail")
+        else:
+            assert rules.needs_regulation(rule, "X", "fail") is False  # R10 : aucun sujet
+    assert rules.needs_regulation("R7", "NO_CRYPTO_EXPOSURE", "warn") is False
+
+
+def test_messages_par_defaut_sans_vocabulaire_d_approbation(store):
+    from backend.agents.verifier.verifier import forbidden_phrases
+
+    item, result = _engine(store)
+    for verdict in rules.check_rules(store, item, result):
+        message = verdict["messageEn"]
+        assert forbidden_phrases(message) == [], message
+        for word in ("consistent with", "compatible", "reasonable alternative", "respected", "recommended"):
+            assert word not in message.lower(), message
