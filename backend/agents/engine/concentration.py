@@ -32,6 +32,11 @@ def _normalize(weights: dict[str, float]) -> dict[str, float]:
     return {k: v / total * 100.0 for k, v in weights.items()} if total else {}
 
 
+def _has_composition(sheet: dict[str, Any] | None) -> bool:
+    """Une fiche sans secteurs, sans pays ni positions (gabarit non rempli) ne décrit aucune composition."""
+    return bool(sheet) and bool(sheet.get("sectorWeights") or sheet.get("countryWeights") or sheet.get("topHoldings"))
+
+
 def concentration(store: DataStore, weights: dict[str, float]) -> dict[str, Any]:
     """Poids (en %) d'un scénario. `weights` : poids par ticker (somme quelconque, normalisée)."""
     weights = _normalize({t: w for t, w in weights.items() if w > 0})
@@ -58,7 +63,7 @@ def concentration(store: DataStore, weights: dict[str, float]) -> dict[str, Any]
                 tech += weight
             continue
         sheet = enriched.get(ticker)
-        if not sheet:
+        if not _has_composition(sheet):
             no_composition.append(ticker)
             sector[asset.get("sector") or "Fund (composition not available)"] += weight
             country[_country_of(ticker, asset_class)] += weight
@@ -91,7 +96,7 @@ def concentration(store: DataStore, weights: dict[str, float]) -> dict[str, Any]
             "Fund composition not available for " + ", ".join(sorted(no_composition))
             + ": exposure read by fund category, look-through incomplete."
         )
-    if enriched and any(store.etf_enriched().get(t) for t in weights):
+    if any(_has_composition(enriched.get(t)) for t in weights):
         caveats.append("Look-through uses only the top holdings published by each issuer.")
 
     top_ticker, top_weight = (None, 0.0)

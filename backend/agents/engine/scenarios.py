@@ -273,13 +273,13 @@ def _record_scenario_metrics(
     )
     if conc["topSingle"]["ticker"]:
         scenario.evidence["topSingleWeight"] = registry.add(
-            kind="metric", label=f"Largest single-security weight (with fund look-through), scenario {scenario.index}",
+            kind="metric", label=f"Largest single-security weight (direct positions plus the fund holdings available in the dataset), scenario {scenario.index}",
             value=conc["topSingle"]["weight"], scenario=scenario.index,
             method="Direct positions plus each fund's published top holdings, as a share of the portfolio.",
             source=conc_source, caveats=conc_caveats, key="topSingleWeight",
         )
     scenario.evidence["techWeightLookThrough"] = registry.add(
-        kind="metric", label=f"Information Technology weight (with fund look-through), scenario {scenario.index}",
+        kind="metric", label=f"Information Technology weight (direct positions plus the fund exposure available in the dataset), scenario {scenario.index}",
         value=conc["techLookThrough"], scenario=scenario.index,
         method="Direct IT equities plus each fund's published IT sector weight, as a share of the portfolio.",
         source=conc_source, caveats=conc_caveats, key="techWeightLookThrough",

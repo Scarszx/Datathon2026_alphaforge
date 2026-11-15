@@ -69,6 +69,16 @@ def test_concentration_avec_composition_des_fnb(store):
     assert unknown["lookThroughComplete"] is False and "AGG" in unknown["caveats"][0]
 
 
+def test_fiche_de_fnb_vide_n_est_pas_une_composition(store, monkeypatch):
+    """Un gabarit non rempli (listes vides, sans source) ne doit pas faire croire à une transparence."""
+    empty = {"ticker": "XIU.TO", "sectorWeights": {}, "countryWeights": {}, "topHoldings": []}
+    monkeypatch.setattr(store, "etf_enriched", lambda: {"XIU.TO": empty})
+    result = concentration(store, {"XIU.TO": 50, "RY.TO": 50})
+    assert result["lookThroughComplete"] is False
+    assert "XIU.TO" in result["caveats"][0] and "look-through incomplete" in result["caveats"][0]
+    assert result["topSingle"]["ticker"] == "RY.TO" and result["topSingle"]["weight"] == 50.0  # aucune position de fonds ajoutée
+
+
 def test_concentration_tech_par_transparence(store):
     result = concentration(store, {"SPY": 50, "NVDA": 50})
     assert result["techLookThrough"] == pytest.approx(50 + 50 * 0.32)
