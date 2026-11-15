@@ -6,7 +6,8 @@ import { useState } from "react";
 import type { RuleVerdict, Run, Scenario } from "../../api/types";
 import { t, type Lang } from "../../lib/i18n";
 import { ruleBadgeClass, ruleLabel, scenarioRuleSummary } from "../../lib/ruleLabels";
-import Explanation from "../Explanation";
+import Provenance from "./Provenance";
+import SummaryCards from "./SummaryCards";
 import EvidenceText, { EvidenceBadge } from "./EvidenceText";
 import CompareCategory, { CompareCategoryButton } from "./CompareCategory";
 import TickerLogo from "../TickerLogo";
@@ -176,9 +177,11 @@ function FixedNotices({ run, lang }: { run: Run; lang: Lang }) {
   );
 }
 
-export default function SimulationPanel({ run, lang, compareCategory, onCompare, onRerun, busy }: {
+export default function SimulationPanel({ run, lang, compareCategory, horizonYears, onCompare, onRerun, busy }: {
   run: Run | null;
   lang: Lang;
+  /** Horizon du mandat confirmé (fait affiché dans la carte « Points à examiner »). */
+  horizonYears?: number;
   /** compareCategory du mandat confirmé actuel (lot B) : sert au bouton « Retirer la comparaison ». */
   compareCategory?: string;
   /** Présent = le bouton de comparaison est actif ; reçoit la nouvelle version du mandat à confirmer. */
@@ -215,6 +218,7 @@ export default function SimulationPanel({ run, lang, compareCategory, onCompare,
                 {onRerun && <button type="button" className="btn-ghost" disabled={busy} onClick={onRerun}>{t("sim.rerun", lang)}</button>}
               </div>
             )}
+            <SummaryCards run={run} lang={lang} horizonYears={horizonYears} />
             <h2 className="section-title" style={{ marginTop: 12 }}>{t("sim.scenarios", lang)}</h2>
             <div className={`scenario-grid${run.scenarios.length < 3 ? " two" : ""}`}>
               {run.scenarios.map((s) => <ScenarioCard key={s.index} run={run} s={s} lang={lang} />)}
@@ -272,7 +276,7 @@ export default function SimulationPanel({ run, lang, compareCategory, onCompare,
               </>
             )}
 
-            {run.explanation && <div style={{ marginTop: 12 }}><Explanation data={run.explanation} /></div>}
+            <Provenance run={run} lang={lang} />
           </>
         )}
       </div>
