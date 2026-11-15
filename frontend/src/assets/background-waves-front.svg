@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-51.2 -28.8 1126.4 633.6" preserveAspectRatio="xMidYMid slice">
+  <!-- Vague avant du fond et son liseré blanc : calque html::after de styles.css, animé.
+       Même repère, même marge et même calage des dégradés que background-waves-back.svg. -->
+  <defs>
+    <linearGradient id="waveFront" gradientUnits="userSpaceOnUse" gradientTransform="matrix(774 0 0 286 250 290)" x1="1" y1="0.5" x2="0.3" y2="1">
+      <stop offset="0" stop-color="#7DD6A3"/>
+      <stop offset="0.6" stop-color="#A5E4C0"/>
+      <stop offset="1" stop-color="#D6F3E2" stop-opacity="0.7"/>
+    </linearGradient>
+  </defs>
+  <path d="M181.79 604.8 L250 576 C 430 500, 600 420, 720 378 C 830 340, 940 305, 1024 290 L1075.2 280.86 L1075.2 604.8 Z" fill="url(#waveFront)" opacity="0.9"/>
+  <path d="M181.79 604.8 L250 576 C 430 500, 600 420, 720 378 C 830 340, 940 305, 1024 290 L1075.2 280.86" fill="none" stroke="#FFFFFF" stroke-opacity="0.55" stroke-width="1.5"/>
+</svg>

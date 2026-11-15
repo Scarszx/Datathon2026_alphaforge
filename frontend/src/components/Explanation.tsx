@@ -1,10 +1,12 @@
 import type { Explanation as Expl } from "../api/types";
 import { useT } from "../lib/i18n";
 import { ruleBadgeClass, ruleLabel } from "../lib/ruleLabels";
+import RuleItem from "./chat/RuleItem";
 
 /** Affiche tel quel le champ explanation renvoyé par le back (contrat : toujours affiché).
  *  Libellés fixes traduits ; sources, étapes, hypothèses et limites viennent du back.
- *  0.4.4 : les contrôles portent reasonCode et scenario ; l'agentId reste dans « Étapes exécutées ». */
+ *  0.4.4 : les contrôles portent reasonCode et scenario ; l'agentId reste dans « Étapes exécutées ».
+ *  Chaque contrôle est replié sur une ligne ; « Voir plus » affiche son message. */
 export default function Explanation({ data, defaultOpen = false }: { data: Expl; defaultOpen?: boolean }) {
   const { t, lang } = useT();
   const checks = data.checks ?? [];
@@ -21,11 +23,11 @@ export default function Explanation({ data, defaultOpen = false }: { data: Expl;
         {checks.length > 0 && (
           <section>
             <h4>{t("expl.checks")}</h4>
-            <ul>{checks.map((c, i) => (
-              <li key={i}>
-                <span className={ruleBadgeClass(c.reasonCode ?? "", c.status)}>{ruleLabel(c.reasonCode ?? "", c.status, lang)}</span>{" "}
-                <code>{c.rule}</code>{c.scenario !== undefined ? ` · ${t("proof.scenario")} ${c.scenario}` : ""} : {c.message}
-              </li>
+            <ul className="rule-list">{checks.map((c, i) => (
+              <RuleItem key={i} rule={c.rule} reasonCode={c.reasonCode ?? ""} status={c.status} lang={lang}
+                context={c.scenario !== undefined ? `${t("proof.scenario")} ${c.scenario}` : undefined}>
+                {c.message ? <p>{c.message}</p> : null}
+              </RuleItem>
             ))}</ul>
           </section>
         )}

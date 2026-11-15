@@ -5,6 +5,7 @@
  * accueil, profil, mandat, R1, catégorie de comparaison. L'ancienne échelle à quatre libellés
  * (riskLevel) n'est plus envoyée à l'API. La description des niveaux est dans lib/riskScale.ts. */
 import { EMPTY_INDUSTRIES, industryPrefs, type IndustryChoice } from "./industries";
+import { EMPTY_ESG_MARKET, esgMarketPrefs, type EsgMarketChoice } from "./esgMarket";
 import type { InvestorProfile, Jurisdiction } from "../api/types";
 
 export type Question = { id: string; label: string; options: string[] }; // options[i] vaut i + 1 point
@@ -101,13 +102,18 @@ export function isComplete(answers: Record<string, number>) {
   return QUESTIONS.every((q) => answers[q.id] !== undefined);
 }
 
+/** Réponses hors score de la création du portefeuille : critères ESG, marché géographique, industries. */
+export type ProfileChoices = EsgMarketChoice & { industries: IndustryChoice };
+export const EMPTY_CHOICES: ProfileChoices = { ...EMPTY_ESG_MARKET, industries: EMPTY_INDUSTRIES };
+
 /**
- * Profil investisseur déduit du questionnaire (contraintes, préférences et exclusions laissées vides).
+ * Profil investisseur déduit du questionnaire (contraintes et exclusions laissées vides ; préférences =
+ * ESG, marchés et industries choisis, voir lib/esgMarket.ts et lib/industries.ts).
  * v0.4.6 : tolérance (1 à 5, question « Perte maximale ») et capacité (1 à 5, question « Capacité
  * financière ») obligatoires et envoyées telles quelles ; riskLevel n'est plus envoyé (R1 : le niveau
  * retenu est calculé côté API comme le plus bas des deux).
  */
-export function profileFromAnswers(answers: Record<string, number>, province?: Jurisdiction, industries: IndustryChoice = EMPTY_INDUSTRIES): InvestorProfile {
+export function profileFromAnswers(answers: Record<string, number>, province?: Jurisdiction, choices: ProfileChoices = EMPTY_CHOICES): InvestorProfile {
   const [min, max] = HORIZONS[answers.horizon];
   const goal = QUESTIONS.find((q) => q.id === "goal")!.options[answers.goal];
   return {
@@ -117,6 +123,6 @@ export function profileFromAnswers(answers: Record<string, number>, province?: J
     horizonMinYears: min,
     ...(max !== null ? { horizonMaxYears: max } : {}),
     objective: goal,
-    constraints: [], preferences: industryPrefs(industries), excludedAssetClasses: [],
+    constraints: [], preferences: [...esgMarketPrefs(choices), ...industryPrefs(choices.industries)], excludedAssetClasses: [],
   };
 }

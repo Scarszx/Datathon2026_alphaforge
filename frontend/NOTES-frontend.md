@@ -14,6 +14,7 @@ le back avec des données fictives marquées.
    conversation ; étendre l'i18n aux autres pages reste à faire si l'équipe le décide.
 3. ✅ **`Run.explanation` affichée** (2026-11-15) : le panneau repliable « Comment AlphaForge arrive à cette conclusion » (`components/chat/Provenance.tsx`) sépare données, hypothèses, règles, sources, calcul du moteur et texte rédigé par l'IA ; la trace technique (`Explanation`) y est imbriquée. Les trois cartes en tête d'analyse (`SummaryCards.tsx`) restent factuelles : fait chiffré et seuil, sans jugement (GN-3200-26-001 §2.1, §3.1.1, §3.1.3, §3.3). Niveaux de langage (Simple / Investisseur / Analyste) : reportés.
 
+4. **Marché géographique du questionnaire** (2026-11-15) : la réponse (Canada, États-Unis ou les deux) est enregistrée dans `preferences` du profil (« Marché géographique : … »), sans nouveau champ de contrat. Aucun champ du mandat ni aucune règle ne la lit, et le mode build ne prend que des actions cotées aux États-Unis. L'utiliser dans l'analyse demande un changement de contrat, à discuter en équipe. La réponse ESG, elle, suit le chemin prévu : « ESG » dans le profil, puis `preferences.esg` du mandat et la règle R8.
 ## Hypothèses du mode démo (`src/api/demo.ts`)
 
 Le mode démo simule le back dans le navigateur (activé par `npm run dev:demo`, `VITE_DEMO=1`) :

@@ -6,6 +6,7 @@ import type { RuleVerdict, Run } from "../../api/types";
 import { t, type Lang } from "../../lib/i18n";
 import { ruleBadgeClass, ruleLabel } from "../../lib/ruleLabels";
 import { EvidenceBadge } from "./EvidenceText";
+import RuleItem from "./RuleItem";
 
 const raised = (v: RuleVerdict) => v.status === "warn" || v.status === "fail";
 
@@ -55,10 +56,15 @@ export default function SummaryCards({ run, lang, horizonYears }: { run: Run; la
         <div className="profile-card summary-card">
           <div className="eyebrow">{t("cards.review", lang)}</div>
           {flagged.length === 0 ? <p className="muted small">{t("cards.review.none", lang)}</p> : (
-            <ul className="small">
-              {flagged.map((v, i) => (
-                <li key={i}><strong>{v.rule}</strong> <span className={ruleBadgeClass(v.reasonCode, v.status)}>{ruleLabel(v.reasonCode, v.status, lang)}</span> {v.message ?? v.messageEn ?? ""}</li>
-              ))}
+            <ul className="rule-list">
+              {flagged.map((v, i) => {
+                const message = v.message ?? v.messageEn ?? "";
+                return (
+                  <RuleItem key={i} rule={v.rule} reasonCode={v.reasonCode} status={v.status} lang={lang}>
+                    {message ? <p>{message}</p> : null}
+                  </RuleItem>
+                );
+              })}
             </ul>
           )}
           {horizonYears !== undefined && <p className="muted small">{t("cards.review.horizon", lang).replace("{years}", String(horizonYears))}</p>}

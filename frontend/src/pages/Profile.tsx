@@ -10,6 +10,7 @@ import { PROVINCES, PROVINCE_LABELS, loadLatestRisk, loadRisk, QUESTIONS, saveRi
 import { levelLabel, retainedLevel, VOLATILITY_ASSUMPTION } from "../lib/riskScale";
 import IndustryPicker from "../components/IndustryPicker";
 import { industryPrefs, splitPreferences, type IndustryChoice } from "../lib/industries";
+import { ESG_ANSWERS, MARKETS, esgMarketPrefs, splitEsgMarket, toggleMarket, type Market } from "../lib/esgMarket";
 import { useApp } from "../lib/store";
 import { cad, pct, plainPct } from "../lib/format";
 
@@ -176,8 +177,11 @@ export default function Profile() {
   const [objective, setObjective] = useState(p?.objective ?? "");
   const [constraints, setConstraints] = useState((p?.constraints ?? []).join("\n"));
   const initialPrefs = splitPreferences(p?.preferences);
+  const initialEsgMarket = splitEsgMarket(initialPrefs.others);
   const [industries, setIndustries] = useState<IndustryChoice>({ liked: initialPrefs.liked, avoided: initialPrefs.avoided });
-  const [preferences, setPreferences] = useState(initialPrefs.others.join("\n"));
+  const [esg, setEsg] = useState(initialEsgMarket.esg);
+  const [markets, setMarkets] = useState<Market[]>(initialEsgMarket.markets);
+  const [preferences, setPreferences] = useState(initialEsgMarket.others.join("\n"));
   const [excluded, setExcluded] = useState((p?.excludedAssetClasses ?? []).join("\n"));
   const [err, setErr] = useState("");
   const [saved, setSaved] = useState(false);
@@ -197,13 +201,15 @@ export default function Profile() {
       riskTolerance: tol, riskCapacity: cap, // v0.4.6 : une seule échelle 1 à 5 ; riskLevel n'est plus envoyé
       ...(province ? { province } : {}),
       horizonMinYears: min, ...(max !== undefined ? { horizonMaxYears: max } : {}),
-      objective: objective.trim(), constraints: lines(constraints), preferences: [...lines(preferences), ...industryPrefs(industries)], excludedAssetClasses: lines(excluded),
+      objective: objective.trim(), constraints: lines(constraints),
+      preferences: [...lines(preferences), ...esgMarketPrefs({ esg, markets }), ...industryPrefs(industries)], excludedAssetClasses: lines(excluded),
     };
     setErr(""); setBusy(true);
     try { await saveProfile(body); setSaved(true); setEditing(false); } catch (x) { setErr(errorText(x)); } finally { setBusy(false); }
   }
   const retained = p?.riskTolerance != null && p?.riskCapacity != null ? retainedLevel(p.riskTolerance, p.riskCapacity) : null;
   const prefs = splitPreferences(p?.preferences);
+  const esgMarket = splitEsgMarket(prefs.others);
   const name = (user?.displayName ?? user?.username ?? "").split(" ")[0];
   const today = new Date().toLocaleDateString("fr-CA", { weekday: "short", day: "numeric", month: "long", year: "numeric" });
   return (
@@ -276,9 +282,16 @@ export default function Profile() {
               <Chips items={p.constraints ?? []} empty="Aucune contrainte." />
               <div className="muted small" style={{ marginTop: 12 }}>Classes d'actifs exclues</div>
               <Chips items={p.excludedAssetClasses ?? []} tone="avoid" empty="Aucune exclusion." />
-              {prefs.others.length > 0 && (<><div className="muted small" style={{ marginTop: 12 }}>Autres préférences</div><Chips items={prefs.others} empty="" /></>)}
+              {esgMarket.others.length > 0 && (<><div className="muted small" style={{ marginTop: 12 }}>Autres préférences</div><Chips items={esgMarket.others} empty="" /></>)}
             </div>
 
+            <div className="dcard">
+              <div className="dcard-head"><div><div className="dcard-title">🌎 ESG et marché géographique</div><div className="muted small">Vos préférences d'investissement</div></div></div>
+              <div className="muted small">Critères ESG</div>
+              <div className="dcard-value sm">{esgMarket.esg ? "Pris en compte (règle R8)" : "Non pris en compte"}</div>
+              <div className="muted small" style={{ marginTop: 14 }}>Marché géographique</div>
+              <Chips items={esgMarket.markets} empty="Aucun marché choisi. Ajoutez-en dans « Modifier mon profil »." />
+            </div>
             <div className="dcard span-half">
               <div className="dcard-head"><div><div className="dcard-title">👍 Ce que j'aime</div><div className="muted small">Industries qui vous intéressent</div></div></div>
               <Chips items={prefs.liked} tone="like" empty="Aucune industrie choisie. Ajoutez-en dans « Modifier mon profil »." />
@@ -316,12 +329,30 @@ export default function Profile() {
                 <div className="field"><label htmlFor="hmax">Horizon maximum (facultatif)</label><input id="hmax" inputMode="numeric" value={hMax} onChange={(e) => setHMax(e.target.value)} /></div>
               </div>
               <div className="field"><label htmlFor="obj">Objectif</label><input id="obj" placeholder="ex. croissance à long terme" value={objective} onChange={(e) => setObjective(e.target.value)} /></div>
+              <div className="row2">
+                <div className="field"><label id="esg-label">Critères ESG dans vos simulations</label>
+                  <div className="opts" role="radiogroup" aria-labelledby="esg-label">
+                    {ESG_ANSWERS.map((o) => (
+                      <label key={o.label} className={`opt${esg === o.value ? " on" : ""}`}>
+                        <input type="radio" name="profile-esg" checked={esg === o.value} onChange={() => setEsg(o.value)} />{o.label}
+                      </label>
+                    ))}
+                  </div></div>
+                <div className="field"><label id="market-label">Marché géographique (plusieurs choix possibles)</label>
+                  <div className="opts" role="group" aria-labelledby="market-label">
+                    {MARKETS.map((m) => (
+                      <label key={m} className={`opt${markets.includes(m) ? " on" : ""}`}>
+                        <input type="checkbox" checked={markets.includes(m)} onChange={() => setMarkets(toggleMarket(markets, m))} />{m}
+                      </label>
+                    ))}
+                  </div></div>
+              </div>
               <div className="field"><label>Industries</label><IndustryPicker value={industries} onChange={setIndustries} /></div>
               <div className="row2">
                 <div className="field"><label htmlFor="con">Contraintes (une par ligne)</label><textarea id="con" rows={3} placeholder="ex. diversification minimale" value={constraints} onChange={(e) => setConstraints(e.target.value)} /></div>
                 <div className="field"><label htmlFor="exc">Classes d'actifs exclues (une par ligne)</label><textarea id="exc" rows={3} placeholder="ex. crypto" value={excluded} onChange={(e) => setExcluded(e.target.value)} /></div>
               </div>
-              <div className="field"><label htmlFor="pre">Autres préférences (une par ligne)</label><textarea id="pre" rows={2} placeholder="ex. ESG" value={preferences} onChange={(e) => setPreferences(e.target.value)} /></div>
+              <div className="field"><label htmlFor="pre">Autres préférences (une par ligne)</label><textarea id="pre" rows={2} placeholder="ex. éviter la spéculation" value={preferences} onChange={(e) => setPreferences(e.target.value)} /></div>
               {err && <p className="error" role="alert">{err}</p>}
               <div><button className="btn" disabled={busy}>{busy ? "Enregistrement…" : "Enregistrer"}</button></div>
             </form>

@@ -1,4 +1,5 @@
-/* Colonne 2 de /chat : conversation. Messages, boutons quickReplies de l'orchestrateur, carte « mandat
+/* Colonne 2 de /chat : conversation. Messages (réponses de l'assistant mises en forme par MessageText,
+ * règles repliées avec « Voir plus »), boutons quickReplies de l'orchestrateur, carte « mandat
  * proposé » (mandateDraft) avec Confirmer (POST mandates puis POST runs) et Modifier (édition des
  * champs clés avant confirmation). */
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
@@ -8,8 +9,8 @@ import { PROVINCES } from "../../lib/risk";
 import { appendSpeech } from "../../lib/speech";
 import { useSpeechToText } from "../../lib/useSpeechToText";
 import Explanation from "../Explanation";
-import EvidenceText from "./EvidenceText";
 import MandateCard from "./MandateCard";
+import MessageText from "./MessageText";
 
 const MAX_LEN = 2000; // schema-message-create-request
 
@@ -71,7 +72,9 @@ function Bubble({
       <div className={`bubble${m.status === "error" ? " err" : ""}`}>
         {m.status === "pending" ? <span className="muted">{t("chat.thinking", lang)}</span> : (
           <>
-            <p className="pre">{m.runId ? <EvidenceText text={m.content} evidence={evidence} lang={lang} /> : m.content}</p>
+            {m.role === "assistant"
+              ? <MessageText text={m.content} evidence={evidence} lang={lang} resolve={!!m.runId} />
+              : <p className="pre">{m.content}</p>}
             {m.role === "assistant" && m.explanation && <Explanation data={m.explanation} />}
             {m.quickReplies?.length ? (
               <div className="suggest" style={{ marginTop: 10 }}>

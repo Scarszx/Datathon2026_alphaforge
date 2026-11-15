@@ -190,7 +190,7 @@ export default function Dashboard() {
                   </div>
                 </div>
                 {chart
-                  ? <Chart key={range} values={chart.values} timestamps={chart.timestamps} axisLabel={(ts) => shortDate(ts, range === "1y" || range === "5y")} format={(v) => amount(v, cur)} />
+                  ? <div className="chart"><Chart key={range} values={chart.values} timestamps={chart.timestamps} axisLabel={(ts) => shortDate(ts, range === "1y" || range === "5y")} format={(v) => amount(v, cur)} /></div>
                   : <p className="muted">Pas assez de points pour tracer la performance.</p>}
               </div>
 
