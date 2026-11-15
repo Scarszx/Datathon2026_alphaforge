@@ -164,13 +164,13 @@ data "aws_iam_policy_document" "agents" {
   # guardrail de la région source et de chaque région de destination du profil
   # us.guardrail.v1:0 (us-east-1, us-east-2, us-west-2).
   statement {
-    sid       = "GuardrailApply"
-    effect    = "Allow"
-    actions   = ["bedrock:ApplyGuardrail"]
+    sid     = "GuardrailApply"
+    effect  = "Allow"
+    actions = ["bedrock:ApplyGuardrail"]
     resources = concat(
       [aws_bedrock_guardrail.this.guardrail_arn],
       [for r in ["us-east-1", "us-east-2", "us-west-2"] :
-        "arn:aws:bedrock:${r}:${local.account_id}:guardrail-profile/us.guardrail.v1:0"]
+      "arn:aws:bedrock:${r}:${local.account_id}:guardrail-profile/us.guardrail.v1:0"]
     )
   }
 
