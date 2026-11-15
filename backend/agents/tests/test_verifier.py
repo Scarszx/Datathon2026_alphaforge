@@ -66,3 +66,50 @@ def test_controle_sur_le_texte_traduit_affiche():
     sections = [_section("It fell {EV-07}.", "Il a baissé de 12 % {EV-07}.")]
     cleaned, hidden, _ = verify_narrative(sections, IDS, MANDATE)
     assert cleaned[0]["text"] == "" and hidden[0]["reason"] == "handwritten_number"
+
+
+# --- lot A : jugements de conformité ou de convenance ------------------------------------------------------------
+
+@pytest.mark.parametrize("sentence", [
+    "The scenario is compliant.", "This portfolio complies with the guidance.", "This idea is suitable.",
+    "These bonds are suitable for you.", "This suits you.", "It is compatible with your risk profile.",
+    "This idea is not suitable for you.", "Le scénario est conforme.", "Ce scénario n'est pas conforme.",
+    "Non conforme.", "Ce titre vous convient.", "Adapté à votre profil.", "Compatible avec votre profil.",
+    "The current portfolio passes.", "Its volatility fits the retained risk profile.",
+    "Les obligations conviennent à ce mandat.",
+])
+def test_jugements_de_conformite_masques(sentence):
+    _, hidden, report = verify_narrative([_section(sentence)], IDS, MANDATE)
+    assert hidden and hidden[0]["reason"] == "forbidden_phrase" and report["forbiddenPhrases"] >= 1
+
+
+@pytest.mark.parametrize("sentence", [
+    "AlphaForge does not assess whether this suits you.",
+    "AlphaForge takes no position on whether the output is suitable for the user.",
+    "AlphaForge ne se prononce pas sur ce qui vous convient.",
+    "Conformément à la note 31-368, le profil retenu est le plus bas des deux.",
+    "The rule was not triggered.", "La règle n'a pas été déclenchée.",
+])
+def test_phrases_ou_l_outil_ne_juge_pas_conservees(sentence):
+    cleaned, hidden, _ = verify_narrative([_section(sentence)], IDS, MANDATE)
+    assert hidden == [] and cleaned[0]["text"] == sentence
+
+
+def test_les_recommandations_restent_masquees_meme_avec_un_avertissement():
+    cleaned, hidden, _ = verify_narrative(
+        [_section("AlphaForge does not assess suitability, but we recommend this fund.")], IDS, MANDATE)
+    assert hidden[0]["reason"] == "forbidden_phrase" and cleaned[0]["text"] == ""
+
+
+def test_recits_reels_de_langfuse_du_15_novembre():
+    """Phrases écrites par le rédacteur et la traduction (runs de démonstration) : celles qui approuvent sont masquées."""
+    import json
+    from pathlib import Path
+
+    data = json.loads((Path(__file__).parent / "fixtures" / "langfuse_narratives_2026-11-15.json").read_text())
+    for narrative in data["narratives"]:
+        sections = [_section(text, key="why") for text in narrative["sections"]]
+        cleaned, hidden, _ = verify_narrative(sections, set(), {})
+        kept = " ".join(s["text"] for s in cleaned)
+        for phrase in narrative["mustBeHidden"]:
+            assert phrase not in kept, phrase

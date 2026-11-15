@@ -4,7 +4,7 @@ Contrôles (contrat module-verifier, SOLUTION.md 7.5) :
 1. chaque {EV-nn}/{KB-nn} existe dans le registre du run ;
 2. aucun nombre écrit à la main (%, $, points de base, ratio, décimal, entier
    significatif) hors constantes du mandat, années, numéros de règle et de document ;
-3. aucune formule de recommandation ou de promesse (motifs EN et FR) ;
+3. aucune formule de recommandation, de promesse ou de jugement de conformité/convenance (motifs EN et FR) ;
 4. mêmes emplacements dans textEn et text (la traduction n'en perd ni n'en ajoute).
 Une phrase fautive est retirée et listée dans hiddenSentences ; jamais de
 nouvelle tentative. Les motifs sont des expressions fixes écrites ici, jamais
@@ -44,7 +44,36 @@ FORBIDDEN_PATTERNS = [
     r"\bachetez\b", r"\bvendez\b", r"\bmeilleur placement\b", r"\bva (?:certainement|forcément) (?:monter|augmenter)\b",
     r"\bconseiller financier\b", r"\bplanificateur financier\b", r"\bfinancial (?:advisor|adviser|planner)\b",
 ]
+
+# Affirmations de conformité ou de convenance (lot A). L'outil n'évalue pas la convenance (GN-3200-26-001, 2.1.1) :
+# dire qu'un scénario est conforme, convient ou « passe » en est une évaluation, et le dire négativement aussi
+# (« is not suitable for you », « non conforme »). Les formes viennent du texte réellement écrit par le rédacteur et
+# la traduction (traces Langfuse du 2026-11-15) en plus de la liste de la mission.
+JUDGEMENT_PATTERNS = [
+    # anglais
+    r"\bnon-?compliant\b", r"\bcompliant\b", r"\bcomplies with\b", r"\bcomply with\b",
+    r"\b(?:is|are|was|were) (?:not |un)?suitable\b", r"\bunsuitable\b", r"\bsuits? you\b",
+    r"compatible with (?:your|the retained) (?:risk )?profile",
+    r"\b(?:passes|passed)\b",
+    r"\bfits? (?:the |your |this )?(?:retained |risk |stated )*(?:profile|mandate)\b",
+    r"\b(?:consistent|in line) with (?:the |your )?(?:retained |risk )*profile\b",
+    r"\b(?:in line|consistent) with \{(?:KB|EV)-\d{2,}\}",
+    # français
+    r"\bconformes?\b", r"\bvous convient\b", r"\bconvien(?:t|nent) (?:à|a) (?:ce|cette|votre|ton|ta)\b",
+    r"adapté(?:e|s|es)? à votre profil", r"compatible avec votre profil",
+    r"\bcorrespond(?:ent)? au profil\b", r"\b(?:cohérent|cohérente|cohérents)s? avec le profil\b",
+    r"\bconformément à \{(?:KB|EV)-\d{2,}\}", r"\ben phase avec \{(?:KB|EV)-\d{2,}\}",
+]
+
+# Une phrase où l'outil dit qu'il ne juge pas est conservée (« AlphaForge does not assess whether this suits you »).
+DISCLAIMER_PATTERN = (
+    r"\b(?:does|do|will) not (?:assess|judge|evaluate|determine|say|decide|take a position)\b|\btakes? no position\b"
+    r"|\bne (?:se )?prononce(?:nt)? pas\b|\bn'(?:évalue|apprécie|juge|établit) pas\b|\bne (?:juge|détermine|évalue) pas\b"
+)
+
 _FORBIDDEN = [re.compile(p, re.IGNORECASE) for p in FORBIDDEN_PATTERNS]
+_JUDGEMENT = [re.compile(p, re.IGNORECASE) for p in JUDGEMENT_PATTERNS]
+_DISCLAIMER = re.compile(DISCLAIMER_PATTERN, re.IGNORECASE)
 
 
 def placeholders(text: str) -> list[str]:
@@ -108,7 +137,10 @@ def handwritten_numbers(sentence: str, constants: set[float]) -> list[str]:
 
 
 def forbidden_phrases(sentence: str) -> list[str]:
-    return [m.group(0) for pattern in _FORBIDDEN for m in [pattern.search(sentence)] if m]
+    found = [m.group(0) for pattern in _FORBIDDEN for m in [pattern.search(sentence)] if m]
+    if not _DISCLAIMER.search(sentence):
+        found += [m.group(0) for pattern in _JUDGEMENT for m in [pattern.search(sentence)] if m]
+    return found
 
 
 def verify_narrative(
