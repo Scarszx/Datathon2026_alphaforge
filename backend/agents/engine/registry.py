@@ -95,13 +95,20 @@ class EvidenceRegistry:
         url: str | None = None,
         as_of: str | None = None,
         label: str | None = None,
+        document_type: str | None = None,
+        regulator: str | None = None,
+        status: str | None = None,
+        section_title: str | None = None,
+        language: str | None = None,
     ) -> str:
         """Inscrit un passage réglementaire tiré de la KB ; renvoie son KB-nn."""
         evidence: dict[str, Any] = {
             "id": self._next("KB"), "kind": "regulation", "label": label or document,
             "document": document, "excerpt": excerpt, "jurisdiction": jurisdiction, "source": source,
         }
-        for k, v in {"section": section, "url": url, "asOf": as_of}.items():
+        optional = {"section": section, "url": url, "asOf": as_of, "documentType": document_type, "regulator": regulator,
+                    "status": status, "sectionTitle": section_title, "language": language}
+        for k, v in optional.items():
             if v:
                 evidence[k] = v
         self.items.append(evidence)

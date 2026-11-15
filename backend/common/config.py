@@ -95,6 +95,13 @@ def kb_id() -> str | None:
     return os.environ.get("KB_ID")
 
 
+def kb_corpus_version() -> str | None:
+    """Version du corpus réellement ingérée dans la Knowledge Base (variable posée après l'ingestion), None sinon.
+
+    Absente : ancien corpus (sans métadonnée `citable`) ; présente : filtre `citable` strict et citations fixées (E2)."""
+    return os.environ.get("KB_CORPUS_VERSION") or None
+
+
 def guardrail_id() -> str | None:
     """Identifiant du Guardrail Bedrock, None tant que non configuré."""
     return os.environ.get("GUARDRAIL_ID")
