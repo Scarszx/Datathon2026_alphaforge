@@ -27,7 +27,7 @@ GRANTS: dict[str, list[str]] = {
 }
 
 # Plafonds d'appels d'outils par invocation (contrat : agents.limits).
-MAX_TOOL_CALLS = {"agent-auditor": 8, "agent-writer": 3, "agent-orchestrator": 6}
+MAX_TOOL_CALLS = {"agent-auditor": 16, "agent-writer": 4, "agent-orchestrator": 8}
 
 # Source citée dans tool.call (contrat observability.events.tool.call.source).
 TOOL_SOURCES = {

@@ -24,12 +24,16 @@ class AgentSpec:
 
 
 MODELS: dict[str, AgentSpec] = {
-    "agent-orchestrator": AgentSpec(config.model_orchestrator, 1024, 25, 6),
-    "agent-auditor": AgentSpec(config.model_auditor, 1024, 20, 10),
-    "agent-writer": AgentSpec(config.model_writer, 2048, 25, 5),
+    "agent-orchestrator": AgentSpec(config.model_orchestrator, 4096, 25, 8),
+    "agent-auditor": AgentSpec(config.model_auditor, 4096, 60, 18),
+    "agent-writer": AgentSpec(config.model_writer, 8192, 60, 6),
 }
 
-_CACHE: dict[str, object] = {}
+# Traduction de la restitution (partie asynchrone du run, hors API Gateway 30 s) :
+# 8192 jetons, 1 tour, 30 s. Somme asynchrone : 60 s (auditeur) + 60 s (rédacteur) + 30 s (traduction) = 150 s < 180 s (Lambda).
+TRANSLATION_SPEC = AgentSpec(config.model_orchestrator, 8192, 30, 1)
+
+_CACHE: dict[tuple[str, int, int], object] = {}
 
 
 def model_id(agent_id: str) -> str:
@@ -39,17 +43,18 @@ def model_id(agent_id: str) -> str:
     return value
 
 
-def create_model(agent_id: str):
+def create_model(agent_id: str, *, spec: AgentSpec | None = None):
     """BedrockModel de l'agent, réutilisé entre invocations chaudes (l'Agent, lui, est recréé)."""
-    if agent_id not in _CACHE:
+    active_spec = spec or MODELS[agent_id]
+    cache_key = (agent_id, active_spec.max_tokens, active_spec.timeout_seconds)
+    if cache_key not in _CACHE:
         from botocore.config import Config
         from strands.models.bedrock import BedrockModel
 
-        spec = MODELS[agent_id]
-        _CACHE[agent_id] = BedrockModel(
+        _CACHE[cache_key] = BedrockModel(
             model_id=model_id(agent_id),
-            max_tokens=spec.max_tokens,
+            max_tokens=active_spec.max_tokens,
             region_name=REGION,  # explicite : sinon Strands retombe sur us-west-2
-            boto_client_config=Config(read_timeout=spec.timeout_seconds + 5, retries={"max_attempts": 2, "mode": "standard"}),
+            boto_client_config=Config(read_timeout=active_spec.timeout_seconds + 5, retries={"max_attempts": 2, "mode": "standard"}),
         )
-    return _CACHE[agent_id]
+    return _CACHE[cache_key]

@@ -63,10 +63,11 @@ class ToolCallLimit(HookProvider):
 
 
 def build_agent(agent_id: str, system_prompt: str, ctx: RequestContext, *, with_tools: bool = True,
-                messages: list[dict[str, Any]] | None = None) -> Agent:
+                messages: list[dict[str, Any]] | None = None, spec: models.AgentSpec | None = None) -> Agent:
     tools = tools_for(agent_id) if with_tools else []
+    model = models.create_model(agent_id, spec=spec) if MODEL_FACTORY is models.create_model else MODEL_FACTORY(agent_id)
     return Agent(
-        model=MODEL_FACTORY(agent_id),
+        model=model,
         name=agent_id,
         system_prompt=system_prompt,
         tools=tools,
@@ -78,14 +79,15 @@ def build_agent(agent_id: str, system_prompt: str, ctx: RequestContext, *, with_
 
 
 def run_agent(agent_id: str, system_prompt: str, prompt: str, ctx: RequestContext, output_model: type[BaseModel], *,
-              with_tools: bool = True, messages: list[dict[str, Any]] | None = None) -> BaseModel:
+              with_tools: bool = True, messages: list[dict[str, Any]] | None = None,
+              spec: models.AgentSpec | None = None) -> BaseModel:
     """Exécute l'agent et renvoie sa sortie structurée, ou lève AgentFailure."""
-    from strands.types.exceptions import StructuredOutputException
+    from strands.types.exceptions import MaxTokensReachedException, StructuredOutputException
 
-    spec = models.MODELS[agent_id]
-    agent = build_agent(agent_id, system_prompt, ctx, with_tools=with_tools, messages=messages)
+    active_spec = spec or models.MODELS[agent_id]
+    agent = build_agent(agent_id, system_prompt, ctx, with_tools=with_tools, messages=messages, spec=active_spec)
     cancel = threading.Event()
-    timer = threading.Timer(spec.timeout_seconds, cancel.set)
+    timer = threading.Timer(active_spec.timeout_seconds, cancel.set)
     timer.daemon = True
     timer.start()
     result = None
@@ -96,12 +98,14 @@ def run_agent(agent_id: str, system_prompt: str, prompt: str, ctx: RequestContex
             prompt,
             invocation_state={"ctx": ctx, "agent_id": agent_id},
             structured_output_model=output_model,
-            limits={"turns": spec.max_turns, "structured_output_attempts": 2},
+            limits={"turns": active_spec.max_turns, "structured_output_attempts": 2},
             cancel_signal=cancel,
         )
         status = "ok" if getattr(result, "structured_output", None) is not None and not cancel.is_set() else "error"
     except StructuredOutputException as exc:
         raise AgentFailure(agent_id, "invalid structured output") from exc
+    except MaxTokensReachedException as exc:
+        raise AgentFailure(agent_id, "max_tokens") from exc
     finally:
         timer.cancel()
         # Étape observée pour explanation (rule-explanation-from-trace) : l'invocation elle-même,

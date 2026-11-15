@@ -73,6 +73,15 @@ def test_sortie_structuree_absente_leve_agent_failure(ctx, scripts):
         orchestrator.converse(ctx, {}, "hello", [])
 
 
+def test_max_tokens_leve_agent_failure(ctx, scripts):
+    from strands.types.exceptions import MaxTokensReachedException
+
+    scripts.add("agent-orchestrator", MaxTokensReachedException("max tokens reached"))
+    with pytest.raises(AgentFailure) as failure:
+        orchestrator.converse(ctx, {}, "hello", [])
+    assert failure.value.reason == "max_tokens"
+
+
 def test_delai_depasse(ctx, scripts, monkeypatch):
     spec = models.MODELS["agent-orchestrator"]
     monkeypatch.setitem(models.MODELS, "agent-orchestrator", models.AgentSpec(spec.model_id, spec.max_tokens, 0, spec.max_turns))
@@ -129,11 +138,11 @@ def test_auditeur_cite_seulement_les_passages_renvoyes(ctx, scripts):
 
 def test_plafond_d_appels_d_outils_de_l_auditeur(ctx, scripts):
     ctx.clients["kb"] = FakeKb([_kb_result()])
-    searches = [call("search_regulation", query=f"query {i}") for i in range(9)]
+    searches = [call("search_regulation", query=f"query {i}", subjects=["profil_risque"]) for i in range(17)]
     scripts.add("agent-auditor", *searches, output("AuditReport", items=[]))
     auditor.audit(ctx, VERDICTS, EvidenceRegistry("en"))
-    assert len([c for c in ctx.tool_calls if c["tool"] == "search_regulation"]) == 8
-    assert len(ctx.clients["kb"].calls) == 8
+    assert len([c for c in ctx.tool_calls if c["tool"] == "search_regulation"]) == 16
+    assert len(ctx.clients["kb"].calls) == 16
 
 
 def test_auditeur_en_echec_garde_les_verdicts(ctx, scripts):

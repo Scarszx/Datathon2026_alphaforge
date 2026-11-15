@@ -35,6 +35,8 @@ def test_limites_et_modeles_conformes_au_contrat():
         spec = models.MODELS[agent["id"]]
         assert spec.max_tokens == agent["max_tokens"]
         assert spec.timeout_seconds == agent["limits"]["timeout_seconds"]
+        if "translation_max_tokens" in agent:
+            assert models.TRANSLATION_SPEC.max_tokens == agent["translation_max_tokens"]
         if "max_tool_calls" in agent["limits"]:
             assert MAX_TOOL_CALLS[agent["id"]] == agent["limits"]["max_tool_calls"]
         if "max_agent_cycles" in agent["limits"]:
