@@ -3,7 +3,8 @@
 import type { Mandate, MandateCreateRequest } from "../../api/types";
 import { t, warningText, type Lang } from "../../lib/i18n";
 import { categoryOf } from "../../lib/comparisonCategories";
-import { PROVINCE_LABELS } from "../../lib/risk";
+import { provinceName } from "../../lib/risk";
+import { levelName } from "../../lib/riskScale";
 import TickerLogo from "../TickerLogo";
 
 export function FieldSourceTag({ field, mandate, lang }: { field: string; mandate: MandateCreateRequest; lang: Lang }) {
@@ -22,14 +23,14 @@ export default function MandateCard({ mandate, confirmed, lang }: { mandate: Man
           <tr><td>{t("mandate.mode", lang)}</td><td>{t(`mandate.mode.${mandate.mode}`, lang)} <FieldSourceTag field="mode" mandate={mandate} lang={lang} /></td></tr>
           <tr><td>{t("mandate.objective", lang)}</td><td>{t(`mandate.objective.${mandate.objective}`, lang)}{mandate.objectiveDetail ? ` — ${mandate.objectiveDetail}` : ""} <FieldSourceTag field="objective" mandate={mandate} lang={lang} /></td></tr>
           <tr><td>{t("mandate.horizon", lang)}</td><td>{mandate.horizonYears} {t("mandate.years", lang)} <FieldSourceTag field="horizonYears" mandate={mandate} lang={lang} /></td></tr>
-          <tr><td>{t("mandate.riskTolerance", lang)}</td><td>{mandate.riskTolerance} / 5 <FieldSourceTag field="riskTolerance" mandate={mandate} lang={lang} /></td></tr>
-          <tr><td>{t("mandate.riskCapacity", lang)}</td><td>{mandate.riskCapacity} / 5 <FieldSourceTag field="riskCapacity" mandate={mandate} lang={lang} /></td></tr>
+          <tr><td>{t("mandate.riskTolerance", lang)}</td><td>{levelName(mandate.riskTolerance, lang)} <FieldSourceTag field="riskTolerance" mandate={mandate} lang={lang} /></td></tr>
+          <tr><td>{t("mandate.riskCapacity", lang)}</td><td>{levelName(mandate.riskCapacity, lang)} <FieldSourceTag field="riskCapacity" mandate={mandate} lang={lang} /></td></tr>
           <tr><td>{t("mandate.maxLoss", lang)}</td><td>
             {confirmed
               ? `${confirmed.effectiveMaxLossPct} %`
               : mandate.maxAcceptableLossPct !== undefined ? `${mandate.maxAcceptableLossPct} %` : "—"}
             {" "}<FieldSourceTag field="maxAcceptableLossPct" mandate={mandate} lang={lang} />
-            {confirmed && <span className="muted small"> · {t("mandate.riskProfile", lang)} : {confirmed.riskProfile}</span>}
+            {confirmed && <span className="muted small"> · {t("mandate.riskProfile", lang)} : {levelName(confirmed.riskProfile, lang)}</span>}
           </td></tr>
           {mandate.compareCategory && (
             <tr><td>{t("sim.scenario.alternative", lang)}</td><td>{categoryOf(mandate.compareCategory)?.label[lang] ?? mandate.compareCategory} <FieldSourceTag field="compareCategory" mandate={mandate} lang={lang} /></td></tr>
@@ -60,7 +61,7 @@ export default function MandateCard({ mandate, confirmed, lang }: { mandate: Man
           ) : null}
           {mandate.constraints?.length ? <tr><td>{t("mandate.constraints", lang)}</td><td>{mandate.constraints.join(", ")}</td></tr> : null}
           {mandate.preferences?.esg ? <tr><td>{t("mandate.preferences.esg", lang)}</td><td>✓</td></tr> : null}
-          <tr><td>{t("mandate.province", lang)}</td><td>{PROVINCE_LABELS[mandate.province]} ({mandate.province})</td></tr>
+          <tr><td>{t("mandate.province", lang)}</td><td>{provinceName(mandate.province, lang)} ({mandate.province})</td></tr>
         </tbody>
       </table>
       {confirmed?.warnings?.length ? (

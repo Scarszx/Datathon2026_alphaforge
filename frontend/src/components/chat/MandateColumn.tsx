@@ -1,10 +1,11 @@
-/* Colonne 1 de /chat : portefeuille (positions et total calculés par le back) + mandat confirmé
+/* Colonne 1 de /chat : portefeuille (positions et total issus du résumé du portefeuille) + mandat confirmé
  * + curseurs « et si » (horizon, perte acceptée). Un curseur crée une nouvelle version du mandat
  * (POST mandates) puis relance l'analyse (POST runs), sans passer par la conversation. */
 import { useState } from "react";
 import type { Mandate, MandateCreateRequest, PortfolioSummary } from "../../api/types";
 import { t, type Lang } from "../../lib/i18n";
 import { cad, plainPct } from "../../lib/format";
+import InfoTip from "../InfoTip";
 import MandateCard from "./MandateCard";
 import { TickerLabel } from "../TickerLogo";
 
@@ -38,7 +39,7 @@ export default function MandateColumn({
     <aside className="chat-col">
       <div className="chat-col-scroll">
         <div className="eyebrow">{t("col.portfolio", lang)}</div>
-        <p className="muted small">{t("col.portfolioSub", lang)}</p>
+        <p className="muted small">{t("col.portfolioSub", lang)}<InfoTip text={t("info.portfolio", lang)} /></p>
         {summary ? (
           <>
             <div className="stats" style={{ padding: 0 }}>

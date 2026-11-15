@@ -5,28 +5,28 @@
  * Stockage : dans `preferences` du profil investisseur (liste de textes du contrat), sous la forme
  * « Industrie : <libellé> » ou « Industrie à éviter : <libellé> », sans nouveau champ de contrat.
  */
-export const INDUSTRIES: { label: string; covers: string }[] = [
-  { label: "Semi-conducteurs et équipements", covers: "Semiconductors, Semiconductor Equipment & Materials" },
-  { label: "Logiciels et infonuagique", covers: "Software - Application, Software - Infrastructure" },
-  { label: "Matériel informatique et équipements de communication", covers: "Computer Hardware, Communication Equipment" },
-  { label: "Télécommunications et contenu Internet", covers: "Telecom Services, Internet Content & Information" },
-  { label: "Pharmaceutique et biotechnologie", covers: "Drug Manufacturers - General, Biotechnology" },
-  { label: "Dispositifs médicaux, diagnostics et distribution médicale", covers: "Medical Devices, Diagnostics & Research, Medical Distribution" },
-  { label: "Banques et crédit", covers: "Banks - Diversified, Credit Services" },
-  { label: "Gestion d'actifs et marchés financiers", covers: "Asset Management, Capital Markets, Financial Data & Stock Exchanges" },
-  { label: "Assurance et régimes de santé", covers: "Insurance - Property & Casualty, Insurance Brokers, Healthcare Plans" },
-  { label: "Aérospatiale et défense", covers: "Aerospace & Defense" },
-  { label: "Machinerie et équipement industriel", covers: "Specialty Industrial Machinery, Farm & Heavy Construction Machinery" },
-  { label: "Transport ferroviaire et logistique", covers: "Railroads, Integrated Freight & Logistics" },
-  { label: "Services publics (électricité)", covers: "Utilities - Regulated Electric" },
-  { label: "Produits chimiques de spécialité", covers: "Specialty Chemicals" },
-  { label: "Pétrole et gaz", covers: "Oil & Gas Refining & Marketing, Oil & Gas Midstream, Oil & Gas Integrated" },
-  { label: "Immobilier (FPI)", covers: "REIT - Specialty" },
-  { label: "Biens de consommation courante", covers: "Beverages - Non-Alcoholic, Tobacco, Household & Personal Products" },
-  { label: "Commerce de détail et en ligne", covers: "Discount Stores, Internet Retail, Home Improvement Retail" },
-  { label: "Automobile", covers: "Auto Manufacturers" },
-  { label: "Voyages et services de voyage", covers: "Travel Services" },
-  { label: "Conglomérats", covers: "Conglomerates" },
+export const INDUSTRIES: { label: string; en: string; covers: string }[] = [
+  { label: "Semi-conducteurs et équipements", en: "Semiconductors and equipment", covers: "Semiconductors, Semiconductor Equipment & Materials" },
+  { label: "Logiciels et infonuagique", en: "Software and cloud", covers: "Software - Application, Software - Infrastructure" },
+  { label: "Matériel informatique et équipements de communication", en: "Computer hardware and communication equipment", covers: "Computer Hardware, Communication Equipment" },
+  { label: "Télécommunications et contenu Internet", en: "Telecommunications and Internet content", covers: "Telecom Services, Internet Content & Information" },
+  { label: "Pharmaceutique et biotechnologie", en: "Pharmaceuticals and biotechnology", covers: "Drug Manufacturers - General, Biotechnology" },
+  { label: "Dispositifs médicaux, diagnostics et distribution médicale", en: "Medical devices, diagnostics and medical distribution", covers: "Medical Devices, Diagnostics & Research, Medical Distribution" },
+  { label: "Banques et crédit", en: "Banks and credit", covers: "Banks - Diversified, Credit Services" },
+  { label: "Gestion d'actifs et marchés financiers", en: "Asset management and capital markets", covers: "Asset Management, Capital Markets, Financial Data & Stock Exchanges" },
+  { label: "Assurance et régimes de santé", en: "Insurance and health plans", covers: "Insurance - Property & Casualty, Insurance Brokers, Healthcare Plans" },
+  { label: "Aérospatiale et défense", en: "Aerospace and defence", covers: "Aerospace & Defense" },
+  { label: "Machinerie et équipement industriel", en: "Industrial machinery and equipment", covers: "Specialty Industrial Machinery, Farm & Heavy Construction Machinery" },
+  { label: "Transport ferroviaire et logistique", en: "Rail transport and logistics", covers: "Railroads, Integrated Freight & Logistics" },
+  { label: "Services publics (électricité)", en: "Utilities (electricity)", covers: "Utilities - Regulated Electric" },
+  { label: "Produits chimiques de spécialité", en: "Specialty chemicals", covers: "Specialty Chemicals" },
+  { label: "Pétrole et gaz", en: "Oil and gas", covers: "Oil & Gas Refining & Marketing, Oil & Gas Midstream, Oil & Gas Integrated" },
+  { label: "Immobilier (FPI)", en: "Real estate (REITs)", covers: "REIT - Specialty" },
+  { label: "Biens de consommation courante", en: "Consumer staples", covers: "Beverages - Non-Alcoholic, Tobacco, Household & Personal Products" },
+  { label: "Commerce de détail et en ligne", en: "Retail and e-commerce", covers: "Discount Stores, Internet Retail, Home Improvement Retail" },
+  { label: "Automobile", en: "Automotive", covers: "Auto Manufacturers" },
+  { label: "Voyages et services de voyage", en: "Travel and travel services", covers: "Travel Services" },
+  { label: "Conglomérats", en: "Conglomerates", covers: "Conglomerates" },
 ];
 const LIKED = "Industrie : ";
 const AVOIDED = "Industrie à éviter : ";
@@ -49,3 +49,6 @@ export function splitPreferences(prefs: string[] = []): IndustryChoice & { other
   }
   return { liked, avoided, others };
 }
+
+/** Libellé d'une industrie dans la langue d'affichage (la valeur stockée reste le libellé français). */
+export const industryName = (label: string, lang: "fr" | "en") => (lang === "en" ? INDUSTRIES.find((i) => i.label === label)?.en ?? label : label);
