@@ -1,12 +1,22 @@
 application:
   name: "AlphaForge"
-  version: "0.4.5"
+  version: "0.4.6"
   description: "Banc d'essai agentique et auto-explicatif pour l'investisseur autonome : il cadre l'intention, simule son impact sur le portefeuille et l'audite contre les textes réglementaires canadiens (simulation seulement). Datathon 2026."
-  status: "validé par l'équipe (0.4.0 le 2026-11-14, 0.4.1 le 2026-11-15) ; 0.4.2 et 0.4.3 validées par l'utilisateur le 2026-11-15, à relire par l'équipe ; 0.4.4 et 0.4.5 demandées par l'utilisateur le 2026-11-15 (lots A et B), à relire par l'équipe"
+  status: "validé par l'équipe (0.4.0 le 2026-11-14, 0.4.1 le 2026-11-15) ; 0.4.2 et 0.4.3 validées par l'utilisateur le 2026-11-15, à relire par l'équipe ; 0.4.4, 0.4.5 et 0.4.6 demandées par l'utilisateur le 2026-11-15 (lots A, B et C), à relire par l'équipe"
   solution_ref: "SOLUTION.md (racine du dépôt) : décisions de produit et de conception détaillées"
   # Règle d'équipe : ce fichier est la référence. Toute modification passe par un accord de l'équipe.
   # Voir aussi : la page de présentation du contrat (même contenu, avec schémas).
   changelog:
+    - version: "0.4.6"
+      date: "2026-11-15"
+      status: "demandé par l'utilisateur le 2026-11-15 (lot C, pas encore déployé) ; à relire par l'équipe"
+      summary:
+        - "Une seule échelle de risque : tolérance (1 à 5), capacité (1 à 5) et niveau retenu = le plus bas des deux (31-103CP p. 66, 31-368 p. 5), la même partout (accueil, profil, mandat, R1, catégorie de comparaison)."
+        - "schema-investor-profile : riskTolerance et riskCapacity deviennent obligatoires (1 à 5) ; riskLevel devient facultatif et ignoré (accepté pour ne pas casser les anciens clients, jamais stocké ni renvoyé à l'orchestrateur)."
+        - "tool-get-profile : le retour ne contient plus riskLevel."
+        - "tool-propose-mandate : refuse un brouillon dont fieldSources.riskCapacity vaut team_assumption (Langfuse, 2026-11-15 : capacité 2 inventée sans question). La capacité vient du profil, de l'utilisateur, ou se demande."
+      impacts_to_handle:
+        - "frontend : retrait du questionnaire public de l'accueil, du niveau à quatre libellés et du « Résultat du calcul » de la page Profil ; envoi de riskTolerance et riskCapacity seulement ; « à compléter » pour un profil ancien sans capacité. Les profils déjà stockés sans riskCapacity restent lisibles ; le PUT suivant exigera les deux champs."
     - version: "0.4.5"
       date: "2026-11-15"
       status: "demandé par l'utilisateur le 2026-11-15 (lot B, pas encore déployé) ; à relire par l'équipe"
@@ -507,9 +517,9 @@ data_schemas:
   - id: "schema-investor-profile"
     description: "Profil fictif d'un investisseur (personas Amira, Mateo, Robert). Aucune donnée personnelle réelle."
     fields:
-      - { name: "riskLevel", type: "string", required: true, enum: ["low", "low_moderate", "moderate", "high"], description: "niveau déclaré (persona); le mandat recalcule le profil retenu" }
-      - { name: "riskTolerance", type: "integer", required: false, description: "1 (faible) à 5 (élevé) : ce que la personne accepte de subir" }
-      - { name: "riskCapacity", type: "integer", required: false, description: "1 à 5 : ce qu'elle peut financièrement encaisser" }
+      - { name: "riskTolerance", type: "integer", required: true, description: "1 (faible) à 5 (élevé) : ce que la personne accepte de subir" }
+      - { name: "riskCapacity", type: "integer", required: true, description: "1 à 5 : ce qu'elle peut financièrement encaisser. Le niveau retenu (R1) est le plus bas des deux (0.4.6)." }
+      - { name: "riskLevel", type: "string", required: false, description: "obsolète (0.4.6) : ancienne échelle à quatre libellés, accepté puis ignoré, jamais stocké ni renvoyé" }
       - { name: "province", type: "string", required: false, enum_ref: "conventions.jurisdictions", description: "sert au filtre de la KB et aux mentions (R9); CA exclu" }
       - { name: "horizonMinYears", type: "integer", required: true }
       - { name: "horizonMaxYears", type: "integer", required: false }
@@ -1083,12 +1093,12 @@ tools:
     description: "Profil investisseur de l'utilisateur courant."
     used_by: ["agent-orchestrator"]
     params: []  # userId vient du contexte
-    returns: "schema-investor-profile, ou null si non rempli (l'orchestrateur pose alors les questions de cadrage)"
+    returns: "schema-investor-profile sans riskLevel (0.4.6), ou null si non rempli (l'orchestrateur pose alors les questions de cadrage)"
     reads: ["db-users"]
 
   - id: "tool-propose-mandate"
     name: "propose_mandate"
-    description: "Valide un brouillon de mandat (schema-mandate-create-request) et le joint au message de l'assistant (mandateDraft). Retire compareCategory (0.4.5). Ne confirme rien : la confirmation passe par api-mandates-create."
+    description: "Valide un brouillon de mandat (schema-mandate-create-request) et le joint au message de l'assistant (mandateDraft). Retire compareCategory (0.4.5) et refuse fieldSources.riskCapacity = team_assumption (0.4.6). Ne confirme rien : la confirmation passe par api-mandates-create."
     used_by: ["agent-orchestrator"]
     params:
       - { name: "draft", type: "object", required: true, validation: "schema-mandate-create-request; tickers dans l'univers" }
