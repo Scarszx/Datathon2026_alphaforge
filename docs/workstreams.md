@@ -1,7 +1,7 @@
 # Découpage du travail en worktrees
 
 Sources :
-- `contract/knowledge-graph.yaml` (**v0.4.0, validé par l'équipe**), la référence pour les routes, les schémas, les tables, les agents, les modules et les outils ;
+- `contract/knowledge-graph.yaml` (**v0.4.1, validé par l'équipe**), la référence pour les routes, les schémas, les tables, les agents, les modules et les outils ;
 - `SOLUTION.md`, qui donne les décisions de produit et de conception, et leurs raisons.
 
 Chaque chantier possède ses dossiers et n'écrit nulle part ailleurs, pour que les branches se fusionnent sans conflit.
