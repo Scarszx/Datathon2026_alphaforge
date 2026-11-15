@@ -1,4 +1,4 @@
-# db-users, db-conversations, db-messages, db-portfolios : clés et attributs
+# db-users, db-conversations, db-messages, db-portfolios, db-analyses : clés et attributs
 # exactement comme dans la section databases du contrat.
 
 resource "aws_dynamodb_table" "users" {
@@ -68,6 +68,24 @@ resource "aws_dynamodb_table" "portfolios" {
   }
   attribute {
     name = "portfolioId"
+    type = "S"
+  }
+}
+
+# db-analyses (contrat v0.4.0) : mandats et runs d'une session.
+# itemKey = MANDATE#<version sur 3 chiffres> ou RUN#<runId>.
+resource "aws_dynamodb_table" "analyses" {
+  name         = local.table_names.analyses
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "sessionId"
+  range_key    = "itemKey"
+
+  attribute {
+    name = "sessionId"
+    type = "S"
+  }
+  attribute {
+    name = "itemKey"
     type = "S"
   }
 }
