@@ -6,6 +6,7 @@ import AppHeader from "../components/AppHeader";
 import Chart from "../components/Chart";
 import Explanation from "../components/Explanation";
 import { amount, money, pct, plainPct, shortDate, signedAmount, toSeconds } from "../lib/format";
+import { TickerLabel } from "../components/TickerLogo";
 
 const RANGES: { key: SummaryRange; label: string }[] = [
   { key: "1m", label: "1 M" }, { key: "6m", label: "6 M" }, { key: "1y", label: "1 A" }, { key: "5y", label: "5 A" },
@@ -199,7 +200,7 @@ export default function PortfolioPage() {
                   <tbody>
                     {summary.holdings.map((h) => (
                       <tr key={h.ticker}>
-                        <td><strong>{h.ticker}</strong> {h.stale && <span className="badge warn" title="Dernier cours connu utilisé">cours ancien</span>}<br /><span className="muted small">{h.name} · {h.assetClass}{h.sector ? ` · ${h.sector}` : ""}</span></td>
+                        <td><TickerLabel ticker={h.ticker} name={`${h.name} · ${h.assetClass}${h.sector ? ` · ${h.sector}` : ""}`} /> {h.stale && <span className="badge warn" title="Dernier cours connu utilisé">cours ancien</span>}</td>
                         <td>{money(h.quantity, 4).replace(/,?0+$/, "")}</td>
                         <td>{amount(h.price, h.currency)}</td>
                         <td>{money(h.value)}</td>

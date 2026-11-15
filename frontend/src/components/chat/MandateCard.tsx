@@ -4,6 +4,7 @@ import type { Mandate, MandateCreateRequest } from "../../api/types";
 import { t, warningText, type Lang } from "../../lib/i18n";
 import { categoryOf } from "../../lib/comparisonCategories";
 import { PROVINCE_LABELS } from "../../lib/risk";
+import TickerLogo from "../TickerLogo";
 
 export function FieldSourceTag({ field, mandate, lang }: { field: string; mandate: MandateCreateRequest; lang: Lang }) {
   const src = mandate.fieldSources?.[field];
@@ -49,7 +50,7 @@ export default function MandateCard({ mandate, confirmed, lang }: { mandate: Man
               <ul className="mandate-ops">
                 {mandate.operations.map((o, i) => (
                   <li key={i}>
-                    {op(o.action)} {o.ticker}
+                    {op(o.action)} <TickerLogo ticker={o.ticker} size={18} /> {o.ticker}
                     {o.amount !== undefined ? ` · ${o.amount} ${o.currency ?? ""}` : ""}
                     {o.weight !== undefined ? ` · ${o.weight} %` : ""}
                   </li>

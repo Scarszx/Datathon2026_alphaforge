@@ -6,6 +6,7 @@ import type { Mandate, MandateCreateRequest, PortfolioSummary } from "../../api/
 import { t, type Lang } from "../../lib/i18n";
 import { cad, plainPct } from "../../lib/format";
 import MandateCard from "./MandateCard";
+import { TickerLabel } from "../TickerLogo";
 
 export default function MandateColumn({
   summary, mandate, busy, lang, onWhatIf,
@@ -49,7 +50,7 @@ export default function MandateColumn({
               <tbody>
                 {[...summary.holdings].sort((a, b) => b.weight - a.weight).map((h) => (
                   <tr key={h.ticker}>
-                    <td className="small"><strong>{h.ticker}</strong>{h.name ? <span className="muted small"> · {h.name}</span> : null}</td>
+                    <td className="small"><TickerLabel ticker={h.ticker} name={h.name} size={24} /></td>
                     <td className="small" style={{ textAlign: "right" }}>{cad(h.value)}</td>
                     <td className="small" style={{ textAlign: "right" }}>{h.weight.toFixed(1)} %</td>
                   </tr>

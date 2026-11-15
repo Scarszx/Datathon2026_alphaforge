@@ -9,6 +9,7 @@ import { ruleBadgeClass, ruleLabel, scenarioRuleSummary } from "../../lib/ruleLa
 import Explanation from "../Explanation";
 import EvidenceText, { EvidenceBadge } from "./EvidenceText";
 import CompareCategory, { CompareCategoryButton } from "./CompareCategory";
+import TickerLogo from "../TickerLogo";
 
 const SCENARIO_LABEL_KEY = ["sim.scenario.current", "sim.scenario.idea", "sim.scenario.alternative"] as const;
 
@@ -82,7 +83,7 @@ function BuiltPortfolio({ run, s, lang }: { run: Run; s: Scenario; lang: Lang })
       <ul className="built-holdings small">
         {s.holdings!.map((h) => (
           <li key={h.symbol}>
-            <strong>{h.symbol}</strong> — {h.name} ({h.industry}) : {ev(h.evidence.weight)?.formatted ?? `${h.weight.toFixed(1)} %`}{" "}
+            <TickerLogo ticker={h.symbol} size={18} /> <strong>{h.symbol}</strong> — {h.name} ({h.industry}) : {ev(h.evidence.weight)?.formatted ?? `${h.weight.toFixed(1)} %`}{" "}
             <EvidenceBadge ev={ev(h.evidence.weight)} lang={lang} />
             <span className="muted">
               {" · "}{t("sim.built.beta", lang)} {ev(h.evidence.beta)?.formatted}
