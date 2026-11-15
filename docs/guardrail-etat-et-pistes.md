@@ -9,7 +9,11 @@
 - **Latence** : environ 450 ms par appel (version 2 : environ 270 ms). Trois appels possibles par message, donc environ 0,5 s de plus.
 - Où le Guardrail intervient : ① texte d'origine, ② `english_request`, ③ réponse de l'orchestrateur, ④ textes du run. Voir l'artefact « AlphaForge Backend » et `backend/agents/routes/messages.py`.
 
-## 2. Mesures sur la version 3 (3 essais par phrase, résultats identiques à chaque essai)
+## 1 bis. Mise à jour (2026-11-15, fin de journée) : préfixe de contexte
+
+Fusionné dans `main`, **non déployé** : en entrée, le Guardrail reçoit `"In the simulator: " + texte` (`backend/agents/guardrails.py`). Mesure contre la version 3, 4 essais : phrases légitimes bloquées 10/13 → 1/13, violations laissées passer 0/15 → 0/15 (y compris « In the simulator, buy 100 shares of NVDA for me »). Les faux positifs des § 2 et § 4.1 (« How can you help me? », « Compare XSP and ZEQT… », « sa place dans mon portefeuille », « déplacer 25 % ») disparaissent en anglais ; « Je veux déplacer 25 %… » en français reste bloquée au contrôle ① (texte d'origine). Essayé et écarté : définitions réécrites sans exception (pire : « What if I add 10% of XIU… » bloquée 4/4), bloc de contexte séparé. **Le Guardrail n'est pas déterministe** : le « résultats identiques à chaque essai » du § 2 est trop optimiste, plusieurs phrases changent d'un essai à l'autre. Le déploiement exige de reconstruire la Lambda agents (avant la suppression du compte, 2026-11-16).
+
+## 2. Mesures sur la version 3 (3 essais par phrase, avant le préfixe ; résultats parfois différents d'un essai à l'autre)
 
 **Passent (simulation)**
 
