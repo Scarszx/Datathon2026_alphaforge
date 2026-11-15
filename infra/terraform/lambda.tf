@@ -17,15 +17,21 @@ locals {
     CONVERSATIONS_TABLE = local.table_names.conversations
     MESSAGES_TABLE      = local.table_names.messages
     PORTFOLIOS_TABLE    = local.table_names.portfolios
+    ANALYSES_TABLE      = local.table_names.analyses
     MODEL_ORCHESTRATOR  = var.model_orchestrator
-    MODEL_ANALYST       = var.model_analyst
-    MODEL_GOVERNANCE    = var.model_governance
     LOG_LEVEL           = var.log_level
   }
   api_env_vars = local.common_env_vars
+  # Lambda agents : jeu de données, modèles de l'auditeur et du rédacteur,
+  # Knowledge Base et Guardrail (noms de backend/common/config.py, WS0b).
   agents_env_vars = merge(local.common_env_vars, {
-    DATASET_BUCKET  = local.dataset_bucket
-    DATASET_VERSION = var.dataset_version
+    DATASET_BUCKET    = local.dataset_bucket
+    DATASET_VERSION   = var.dataset_version
+    MODEL_AUDITOR     = var.model_auditor
+    MODEL_WRITER      = var.model_writer
+    KB_ID             = aws_bedrockagent_knowledge_base.regulation.id
+    GUARDRAIL_ID      = aws_bedrock_guardrail.this.guardrail_id
+    GUARDRAIL_VERSION = aws_bedrock_guardrail_version.this.version
   })
 }
 

@@ -8,6 +8,7 @@ locals {
     conversations_index = "arn:aws:dynamodb:${var.aws_region}:${local.account_id}:table/${local.table_names.conversations}/index/updatedAt-index"
     messages            = "arn:aws:dynamodb:${var.aws_region}:${local.account_id}:table/${local.table_names.messages}"
     portfolios          = "arn:aws:dynamodb:${var.aws_region}:${local.account_id}:table/${local.table_names.portfolios}"
+    analyses            = "arn:aws:dynamodb:${var.aws_region}:${local.account_id}:table/${local.table_names.analyses}"
   }
 }
 
@@ -68,6 +69,15 @@ data "aws_iam_policy_document" "api" {
     resources = [local.table_arn.portfolios]
   }
 
+  # db-analyses : read_write_delete (écrit les mandats, version = dernière + 1 ;
+  # supprime mandats et runs avec la conversation).
+  statement {
+    sid       = "AnalysesReadWriteDelete"
+    effect    = "Allow"
+    actions   = ["dynamodb:GetItem", "dynamodb:Query", "dynamodb:PutItem", "dynamodb:DeleteItem", "dynamodb:BatchWriteItem"]
+    resources = [local.table_arn.analyses]
+  }
+
   # Journaux (groupes créés par Terraform, rétention 14 jours).
   statement {
     sid       = "Logs"
@@ -112,6 +122,14 @@ data "aws_iam_policy_document" "agents" {
     resources = [local.table_arn.users]
   }
 
+  # db-analyses : read_write (lit les mandats, écrit les runs partial puis done).
+  statement {
+    sid       = "AnalysesReadWrite"
+    effect    = "Allow"
+    actions   = ["dynamodb:GetItem", "dynamodb:Query", "dynamodb:PutItem", "dynamodb:UpdateItem"]
+    resources = [local.table_arn.analyses]
+  }
+
   # Jeu de données : le préfixe complet (la version change sans toucher à l'IAM).
   statement {
     sid       = "DatasetRead"
@@ -130,6 +148,23 @@ data "aws_iam_policy_document" "agents" {
       "bedrock:InvokeModelWithResponseStream",
     ]
     resources = local.bedrock_invoke_arns
+  }
+
+  # srv-bedrock-kb : recherche dans la KB réglementaire (tool-search-regulation).
+  statement {
+    sid       = "KnowledgeBaseRetrieve"
+    effect    = "Allow"
+    actions   = ["bedrock:Retrieve"]
+    resources = [aws_bedrockagent_knowledge_base.regulation.arn]
+  }
+
+  # srv-bedrock-guardrails : filtre d'entrée et de sortie (ApplyGuardrail, ou
+  # guardrail passé à l'invocation du modèle).
+  statement {
+    sid       = "GuardrailApply"
+    effect    = "Allow"
+    actions   = ["bedrock:ApplyGuardrail"]
+    resources = [aws_bedrock_guardrail.this.guardrail_arn]
   }
 
   # Journaux.

@@ -1,5 +1,5 @@
 # Exemple de valeurs : copier en terraform.tfvars (ignoré par git) et adapter.
-# Les variables avec défaut (région, préfixe, modèles, CORS) n'ont pas besoin d'y figurer.
+# Les variables avec défaut (région, préfixe, modèles, embeddings, CORS) n'ont pas besoin d'y figurer.
 
 aws_region = "us-east-1"
 
@@ -12,6 +12,10 @@ dataset_version = "2026-11-12"
 # ou la table des couches de la doc AWS SDK for pandas. Format attendu :
 #   arn:aws:lambda:us-east-1:336392948345:layer:AWSSDKPandas-Python312-Arm64:<version>
 pandas_layer_arn = null
+
+# Version du corpus réglementaire sous s3://<bucket>/kb/<version>/ (défaut :
+# date de récupération de docs/for_KB/). kb_sync.sh lit ce préfixe dans les outputs.
+kb_corpus_version = "2026-11-14"
 
 cors_origins = ["http://localhost:3000"]
 log_level    = "INFO"
