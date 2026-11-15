@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-51.2 -28.8 1126.4 633.6" preserveAspectRatio="xMidYMid slice">
+  <!-- Vagues arrière du fond (droite, gauche) : calque html::before de styles.css, animé.
+       Même repère que background.svg (0 0 1024 576) avec 5 % de marge par côté : les formes prolongent
+       leur courbe dans la marge, pour que les bords ne se découvrent pas quand le calque bouge.
+       Dégradés calés sur la boîte d'origine de chaque vague (userSpaceOnUse) : couleurs identiques à l'image fournie. -->
+  <defs>
+    <linearGradient id="waveRight" gradientUnits="userSpaceOnUse" gradientTransform="matrix(384 0 0 501 640 75)" x1="1" y1="0.1" x2="0.55" y2="1">
+      <stop offset="0" stop-color="#A6E6C2"/>
+      <stop offset="1" stop-color="#C9EFD9" stop-opacity="0.6"/>
+    </linearGradient>
+    <linearGradient id="waveLeft" gradientUnits="userSpaceOnUse" gradientTransform="matrix(520 0 0 168.63 0 407.37)" x1="0" y1="0.7" x2="0.4" y2="1">
+      <stop offset="0" stop-color="#C6EED8"/>
+      <stop offset="1" stop-color="#E2F6EA" stop-opacity="0.5"/>
+    </linearGradient>
+  </defs>
+  <path d="M625.23 604.8 L640 576 C 720 420, 860 230, 1024 75 L1075.2 26.61 L1075.2 604.8 Z" fill="url(#waveRight)" opacity="0.85"/>
+  <path d="M-51.2 410.93 L0 408 C 140 400, 260 470, 360 520 C 420 548, 470 566, 520 576 L664 604.8 L-51.2 604.8 Z" fill="url(#waveLeft)" opacity="0.9"/>
+</svg>

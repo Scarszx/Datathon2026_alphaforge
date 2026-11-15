@@ -1,4 +1,4 @@
-# Jeu de données de marché AlphaForge AI (`data/`, chantier WS3)
+# Jeu de données de marché Grow (`data/`, chantier WS3)
 
 Ce dossier contient le pipeline d'ingestion reproductible (`job-ingestion`) qui produit le jeu de données élargi (~250 actifs sur 10 ans) au format de la section `storage` (`storage-dataset`) du contrat `contract/knowledge-graph.yaml`.
 

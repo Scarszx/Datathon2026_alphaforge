@@ -1,4 +1,4 @@
-# Infrastructure AlphaForge (Terraform)
+# Infrastructure Grow (Terraform)
 
 Décrit toute l'infrastructure du contrat v0.4.0 (`contract/knowledge-graph.yaml`) : Cognito, DynamoDB (dont `Analyses`), S3 (+ CloudFront pour le front), deux Lambdas, API Gateway HTTP API (17 routes), CloudWatch, Knowledge Base Bedrock (S3 Vectors) et Guardrail Bedrock. Prête pour un `terraform plan` — **jamais d'`apply` ici** : une seule personne le fera, après validation de l'équipe.
 

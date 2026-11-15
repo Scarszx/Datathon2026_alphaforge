@@ -14,7 +14,7 @@ vi.mock("./lib/useSpeechToText", () => ({
 import ConversationColumn from "./components/chat/ConversationColumn";
 
 const renderIt = (onSend = vi.fn()) => render(
-  <ConversationColumn messages={[]} evidence={[]} busy={false} lang="fr" onSend={onSend} onQuickReply={vi.fn()} onConfirmDraft={vi.fn()} />,
+  <ConversationColumn messages={[]} evidence={[]} busy={false} lang="fr" refusal={null} onDismissRefusal={vi.fn()} onSend={onSend} onQuickReply={vi.fn()} onConfirmDraft={vi.fn()} />,
 );
 const input = () => screen.getByRole("textbox") as HTMLInputElement;
 Element.prototype.scrollIntoView = vi.fn();

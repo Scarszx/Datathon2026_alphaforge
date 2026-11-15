@@ -122,6 +122,8 @@ describe("SimulationPanel (affichage progressif partial → done)", () => {
       ],
     };
     render(<SimulationPanel run={oldRun} lang="fr" />);
+    // Les citations sont dans le détail de chaque règle (« Voir plus ») : tout déplier avant de compter.
+    for (const more of screen.getAllByRole("button", { name: "Voir plus" })) fireEvent.click(more);
     expect(screen.getAllByRole("button", { name: "KB-01" }).length).toBe(1); // seulement sous la règle déclenchée
   });
 
@@ -140,7 +142,7 @@ describe("SimulationPanel (affichage progressif partial → done)", () => {
   it("mentions fixes du lot D affichées en partial, avec la version du jeu et la phrase fixe", () => {
     render(<SimulationPanel run={PARTIAL} lang="fr" />);
     expect(screen.getByText(/Vous prenez seul vos décisions/)).toBeTruthy();
-    expect(screen.getByText(/AlphaForge ne se prononce pas sur ce qui vous convient\./)).toBeTruthy();
+    expect(screen.getByText(/Grow ne se prononce pas sur ce qui vous convient\./)).toBeTruthy();
     expect(screen.getByText(/jeu de données demo/)).toBeTruthy();
   });
 
@@ -340,7 +342,7 @@ describe("Cartes de synthèse et provenance (idées 1 et 6)", () => {
   it("le panneau de provenance sépare moteur de calcul et rédaction par l'IA", () => {
     const { container } = render(<SimulationPanel run={RUN} lang="fr" />);
     const prov = container.querySelector("details.provenance")!;
-    expect(prov.querySelector("summary")?.textContent).toBe("Comment AlphaForge arrive à cette conclusion");
+    expect(prov.querySelector("summary")?.textContent).toBe("Comment Grow arrive à cette conclusion");
     expect(prov.textContent).toContain("Calculé par le moteur");
     expect(prov.textContent).toContain("Rédigé par l'IA");
     expect(prov.textContent).toContain("Avis 31-368");

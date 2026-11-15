@@ -1,4 +1,4 @@
-# AlphaForge AI
+# Grow
 
 **Datathon PolyFinances 2026 · Défi « AlphaForge AI »** · Un banc d'essai agentique et auto-explicatif pour l'investisseur autonome.
 
@@ -69,7 +69,7 @@ Pour reproduire le déploiement complet, suivre la section
 
 ## Architecture AWS
 
-![Architecture AWS AlphaForge](docs/alphaforge-infra.png)
+![Architecture AWS Grow](docs/alphaforge-infra.png)
 
 Le schéma présente le frontend hébergé sur S3/CloudFront, l'API Gateway,
 les Lambdas, DynamoDB, le jeu de données, Bedrock, la Knowledge Base,
@@ -79,7 +79,7 @@ les Guardrails et CloudWatch.
 
 ## En bref
 
-Sur une plateforme de courtage autonome, l'investisseur voit ce qu'il possède, mais il est seul au moment de tester une idée. AlphaForge lui ouvre une session de simulation :
+Sur une plateforme de courtage autonome, l'investisseur voit ce qu'il possède, mais il est seul au moment de tester une idée. Grow lui ouvre une session de simulation :
 
 1. **Cadrage.** Un agent lit son profil et son portefeuille, pose au plus une étape de questions, puis propose un *mandat* (objectif, horizon, tolérance et capacité de perte). L'utilisateur le confirme.
 2. **Mesure.** Du code, pas un modèle de langage, construit trois scénarios (portefeuille actuel, idée telle quelle, alternative par catégorie d'actifs) et calcule rendement, volatilité, pire baisse, tests de résistance (2022, krach COVID 2020, hausse des taux, krach crypto) et concentration par titre, secteur, pays et devise.

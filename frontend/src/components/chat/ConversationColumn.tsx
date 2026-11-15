@@ -1,4 +1,5 @@
-/* Colonne 2 de /chat : conversation. Messages, boutons quickReplies de l'orchestrateur, carte « mandat
+/* Colonne 2 de /chat : conversation. Messages (réponses de l'assistant mises en forme par MessageText,
+ * règles repliées avec « Voir plus »), boutons quickReplies de l'orchestrateur, carte « mandat
  * proposé » (mandateDraft) avec Confirmer (POST mandates puis POST runs) et Modifier (édition des
  * champs clés avant confirmation). */
 import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from "react";
@@ -8,8 +9,8 @@ import { PROVINCES } from "../../lib/risk";
 import { appendSpeech } from "../../lib/speech";
 import { useSpeechToText } from "../../lib/useSpeechToText";
 import Explanation from "../Explanation";
-import EvidenceText from "./EvidenceText";
 import MandateCard from "./MandateCard";
+import MessageText from "./MessageText";
 
 const MAX_LEN = 2000; // schema-message-create-request
 
@@ -71,7 +72,9 @@ function Bubble({
       <div className={`bubble${m.status === "error" ? " err" : ""}`}>
         {m.status === "pending" ? <span className="muted">{t("chat.thinking", lang)}</span> : (
           <>
-            <p className="pre">{m.runId ? <EvidenceText text={m.content} evidence={evidence} lang={lang} /> : m.content}</p>
+            {m.role === "assistant"
+              ? <MessageText text={m.content} evidence={evidence} lang={lang} resolve={!!m.runId} />
+              : <p className="pre">{m.content}</p>}
             {m.role === "assistant" && m.explanation && <Explanation data={m.explanation} />}
             {m.quickReplies?.length ? (
               <div className="suggest" style={{ marginTop: 10 }}>
@@ -105,12 +108,15 @@ function Bubble({
 }
 
 export default function ConversationColumn({
-  messages, evidence, busy, lang, onSend, onQuickReply, onConfirmDraft,
+  messages, evidence, busy, lang, refusal, onDismissRefusal, onSend, onQuickReply, onConfirmDraft,
 }: {
   messages: Message[];
   evidence: import("../../api/types").Evidence[];
   busy: boolean;
   lang: Lang;
+  /** Refus de Guardrail : texte envoyé (remis dans le champ pour être reformulé) et explication rédigée côté serveur. */
+  refusal: { id: number; sent: string; message: string } | null;
+  onDismissRefusal: () => void;
   onSend: (text: string) => void;
   onQuickReply: (text: string) => void;
   onConfirmDraft: (m: MandateCreateRequest) => void;
@@ -126,6 +132,8 @@ export default function ConversationColumn({
   const field = useRef<HTMLInputElement>(null);
   // Garde la fin de la phrase en cours visible quand elle dépasse la largeur du champ.
   useEffect(() => { const el = field.current; if (el && partial) el.scrollLeft = el.scrollWidth; }, [partial]);
+  // Un refus remet le texte envoyé dans le champ : l'utilisateur le reformule au lieu de le retaper.
+  useEffect(() => { if (refusal) { setV(refusal.sent); setDictated(false); field.current?.focus(); } }, [refusal?.id]);
   const end = useRef<HTMLDivElement>(null);
   useEffect(() => { end.current?.scrollIntoView({ block: "end" }); }, [messages.length, busy]);
 
@@ -157,7 +165,7 @@ export default function ConversationColumn({
       <div className="chat-col-foot">
         <form className={`af-composer${partial ? " af-composer-live" : ""}`} onSubmit={submit}>
           {/* Lecture seule pendant la dictée : une frappe copierait le texte provisoire dans `v`, qui serait réaffiché. */}
-          <input ref={field} value={shown} onChange={(e) => setV(e.target.value)} onKeyDown={key} readOnly={dictating}
+          <input ref={field} value={shown} onChange={(e) => { setV(e.target.value); if (refusal) onDismissRefusal(); }} onKeyDown={key} readOnly={dictating}
             placeholder={t("chat.placeholder", lang)} aria-label={t("chat.send", lang)} maxLength={MAX_LEN} />
           {speech.supported && (
             <button type="button" className={`af-mic${speech.state === "listening" ? " listening" : ""}`}
@@ -172,6 +180,15 @@ export default function ConversationColumn({
           )}
           <button type="submit" className="af-send" disabled={busy || !shown.trim()} aria-label={t("chat.send", lang)}>↑</button>
         </form>
+        {refusal && (
+          <div className="af-refusal" role="status" aria-live="polite">
+            <span className="af-refusal-icon" aria-hidden="true">⚠</span>
+            <div>
+              <strong>{lang === "en" ? "Request not supported" : "Demande non prise en charge"}</strong>
+              <p>{refusal.message}</p>
+            </div>
+          </div>
+        )}
         {(speech.state === "denied" || speech.state === "error") && (
           <p className="af-mic-note err" role="status">
             {speech.state === "denied" ? t("chat.mic.denied", lang) : t("chat.mic.error", lang)}

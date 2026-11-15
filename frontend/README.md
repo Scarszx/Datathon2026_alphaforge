@@ -1,6 +1,6 @@
 # Front (SPA) : lancer sur votre ordinateur
 
-Front du contrat d'API AlphaForge (simulation seulement : aucune transaction réelle, aucun conseil financier).
+Front du contrat d'API Grow (simulation seulement : aucune transaction réelle, aucun conseil financier).
 Tout le front est dans ce dossier `frontend/` (chantier WS6). Les écarts et hypothèses du chantier sont dans `NOTES-frontend.md`.
 
 Prérequis : [Node.js](https://nodejs.org) 18 ou plus récent.
@@ -21,7 +21,7 @@ Ouvrez ensuite **http://localhost:5173** dans votre navigateur.
 | Commande | Mode | Ce qu'il faut |
 |---|---|---|
 | `npm run dev:demo` | **Démo** : connexion, inscription, portefeuille, profil et assistant simulés dans le navigateur (`frontend/src/api/demo.ts`). Prix fictifs. | Rien |
-| `npm run dev` | **Réel** : Cognito pour la connexion, API AlphaForge pour les données | Un fichier `.env` (voir plus bas) |
+| `npm run dev` | **Réel** : Cognito pour la connexion, API Grow pour les données | Un fichier `.env` (voir plus bas) |
 
 En mode démo, les données (comptes, portefeuilles, conversations) sont gardées dans le `localStorage` du navigateur.
 Pour tout remettre à zéro : outils de développement du navigateur → Application → Local Storage → supprimer `af.demo.db`.
@@ -84,6 +84,13 @@ Fichiers : `src/lib/risk.ts`, `src/components/RiskForm.tsx`.
 5. Capacité financière à absorber une perte
 
 **Score** = somme des points, de 5 (minimum) à 25 (maximum).
+
+Questions hors score : province (obligatoire), puis, à la création du portefeuille seulement, critères ESG
+(oui ou non, obligatoire), marché géographique (Canada, États-Unis ou les deux, obligatoire) et industries
+(facultatif). Ces trois dernières vont dans `preferences` du profil, sans nouveau champ de contrat :
+« ESG » (seulement si oui), « Marché géographique : Canada », « Marché géographique : États-Unis »,
+« Industrie : … », « Industrie à éviter : … » (`src/lib/esgMarket.ts`, `src/lib/industries.ts`).
+Elles se modifient ensuite dans « Modifier mon profil ».
 
 **Premier calcul** :
 
