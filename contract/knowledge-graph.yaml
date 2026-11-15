@@ -17,6 +17,7 @@ application:
         - "Nouveaux services : Bedrock Knowledge Bases (corpus réglementaire filtré par juridiction) et Bedrock Guardrails."
         - "Profil investisseur : tolérance et capacité de perte séparées, province."
         - "Politique de langue : système interne en anglais, affichage dans userLanguage (conventions.language_policy)."
+        - "Limites des agents relevées (banc de fumée du 2026-11-14 : 1024 tokens coupaient la sortie structurée de l'orchestrateur) : orchestrateur 4096 tokens et 8 cycles (traduction 8192), auditeur 4096 tokens et 16 recherches en 60 s, rédacteur 8192 tokens et 4 appels en 60 s."
       impacts_to_handle:
         - "backend/api/registry.json et backend/api/tests/test_routes_agents.py copient l'ancien registre (agent-analyst, agent-governance) : à régénérer (Agent-Backend-API)."
         - "infra/terraform : table Analyses, Knowledge Base, Guardrail, droits IAM Bedrock KB et Guardrails à ajouter (Agent-Infra), sans apply sans accord."
@@ -866,12 +867,13 @@ agents:
     role: "Seule voix face à l'utilisateur. Détecte userLanguage et traduit chaque message de l'utilisateur en anglais avant toute action; tout ce qu'il transmet aux outils et aux autres composants est en anglais; traduit dans userLanguage tout texte affiché (réponse, quickReplies, narrative, motifs de verdict, mentions), en conservant les emplacements {EV-nn}/{KB-nn} et sans traduire les extraits réglementaires. Lit la session (portefeuille, profil, province), détecte ce qui manque, pose au plus une étape de questions (quickReplies), propose le mandat, attend sa confirmation, puis lance l'analyse. Répond aux questions de suivi à partir du registre. Ne calcule jamais de tête et ne nomme jamais un titre comme recommandation."
     runs_in: "srv-agent-runtime"
     model: "Claude Sonnet 5.5 via Bedrock, région us-east-1 (profil d'inférence global.anthropic.claude-sonnet-5-5, testé par l'équipe; lu dans la config)"
-    max_tokens: 1024
+    max_tokens: 4096  # conversation; traduction de la restitution : translation_max_tokens
+    translation_max_tokens: 8192
     allowed_tools: ["tool-get-portfolio", "tool-get-profile", "tool-search-assets", "tool-propose-mandate", "tool-read-evidence"]
     system_prompt_language: "en"
     system_prompt_must_include: "If the user's message is not in English, translate it into English before doing anything else; all tool calls and all communication with other components are in English. When replying to the user, answer in the user's language (userLanguage), keep every {EV-nn}/{KB-nn} placeholder unchanged, and never translate quoted regulatory excerpts." 
     delegates_to: []
-    limits: { max_agent_cycles: 6, timeout_seconds: 25 }
+    limits: { max_agent_cycles: 8, timeout_seconds: 25 }  # 25 s : POST /messages est synchrone derrière l'API Gateway (30 s)
     fail_mode: "closed"
     fail_mode_note: "Mandat incomplet : il pose la question ou propose des valeurs par défaut marquées team_assumption, à confirmer."
     owner_agent: "Agent-Backend-Agents"
@@ -884,9 +886,9 @@ agents:
     role: "Travaille en anglais (requêtes KB et motifs en anglais). Ne décide pas des verdicts (module-rules le fait). Pour chaque verdict, cherche dans la Knowledge Base le passage qui le fonde (filtre juridiction ∈ {CA, province}), l'inscrit au registre (KB-nn) et formule le motif en une phrase."
     runs_in: "srv-agent-runtime"
     model: "Claude Sonnet 5.5 via Bedrock, région us-east-1 (profil d'inférence global.anthropic.claude-sonnet-5-5, testé par l'équipe; lu dans la config)"
-    max_tokens: 1024
+    max_tokens: 4096
     allowed_tools: ["tool-search-regulation", "tool-read-evidence"]
-    limits: { max_tool_calls: 8, timeout_seconds: 20 }
+    limits: { max_tool_calls: 16, timeout_seconds: 60 }  # partie asynchrone du run (Lambda 180 s)
     fail_mode: "closed"
     fail_mode_note: "Aucun passage trouvé : le verdict reste affiché avec « fondement : hypothèse d'équipe » ou not_verified. Jamais de citation inventée."
     owner_agent: "Agent-Backend-Agents"
@@ -898,9 +900,9 @@ agents:
     role: "Rédige en anglais (textEn) 4 sections (données utilisées, pourquoi ce verdict, limites, ce qui changerait la réponse) à partir du registre seulement; agent-orchestrator les traduit. N'écrit aucun chiffre : seulement des emplacements {EV-nn} et {KB-nn}."
     runs_in: "srv-agent-runtime"
     model: "Claude Sonnet 5.5 via Bedrock, région us-east-1 (profil d'inférence global.anthropic.claude-sonnet-5-5, testé par l'équipe; lu dans la config)"
-    max_tokens: 2048
+    max_tokens: 8192
     allowed_tools: ["tool-read-evidence"]
-    limits: { max_tool_calls: 3, timeout_seconds: 25 }
+    limits: { max_tool_calls: 4, timeout_seconds: 60 }  # partie asynchrone du run (Lambda 180 s)
     fail_mode: "open"
     fail_mode_note: "En cas d'échec, le run reste utilisable (scénarios, verdicts, citations) avec status = error sur narrative."
     owner_agent: "Agent-Backend-Agents"
