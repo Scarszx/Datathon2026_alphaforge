@@ -1,0 +1,163 @@
+{
+  "agents": [
+    {
+      "id": "agent-orchestrator",
+      "name": "Orchestrateur",
+      "role": "Seule voix face à l'utilisateur. Détecte userLanguage et traduit chaque message de l'utilisateur en anglais avant toute action; tout ce qu'il transmet aux outils et aux autres composants est en anglais; traduit dans userLanguage tout texte affiché (réponse, quickReplies, narrative, motifs de verdict, mentions), en conservant les emplacements {EV-nn}/{KB-nn} et sans traduire les extraits réglementaires. Lit la session (portefeuille, profil, province), détecte ce qui manque, pose au plus une étape de questions (quickReplies), propose le mandat, attend sa confirmation, puis lance l'analyse. Répond aux questions de suivi à partir du registre. Ne calcule jamais de tête et ne nomme jamais un titre comme recommandation.",
+      "allowedTools": [
+        "tool-get-portfolio",
+        "tool-get-profile",
+        "tool-search-assets",
+        "tool-propose-mandate",
+        "tool-read-evidence"
+      ],
+      "delegatesTo": [],
+      "limits": {
+        "max_agent_cycles": 6,
+        "timeout_seconds": 25
+      }
+    },
+    {
+      "id": "agent-auditor",
+      "name": "Auditeur de convenance",
+      "role": "Travaille en anglais (requêtes KB et motifs en anglais). Ne décide pas des verdicts (module-rules le fait). Pour chaque verdict, cherche dans la Knowledge Base le passage qui le fonde (filtre juridiction ∈ {CA, province}), l'inscrit au registre (KB-nn) et formule le motif en une phrase.",
+      "allowedTools": [
+        "tool-search-regulation",
+        "tool-read-evidence"
+      ],
+      "delegatesTo": [],
+      "limits": {
+        "max_tool_calls": 8,
+        "timeout_seconds": 20
+      }
+    },
+    {
+      "id": "agent-writer",
+      "name": "Rédacteur",
+      "role": "Rédige en anglais (textEn) 4 sections (données utilisées, pourquoi ce verdict, limites, ce qui changerait la réponse) à partir du registre seulement; agent-orchestrator les traduit. N'écrit aucun chiffre : seulement des emplacements {EV-nn} et {KB-nn}.",
+      "allowedTools": [
+        "tool-read-evidence"
+      ],
+      "delegatesTo": [],
+      "limits": {
+        "max_tool_calls": 3,
+        "timeout_seconds": 25
+      }
+    }
+  ],
+  "modules": [
+    {
+      "id": "module-engine",
+      "name": "Moteur de calcul",
+      "role": "Construit les scénarios 0/1/2 et calcule : rendement, volatilité annualisée, pire baisse, tests de résistance (2022, hausse des taux dérivée de V39079/DFF, krach crypto dérivé de BTC-USD), concentration par titre, secteur, pays et devise (avec composition des FNB), corrélations. Chaque résultat est inscrit au registre (EV-nn)."
+    },
+    {
+      "id": "module-rules",
+      "name": "Règles de convenance R1-R10",
+      "role": "Applique R1 à R10 (voir rules_catalog) au mandat et aux scénarios; produit les verdicts sans citation. Seuils d'hypothèse dans un fichier de configuration."
+    },
+    {
+      "id": "module-verifier",
+      "name": "Vérificateur",
+      "role": "Contrôle chaque phrase du texte final affiché (text, dans userLanguage) : mêmes emplacements que textEn, emplacements EV/KB existants, aucun chiffre écrit à la main hors constantes du mandat, aucune formule de recommandation ou de promesse. Une phrase fautive est masquée et signalée; pas de nouvelle tentative bloquante."
+    }
+  ],
+  "tools": [
+    {
+      "id": "tool-search-assets",
+      "description": "Cherche des actifs de l'univers par nom ou symbole.",
+      "reads": [
+        "storage-dataset: universe.parquet"
+      ]
+    },
+    {
+      "id": "tool-get-prices",
+      "description": "Prix ajustés (adj_close) d'un actif, dans sa devise de cotation.",
+      "reads": [
+        "storage-dataset: prices/{ticker}.parquet"
+      ]
+    },
+    {
+      "id": "tool-get-macro",
+      "description": "Série macroéconomique ou taux de change USD/CAD.",
+      "reads": [
+        "storage-dataset: macro/macro.parquet",
+        "storage-dataset: fx/usdcad.parquet"
+      ]
+    },
+    {
+      "id": "tool-compute-metrics",
+      "description": "Calcule des indicateurs sur un ou plusieurs actifs et renvoie des chiffres (jamais les lignes brutes).",
+      "reads": [
+        "storage-dataset: prices/{ticker}.parquet",
+        "storage-dataset: fx/usdcad.parquet"
+      ]
+    },
+    {
+      "id": "tool-get-portfolio",
+      "description": "Positions du portefeuille de l'utilisateur courant.",
+      "reads": [
+        "db-portfolios"
+      ]
+    },
+    {
+      "id": "tool-get-profile",
+      "description": "Profil investisseur de l'utilisateur courant.",
+      "reads": [
+        "db-users"
+      ]
+    },
+    {
+      "id": "tool-propose-mandate",
+      "description": "Valide un brouillon de mandat (schema-mandate-create-request) et le joint au message de l'assistant (mandateDraft). Ne confirme rien : la confirmation passe par api-mandates-create.",
+      "reads": [
+        "storage-dataset: universe.parquet"
+      ]
+    },
+    {
+      "id": "tool-read-evidence",
+      "description": "Lit le registre de preuves du dernier run de la session (ou un élément précis).",
+      "reads": [
+        "db-analyses"
+      ]
+    },
+    {
+      "id": "tool-portfolio-impact",
+      "description": "Construit les scénarios 0/1/2 d'un mandat et calcule leurs mesures.",
+      "reads": [
+        "db-portfolios",
+        "db-analyses",
+        "storage-dataset"
+      ]
+    },
+    {
+      "id": "tool-stress-test",
+      "description": "Rejoue un portefeuille sur une période de stress dérivée des données (y2022, rate_hikes, crypto_crash).",
+      "reads": [
+        "storage-dataset"
+      ]
+    },
+    {
+      "id": "tool-concentration",
+      "description": "Poids par titre, secteur, pays et devise, avec la composition des FNB (etf_enriched.json).",
+      "reads": [
+        "storage-dataset: etf_enriched.json",
+        "storage-dataset: universe.parquet"
+      ]
+    },
+    {
+      "id": "tool-check-rules",
+      "description": "Applique R1-R10 au mandat et aux scénarios (code, seuils configurables).",
+      "reads": [
+        "db-analyses"
+      ]
+    },
+    {
+      "id": "tool-search-regulation",
+      "description": "Recherche dans la Knowledge Base réglementaire (Retrieve) avec filtre de métadonnées.",
+      "reads": [
+        "srv-bedrock-kb"
+      ]
+    }
+  ]
+}

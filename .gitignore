@@ -1,5 +1,29 @@
 node_modules
-dist
 *.tsbuildinfo
 # LibreOffice lock files
 .~lock.*#
+
+# Identifiants AWS locaux du compte de l'événement (jamais dans git)
+.aws-local/
+
+# Terraform (état et variables locaux, jamais dans git)
+.terraform/
+*.tfstate*
+*.tfvars
+
+# Python
+.venv/
+__pycache__/
+
+# Paquets construits (zips des Lambdas, etc.)
+build/
+dist/
+
+# Jeu de données généré localement (ingestion)
+data/output/
+.env
+
+# Données Parquet : jamais dans git, sauf les mini-jeux de test (fixtures)
+*.parquet
+!data/fixtures/**/*.parquet
+!backend/agents/tests/fixtures/**/*.parquet

@@ -1,0 +1,1145 @@
+application:
+  name: "AlphaForge"
+  version: "0.4.0"
+  description: "Banc d'essai agentique et auto-explicatif pour l'investisseur autonome : il cadre l'intention, simule son impact sur le portefeuille et l'audite contre les textes réglementaires canadiens (simulation seulement). Datathon 2026."
+  status: "validé par l'équipe (2026-11-14)"
+  solution_ref: "SOLUTION.md (racine du dépôt) : décisions de produit et de conception détaillées"
+  # Règle d'équipe : ce fichier est la référence. Toute modification passe par un accord de l'équipe.
+  # Voir aussi : la page de présentation du contrat (même contenu, avec schémas).
+  changelog:
+    - version: "0.4.0"
+      date: "2026-11-14"
+      summary:
+        - "Aligné sur SOLUTION.md : flux cadrage → mandat confirmé → calcul → audit → restitution."
+        - "Agents : agent-orchestrator, agent-auditor (remplace agent-governance), agent-writer. agent-analyst est retiré : le calcul devient un module de code (module-engine)."
+        - "Modules de code sans LLM : module-engine, module-rules (R1-R10), module-verifier."
+        - "Nouvelles routes : mandats et exécutions d'analyse (runs). Nouvelle table Analyses."
+        - "Nouveaux services : Bedrock Knowledge Bases (corpus réglementaire filtré par juridiction) et Bedrock Guardrails."
+        - "Profil investisseur : tolérance et capacité de perte séparées, province."
+        - "Politique de langue : système interne en anglais, affichage dans userLanguage (conventions.language_policy)."
+      impacts_to_handle:
+        - "backend/api/registry.json et backend/api/tests/test_routes_agents.py copient l'ancien registre (agent-analyst, agent-governance) : à régénérer (Agent-Backend-API)."
+        - "infra/terraform : table Analyses, Knowledge Base, Guardrail, droits IAM Bedrock KB et Guardrails à ajouter (Agent-Infra), sans apply sans accord."
+    - version: "0.3.0"
+      summary: ["version initiale de l'équipe"]
+
+# ==========================================
+# 0. CONVENTIONS COMMUNES
+# ==========================================
+conventions:
+  api_base_path: "/v1"
+  format: "JSON UTF-8, champs en camelCase"
+  dates: "ISO 8601 UTC, ex. 2026-11-14T09:30:00Z. Dates de marché : YYYY-MM-DD."
+  amounts: "nombres (jamais des chaînes). Les pourcentages sont des nombres : 9.07 veut dire 9,07 %."
+  supported_currencies: ["CAD", "USD"]  # le jeu de données ne fournit que le taux USD/CAD
+  authentication:
+    provider: "srv-cognito"
+    scheme: "Authorization: Bearer <accessToken>"
+    user_identity: "userId = claim 'sub' du JWT. Jamais lu dans le corps de la requête ni fourni par le modèle."
+    public_routes: []  # le login se fait directement auprès de Cognito (SDK), pas via notre API
+  identifiers:
+    sessionId: "UUID v4 généré par le serveur"
+    messageId: "ULID (triable par ordre chronologique)"
+    portfolioId: "texte court, 'main' par défaut"
+    ticker: "symbole exact du jeu de données, ex. AAPL, RY.TO, BTC-USD"
+    mandateVersion: "entier croissant par session, à partir de 1"
+    runId: "ULID d'une exécution d'analyse"
+    evidenceId: "EV-<nn> pour un calcul, KB-<nn> pour une citation réglementaire; unique dans un run"
+  language_policy:
+    internal_language: "en"
+    rule: "Tout le système interne est en anglais : prompts système, descriptions d'outils et de paramètres lues par le modèle, arguments d'outils, champs du mandat, éléments du registre (label, method, caveats), raisons de verdict, requêtes et corpus de la Knowledge Base, journaux. Seuls les textes affichés à l'utilisateur sont dans userLanguage."
+    input: "agent-orchestrator détecte userLanguage (ISO 639-1) et traduit le message de l'utilisateur en anglais avant toute autre action. Le message original est stocké tel quel (content)."
+    output: "agent-orchestrator traduit dans userLanguage tout texte affiché (sa réponse, quickReplies, narrative, motifs de verdict, jurisdictionNotices). Les emplacements {EV-nn}/{KB-nn} restent identiques; les extraits réglementaires (evidence.excerpt) ne sont jamais traduits."
+    ui_labels: "les libellés fixes (noms de mesures, règles) sont traduits par le front à partir de clés stables."
+  jurisdictions: ["CA", "QC", "ON", "BC", "AB", "SK", "MB", "NB", "NS", "PE", "NL", "YT", "NT", "NU"]  # CA = textes nationaux
+  pagination: "limit + cursor opaque; réponse { items, nextCursor }"
+  region: "us-east-1 (validé : accès aux modèles testé par l'équipe; toutes les ressources y restent)"
+  error_format_ref: "schema-error"
+  error_codes:
+    UNAUTHORIZED: 401
+    FORBIDDEN: 403
+    VALIDATION_ERROR: 400
+    CONVERSATION_NOT_FOUND: 404
+    PORTFOLIO_NOT_FOUND: 404
+    ASSET_NOT_FOUND: 404
+    MANDATE_NOT_FOUND: 404
+    RUN_NOT_FOUND: 404
+    MANDATE_NOT_CONFIRMED: 409
+    GUARDRAIL_BLOCKED: 422
+    AGENT_TIMEOUT: 504
+    INTERNAL: 500
+
+# ==========================================
+# 1. LES SERVICES (composants)
+# ==========================================
+services:
+  - id: "srv-frontend"
+    name: "Front (SPA)"
+    type: "frontend"
+    tech_stack: "SPA (framework à choisir) + Amplify Auth (ou SDK Cognito)"
+    hosting: "S3 + CloudFront"
+    owner_agent: "Agent-Frontend"
+    pages:
+      - "/login (username, mot de passe)"
+      - "/chat (session en 3 colonnes : portefeuille + mandat avec curseurs | conversation avec réponses rapides | panneau de simulation : scénarios 0/1/2, verdicts, citations, explication) + menu latéral d'historique"
+      - "/portefeuille (positions, valeur, répartition, performance)"
+    uses_services:
+      - "srv-cognito"       # connexion directe, obtient les jetons
+      - "srv-api-gateway"   # tout le reste
+    consumes_apis:
+      - "api-me-get"
+      - "api-me-profile-put"
+      - "api-conversations-list"
+      - "api-conversations-create"
+      - "api-conversations-update"
+      - "api-conversations-delete"
+      - "api-messages-list"
+      - "api-messages-create"
+      - "api-portfolios-list"
+      - "api-portfolio-holdings-put"
+      - "api-portfolio-summary"
+      - "api-market-search"
+      - "api-agents-registry"
+      - "api-mandates-create"
+      - "api-mandates-list"
+      - "api-runs-create"
+      - "api-runs-get"
+    rules:
+      - "Le front ne calcule rien : prix, poids, gains et répartitions viennent du back."
+      - "Il affiche toujours le champ explanation d'une réponse de l'assistant."
+      - "Il remplace chaque emplacement {EV-nn} ou {KB-nn} du texte narratif par la valeur formatée du registre (run.evidence), sous forme de badge cliquable. Il n'affiche jamais un chiffre absent du registre."
+      - "Affichage progressif : scénarios et verdicts dès la réponse de api-runs-create, puis citations et texte quand api-runs-get passe à status = done."
+      - "Les hypothèses d'équipe (seuils) sont affichées comme telles. Mention permanente : simulation pédagogique, pas un conseil financier."
+
+  - id: "srv-cognito"
+    name: "Amazon Cognito (user pool)"
+    type: "managed_service"
+    description: "Stocke les comptes et mots de passe, émet et renouvelle les JWT. Aucun mot de passe n'est stocké dans nos tables."
+    notes:
+      - "Client d'application sans secret; flux SRP ou USER_PASSWORD_AUTH activé."
+      - "Comptes créés à la main pour le datathon, avec mot de passe définitif (admin-set-user-password --permanent) pour éviter le changement de mot de passe temporaire."
+
+  - id: "srv-api-gateway"
+    name: "API Gateway (HTTP API)"
+    type: "managed_service"
+    description: "Porte d'entrée unique pour le front. Authorizer JWT natif relié à Cognito."
+    routes_to:
+      srv-api-light: ["/me", "/me/profile", "/conversations*", "/portfolios (GET, PUT holdings)", "/agents", "GET et POST /conversations/{sessionId}/mandates"]
+      srv-agent-runtime: ["POST /conversations/{sessionId}/messages", "POST /conversations/{sessionId}/runs", "GET /conversations/{sessionId}/runs/{runId}", "GET /portfolios/{portfolioId}/summary", "GET /market/search"]
+    depends_on:
+      - "srv-cognito"
+    known_limit: "Délai maximal d'intégration d'environ 30 s : le chat reste synchrone au départ (voir open_questions)."
+
+  - id: "srv-api-light"
+    name: "Lambda API (CRUD léger)"
+    type: "microservice"
+    tech_stack: "Python (sans pandas, démarrage à froid court)"
+    owner_agent: "Agent-Backend-API"
+    exposes_apis:
+      - "api-me-get"
+      - "api-me-profile-put"
+      - "api-conversations-list"
+      - "api-conversations-create"
+      - "api-conversations-update"
+      - "api-conversations-delete"
+      - "api-messages-list"
+      - "api-portfolios-list"
+      - "api-portfolio-holdings-put"
+      - "api-agents-registry"
+      - "api-mandates-create"
+      - "api-mandates-list"
+    access_to_dbs:
+      - id: "db-users"
+        mode: "read_write"
+      - id: "db-conversations"
+        mode: "read_write_delete"
+      - id: "db-messages"
+        mode: "read_delete"
+      - id: "db-portfolios"
+        mode: "read_write"
+      - id: "db-analyses"
+        mode: "read_write_delete"   # écrit les mandats; supprime avec la conversation
+    rules:
+      - "Vérifie à chaque appel que la ressource appartient au userId du JWT."
+      - "GET /portfolios crée le portefeuille 'main' vide s'il n'existe pas; GET /me crée le profil au premier appel."
+      - "PUT holdings valide chaque ticker contre universe.parquet (lecture S3 de ce seul fichier, ou copie embarquée)."
+      - "POST mandates valide le mandat (schema-mandate), calcule riskProfile = min(riskTolerance, riskCapacity) et applique le contrôle de cohérence (ex. horizon incompatible avec l'objectif → warnings). Il n'appelle aucun LLM : c'est le chemin des curseurs « et si »."
+
+  - id: "srv-agent-runtime"
+    name: "Lambda agents (orchestration + outils)"
+    type: "microservice"
+    tech_stack: "Python 3.x, Strands Agents SDK sur Amazon Bedrock (décision ferme), pandas + pyarrow ou DuckDB (couche Lambda AWS SDK for pandas à valider)"
+    owner_agent: "Agent-Backend-Agents"
+    description: "Une seule Lambda qui a toutes les connexions nécessaires. Les agents, les modules de code et les outils y tournent. Les limites par agent sont appliquées dans le code (voir agents, modules et tools)."
+    exposes_apis:
+      - "api-messages-create"
+      - "api-runs-create"
+      - "api-runs-get"
+      - "api-portfolio-summary"
+      - "api-market-search"
+    access_to_dbs:
+      - id: "db-conversations"
+        mode: "read_update"      # met à jour updatedAt
+      - id: "db-messages"
+        mode: "read_write"
+      - id: "db-portfolios"
+        mode: "read"
+      - id: "db-users"
+        mode: "read"             # profil investisseur
+      - id: "db-analyses"
+        mode: "read_write"       # lit les mandats, écrit les runs
+    access_to_storage:
+      - id: "storage-dataset"
+        mode: "read"
+    uses_services:
+      - "srv-bedrock"
+      - "srv-bedrock-kb"
+      - "srv-bedrock-guardrails"
+      - "srv-cloudwatch"
+    contains_agents:
+      - "agent-orchestrator"
+      - "agent-auditor"
+      - "agent-writer"
+    contains_modules:
+      - "module-engine"
+      - "module-rules"
+      - "module-verifier"
+    permission_enforcement: "code"
+    known_limit: "Tous les agents partagent le rôle IAM de la Lambda. L'isolation par agent est logicielle (toolbox grant, validation des paramètres). Évolutions possibles sans changer le contrat : rôles étroits pris par outil (STS), ou Lambdas d'outils regroupées par droits."
+    performance_notes:
+      - "Charger seulement les colonnes utiles du Parquet et garder le résultat en mémoire entre appels."
+      - "Préchauffer la Lambda avant une démonstration (démarrage à froid avec pandas)."
+      - "Outils larges plutôt que nombreux petits outils : moins de cycles d'agent."
+      - "Ne jamais renvoyer des lignes brutes au modèle : les résultats d'outils sont rejoués à chaque cycle."
+
+  - id: "srv-bedrock"
+    name: "Amazon Bedrock"
+    type: "managed_service"
+    description: "Modèles de langage des agents. Modèle par agent défini dans le registre. Vérifier l'accès au modèle et l'IAM avant de changer de modèle."
+
+  - id: "srv-bedrock-kb"
+    name: "Amazon Bedrock Knowledge Bases"
+    type: "managed_service"
+    description: "Corpus réglementaire (storage-kb-corpus) indexé. Interrogé par agent-auditor avec un filtre de métadonnées juridiction ∈ {CA, province de l'utilisateur}, éventuellement sur sujets."
+    notes:
+      - "Magasin de vecteurs : Amazon S3 Vectors (créé en quelques secondes, sans coût fixe, entièrement en Terraform). Embeddings : Titan Text Embeddings V2, 1024 dimensions (aucune activation manuelle : Bedrock active les modèles serverless au premier appel). Découpage en passages de 300 tokens. L'ingestion du corpus (job-kb-sync) est l'étape la plus longue : à lancer juste après apply."
+      - "Repli : index JSON local des passages clés, pour la démo seulement si la KB n'est pas prête."
+
+  - id: "srv-bedrock-guardrails"
+    name: "Amazon Bedrock Guardrails"
+    type: "managed_service"
+    description: "Filtre d'entrée (traduction anglaise du message utilisateur, et texte original) et de sortie (texte final affiché) : ordres de transaction, promesses de rendement, conseil personnalisé, données personnelles. Un blocage renvoie GUARDRAIL_BLOCKED ou un refus expliqué; le message refusé n'entre pas dans l'historique."
+
+  - id: "srv-cloudwatch"
+    name: "Amazon CloudWatch Logs"
+    type: "managed_service"
+    description: "Reçoit les journaux JSON par agent et par outil (voir observability)."
+
+# ==========================================
+# 2. LES CONTRATS D'API (front <-> API Gateway)
+# ==========================================
+apis:
+  - id: "api-me-get"
+    provider: "srv-api-light"
+    method: "GET"
+    path: "/v1/me"
+    description: "Retourne le profil de l'utilisateur connecté, avec son profil investisseur. Crée le profil au premier appel."
+    auth: "jwt"
+    response_payload:
+      schema_ref: "schema-user"
+
+  - id: "api-me-profile-put"
+    provider: "srv-api-light"
+    method: "PUT"
+    path: "/v1/me/profile"
+    description: "Remplace le profil investisseur (risque, horizon, objectif, contraintes, préférences)."
+    auth: "jwt"
+    request_payload:
+      schema_ref: "schema-investor-profile"
+    response_payload:
+      schema_ref: "schema-user"
+
+  - id: "api-conversations-list"
+    provider: "srv-api-light"
+    method: "GET"
+    path: "/v1/conversations"
+    description: "Liste les conversations de l'utilisateur (menu latéral), plus récentes d'abord."
+    auth: "jwt"
+    query_params:
+      - { name: "limit", type: "integer", default: 20 }
+      - { name: "cursor", type: "string", required: false }
+    response_payload:
+      schema_ref: "schema-conversation-page"
+
+  - id: "api-conversations-create"
+    provider: "srv-api-light"
+    method: "POST"
+    path: "/v1/conversations"
+    description: "Crée une conversation et retourne son sessionId."
+    auth: "jwt"
+    request_payload:
+      schema_ref: "schema-conversation-create-request"
+    response_payload:
+      schema_ref: "schema-conversation"
+      status: 201
+
+  - id: "api-conversations-update"
+    provider: "srv-api-light"
+    method: "PATCH"
+    path: "/v1/conversations/{sessionId}"
+    description: "Renomme une conversation."
+    auth: "jwt"
+    request_payload:
+      schema_ref: "schema-conversation-update-request"
+    response_payload:
+      schema_ref: "schema-conversation"
+    errors: ["CONVERSATION_NOT_FOUND"]
+
+  - id: "api-conversations-delete"
+    provider: "srv-api-light"
+    method: "DELETE"
+    path: "/v1/conversations/{sessionId}"
+    description: "Supprime une conversation et ses messages."
+    auth: "jwt"
+    response_payload:
+      status: 204
+    errors: ["CONVERSATION_NOT_FOUND"]
+
+  - id: "api-messages-list"
+    provider: "srv-api-light"
+    method: "GET"
+    path: "/v1/conversations/{sessionId}/messages"
+    description: "Messages d'une conversation, ordre chronologique. Les messages de l'assistant contiennent leur explanation."
+    auth: "jwt"
+    query_params:
+      - { name: "limit", type: "integer", default: 50 }
+      - { name: "cursor", type: "string", required: false }
+    response_payload:
+      schema_ref: "schema-message-page"
+    errors: ["CONVERSATION_NOT_FOUND"]
+
+  - id: "api-messages-create"
+    provider: "srv-agent-runtime"
+    method: "POST"
+    path: "/v1/conversations/{sessionId}/messages"
+    description: "Envoie une question. Les agents répondent de façon synchrone; le message de l'assistant contient son explanation."
+    auth: "jwt"
+    request_payload:
+      schema_ref: "schema-message-create-request"
+    response_payload:
+      schema_ref: "schema-message-create-response"
+    errors: ["CONVERSATION_NOT_FOUND", "VALIDATION_ERROR", "AGENT_TIMEOUT", "GUARDRAIL_BLOCKED"]
+    notes:
+      - "Le champ status du message ('done', 'pending', 'error') prévoit un passage à une réponse asynchrone (202 puis relecture) sans changer les objets."
+      - "Phase de cadrage : l'orchestrateur répond avec au plus une étape de questions (quickReplies) puis un mandateDraft. Il ne lance aucun calcul tant que le mandat n'est pas confirmé (api-mandates-create)."
+      - "Questions de suivi (« d'où vient EV-07 ? ») : réponse tirée du registre du dernier run, sans nouveau calcul."
+      - "« Et si » en texte libre : l'orchestrateur renvoie un nouveau mandateDraft à confirmer."
+
+  - id: "api-mandates-create"
+    provider: "srv-api-light"
+    method: "POST"
+    path: "/v1/conversations/{sessionId}/mandates"
+    description: "Confirme un mandat (proposé par l'orchestrateur ou modifié par les curseurs) et crée une nouvelle version. Aucun LLM."
+    auth: "jwt"
+    request_payload:
+      schema_ref: "schema-mandate-create-request"
+    response_payload:
+      schema_ref: "schema-mandate"
+      status: 201
+    errors: ["CONVERSATION_NOT_FOUND", "VALIDATION_ERROR"]
+
+  - id: "api-mandates-list"
+    provider: "srv-api-light"
+    method: "GET"
+    path: "/v1/conversations/{sessionId}/mandates"
+    description: "Versions du mandat de la session, de la plus récente à la plus ancienne (comparaison v1/v2)."
+    auth: "jwt"
+    response_payload:
+      schema_ref: "schema-mandate-list"
+    errors: ["CONVERSATION_NOT_FOUND"]
+
+  - id: "api-runs-create"
+    provider: "srv-agent-runtime"
+    method: "POST"
+    path: "/v1/conversations/{sessionId}/runs"
+    description: "Lance l'analyse d'un mandat confirmé. Renvoie tout de suite la partie déterministe (scénarios 0/1/2, preuves EV, verdicts R1-R10) avec status = partial. Les citations KB et le texte narratif sont complétés ensuite."
+    auth: "jwt"
+    request_payload:
+      schema_ref: "schema-run-create-request"
+    response_payload:
+      schema_ref: "schema-run"
+      status: 201
+    errors: ["CONVERSATION_NOT_FOUND", "MANDATE_NOT_FOUND", "MANDATE_NOT_CONFIRMED", "VALIDATION_ERROR"]
+    notes:
+      - "Chaîne : module-engine → module-rules → agent-auditor (KB) → agent-writer → module-verifier."
+      - "Mécanisme de complétion (invocation asynchrone de la Lambda puis relecture, ou réponse diffusée en continu) : voir open_questions. Le schéma ne change pas."
+
+  - id: "api-runs-get"
+    provider: "srv-agent-runtime"
+    method: "GET"
+    path: "/v1/conversations/{sessionId}/runs/{runId}"
+    description: "Relit un run. status passe de partial à done (citations et narrative présentes) ou error."
+    auth: "jwt"
+    response_payload:
+      schema_ref: "schema-run"
+    errors: ["CONVERSATION_NOT_FOUND", "RUN_NOT_FOUND"]
+
+  - id: "api-portfolios-list"
+    provider: "srv-api-light"
+    method: "GET"
+    path: "/v1/portfolios"
+    description: "Portefeuilles de l'utilisateur. Crée 'main' vide s'il n'existe pas."
+    auth: "jwt"
+    response_payload:
+      schema_ref: "schema-portfolio-list"
+
+  - id: "api-portfolio-holdings-put"
+    provider: "srv-api-light"
+    method: "PUT"
+    path: "/v1/portfolios/{portfolioId}/holdings"
+    description: "Remplace toute la liste des positions. Le front envoie l'état complet de la table qu'il affiche."
+    auth: "jwt"
+    request_payload:
+      schema_ref: "schema-holdings-put-request"
+    response_payload:
+      schema_ref: "schema-portfolio"
+    errors: ["PORTFOLIO_NOT_FOUND", "VALIDATION_ERROR", "ASSET_NOT_FOUND"]
+
+  - id: "api-portfolio-summary"
+    provider: "srv-agent-runtime"
+    method: "GET"
+    path: "/v1/portfolios/{portfolioId}/summary"
+    description: "Positions enrichies (prix, valeur, poids, gains), répartitions, performance et risque, déjà calculés et convertis dans la devise du portefeuille."
+    auth: "jwt"
+    query_params:
+      - { name: "range", type: "string", enum: ["1m", "6m", "1y", "5y"], default: "1y" }
+    response_payload:
+      schema_ref: "schema-portfolio-summary"
+    errors: ["PORTFOLIO_NOT_FOUND"]
+
+  - id: "api-market-search"
+    provider: "srv-agent-runtime"
+    method: "GET"
+    path: "/v1/market/search"
+    description: "Recherche dans l'univers d'actifs du jeu de données (autocomplétion de ticker)."
+    auth: "jwt"
+    query_params:
+      - { name: "q", type: "string", required: true }
+      - { name: "assetClass", type: "string", required: false }
+    response_payload:
+      schema_ref: "schema-asset-search-response"
+
+  - id: "api-agents-registry"
+    provider: "srv-api-light"
+    method: "GET"
+    path: "/v1/agents"
+    description: "Registre public des agents (id, rôle, outils autorisés, limites) pour montrer la gouvernance à l'écran. Contenu statique tiré du registre ci-dessous."
+    auth: "jwt"
+    optional: true
+    response_payload:
+      schema_ref: "schema-agents-registry"
+
+# ==========================================
+# 3. LES SCHÉMAS DE DONNÉES (payloads et modèles)
+# ==========================================
+data_schemas:
+  - id: "schema-error"
+    fields:
+      - { name: "error", type: "object", required: true, description: "{ code, message, requestId }" }
+
+  - id: "schema-investor-profile"
+    description: "Profil fictif d'un investisseur (personas Amira, Mateo, Robert). Aucune donnée personnelle réelle."
+    fields:
+      - { name: "riskLevel", type: "string", required: true, enum: ["low", "low_moderate", "moderate", "high"], description: "niveau déclaré (persona); le mandat recalcule le profil retenu" }
+      - { name: "riskTolerance", type: "integer", required: false, description: "1 (faible) à 5 (élevé) : ce que la personne accepte de subir" }
+      - { name: "riskCapacity", type: "integer", required: false, description: "1 à 5 : ce qu'elle peut financièrement encaisser" }
+      - { name: "province", type: "string", required: false, enum_ref: "conventions.jurisdictions", description: "sert au filtre de la KB et aux mentions (R9); CA exclu" }
+      - { name: "horizonMinYears", type: "integer", required: true }
+      - { name: "horizonMaxYears", type: "integer", required: false }
+      - { name: "objective", type: "string", required: true, description: "ex. croissance à long terme, préservation du capital" }
+      - { name: "constraints", type: "array", items_type: "string", description: "ex. diversification minimale, pas de levier" }
+      - { name: "preferences", type: "array", items_type: "string", description: "ex. ESG, IA, éviter la spéculation" }
+      - { name: "excludedAssetClasses", type: "array", items_type: "string", description: "ex. crypto" }
+
+  - id: "schema-user"
+    fields:
+      - { name: "userId", type: "string", required: true, description: "claim sub de Cognito" }
+      - { name: "username", type: "string", required: true }
+      - { name: "displayName", type: "string" }
+      - { name: "baseCurrency", type: "string", enum: ["CAD", "USD"], description: "devise d'affichage par défaut" }
+      - { name: "investorProfile", type: "object", schema_ref: "schema-investor-profile", description: "null tant qu'il n'est pas rempli" }
+
+  - id: "schema-conversation"
+    fields:
+      - { name: "sessionId", type: "string", required: true }
+      - { name: "title", type: "string" }
+      - { name: "userLanguage", type: "string", description: "ISO 639-1 détecté par agent-orchestrator (ex. fr, en); défaut en" }
+      - { name: "createdAt", type: "string", required: true }
+      - { name: "updatedAt", type: "string", required: true }
+
+  - id: "schema-conversation-create-request"
+    fields:
+      - { name: "title", type: "string", required: false }
+
+  - id: "schema-conversation-update-request"
+    fields:
+      - { name: "title", type: "string", required: true }
+
+  - id: "schema-conversation-page"
+    fields:
+      - { name: "items", type: "array", items_ref: "schema-conversation", required: true }
+      - { name: "nextCursor", type: "string", description: "null s'il n'y a plus de page" }
+
+  - id: "schema-explanation"
+    description: "Construit par le runtime à partir des appels d'outils réellement exécutés (journal de l'exécution), pas rédigé par le modèle. Ne contient jamais de raisonnement interne détaillé."
+    fields:
+      - { name: "sources", type: "array", items_ref: "schema-explanation-source", required: true }
+      - { name: "assumptions", type: "array", items_type: "string", description: "hypothèses explicites (ex. volatilité annualisée sur 252 jours)" }
+      - { name: "limitations", type: "array", items_type: "string", description: "limites et incertitudes (ex. le rendement passé ne prédit pas le futur)" }
+      - { name: "steps", type: "array", items_ref: "schema-explanation-step", required: true }
+      - { name: "checks", type: "array", items_ref: "schema-explanation-check", description: "contrôles de l'agent de gouvernance, visibles" }
+
+  - id: "schema-explanation-source"
+    fields:
+      - { name: "id", type: "string", required: true, description: "ex. prices_daily" }
+      - { name: "dataset", type: "string", description: "chemin versionné ex. prices/RY.TO.parquet@2026-11-12" }
+      - { name: "asOf", type: "string", description: "date d'extraction ou de dernière observation" }
+      - { name: "note", type: "string", description: "ex. adj_close, devise de cotation" }
+
+  - id: "schema-explanation-step"
+    fields:
+      - { name: "agentId", type: "string", required: true }
+      - { name: "tool", type: "string", required: true }
+      - { name: "params", type: "object", description: "paramètres de l'appel (ticker, dates...)" }
+      - { name: "status", type: "string", enum: ["ok", "error", "empty"], required: true }
+      - { name: "durationMs", type: "integer" }
+
+  - id: "schema-explanation-check"
+    fields:
+      - { name: "agentId", type: "string", required: true }
+      - { name: "rule", type: "string", required: true, description: "ex. risk_fit, diversification, simulation_only, missing_info, ou R1..R10 (module-rules)" }
+      - { name: "status", type: "string", enum: ["pass", "warn", "fail", "not_verified"], required: true }
+      - { name: "message", type: "string", required: true }
+      - { name: "citations", type: "array", items_type: "string", description: "identifiants KB-nn du registre" }
+
+  - id: "schema-message"
+    fields:
+      - { name: "messageId", type: "string", required: true }
+      - { name: "sessionId", type: "string", required: true }
+      - { name: "role", type: "string", enum: ["user", "assistant"], required: true }
+      - { name: "content", type: "string", required: true }
+      - { name: "status", type: "string", enum: ["done", "pending", "error"], required: true }
+      - { name: "createdAt", type: "string", required: true }
+      - { name: "explanation", type: "object", schema_ref: "schema-explanation", description: "présent seulement quand role = assistant" }
+      - { name: "quickReplies", type: "array", items_type: "string", description: "réponses rapides proposées par l'orchestrateur (cadrage)" }
+      - { name: "mandateDraft", type: "object", schema_ref: "schema-mandate-create-request", description: "mandat proposé, à confirmer par api-mandates-create" }
+      - { name: "runId", type: "string", description: "run auquel se rapporte ce message, s'il y en a un" }
+
+  - id: "schema-message-page"
+    fields:
+      - { name: "items", type: "array", items_ref: "schema-message", required: true }
+      - { name: "nextCursor", type: "string" }
+
+  - id: "schema-message-create-request"
+    fields:
+      - { name: "content", type: "string", required: true, description: "2000 caractères maximum" }
+
+  - id: "schema-message-create-response"
+    fields:
+      - { name: "userMessage", type: "object", schema_ref: "schema-message", required: true }
+      - { name: "assistantMessage", type: "object", schema_ref: "schema-message", required: true }
+
+  - id: "schema-holding"
+    description: "Une position. Aucun prix ni nom n'est stocké : ils viennent du jeu de données."
+    fields:
+      - { name: "ticker", type: "string", required: true, description: "doit exister dans universe.parquet" }
+      - { name: "quantity", type: "number", required: true, description: "supérieur à 0" }
+      - { name: "avgCost", type: "number", required: true, description: "prix de revient moyen par unité, dans la devise de cotation de l'actif" }
+
+  - id: "schema-portfolio"
+    fields:
+      - { name: "portfolioId", type: "string", required: true }
+      - { name: "name", type: "string", required: true }
+      - { name: "baseCurrency", type: "string", enum: ["CAD", "USD"], required: true }
+      - { name: "holdings", type: "array", items_ref: "schema-holding", required: true }
+      - { name: "updatedAt", type: "string", required: true }
+
+  - id: "schema-portfolio-list"
+    fields:
+      - { name: "items", type: "array", items_ref: "schema-portfolio", required: true }
+
+  - id: "schema-holdings-put-request"
+    fields:
+      - { name: "holdings", type: "array", items_ref: "schema-holding", required: true }
+
+  - id: "schema-portfolio-summary"
+    description: "Tout est calculé côté back et exprimé dans baseCurrency (conversion avec le taux USD/CAD du jeu de données)."
+    fields:
+      - { name: "portfolioId", type: "string", required: true }
+      - { name: "baseCurrency", type: "string", required: true }
+      - { name: "asOf", type: "string", required: true, description: "date de la dernière observation de prix utilisée" }
+      - { name: "totals", type: "object", description: "{ value, cost, pnl, pnlPct, dayChange, dayChangePct }" }
+      - { name: "holdings", type: "array", description: "par ligne : ticker, name, assetClass, quantity, avgCost, currency, price, value, weight, pnl, pnlPct, dayChangePct, sector, stale" }
+      - { name: "allocation", type: "object", description: "{ byAssetClass[], bySector[], byCurrency[] } avec { label, weight }" }
+      - { name: "performance", type: "object", description: "{ range, points: [{ date, value }] }" }
+      - { name: "risk", type: "object", description: "{ volatility, maxDrawdown } annualisés / sur la période, en pourcentage" }
+      - { name: "warnings", type: "array", items_type: "string", description: "ex. données manquantes ou dernier cours utilisé" }
+      - { name: "explanation", type: "object", schema_ref: "schema-explanation", description: "sources, hypothèses et limites des chiffres affichés" }
+
+  - id: "schema-asset"
+    fields:
+      - { name: "ticker", type: "string", required: true }
+      - { name: "name", type: "string", required: true }
+      - { name: "assetClass", type: "string", required: true, description: "valeurs de assets_universe.csv (actions, FNB, crypto)" }
+      - { name: "market", type: "string" }
+      - { name: "currency", type: "string" }
+      - { name: "sector", type: "string" }
+
+  - id: "schema-asset-search-response"
+    fields:
+      - { name: "items", type: "array", items_ref: "schema-asset", required: true }
+
+  - id: "schema-agents-registry"
+    fields:
+      - { name: "agents", type: "array", description: "par agent : id, name, role, allowedTools, delegatesTo, limits" }
+      - { name: "modules", type: "array", description: "par module de code : id, name, role" }
+      - { name: "tools", type: "array", description: "par outil : id, description, reads" }
+
+  - id: "schema-operation"
+    description: "Une opération simulée de l'idée testée."
+    fields:
+      - { name: "action", type: "string", enum: ["add", "remove", "set_weight"], required: true }
+      - { name: "ticker", type: "string", required: true, description: "dans l'univers" }
+      - { name: "amount", type: "number", description: "montant dans currency (add/remove)" }
+      - { name: "weight", type: "number", description: "poids cible en % (set_weight)" }
+      - { name: "currency", type: "string", enum: ["CAD", "USD"] }
+
+  - id: "schema-mandate-create-request"
+    description: "Contrat de l'analyse, confirmé par l'utilisateur. Chaque champ dit d'où il vient (fieldSources)."
+    fields:
+      - { name: "portfolioId", type: "string", required: true }
+      - { name: "mode", type: "string", enum: ["add_asset", "rebalance", "diagnose"], required: true, description: "modes A, B, C de SOLUTION.md" }
+      - { name: "objective", type: "string", enum: ["growth", "income", "preservation", "project", "retirement"], required: true }
+      - { name: "objectiveDetail", type: "string", description: "ex. achat d'un condo" }
+      - { name: "horizonYears", type: "number", required: true }
+      - { name: "riskTolerance", type: "integer", required: true, description: "1 à 5" }
+      - { name: "riskCapacity", type: "integer", required: true, description: "1 à 5" }
+      - { name: "maxAcceptableLossPct", type: "number", description: "absent = défaut par horizon (hypothèse d'équipe)" }
+      - { name: "constraints", type: "array", items_type: "string" }
+      - { name: "preferences", type: "object", description: "{ esg: bool, excludedSectors: [], excludedAssetClasses: [] }" }
+      - { name: "province", type: "string", required: true, enum_ref: "conventions.jurisdictions" }
+      - { name: "userLanguage", type: "string", required: true, description: "ISO 639-1; langue d'affichage. Tous les champs texte du mandat sont en anglais (language_policy)." }
+      - { name: "operations", type: "array", items_ref: "schema-operation", description: "vide pour diagnose" }
+      - { name: "subjectTicker", type: "string", description: "titre étudié en mode diagnose" }
+      - { name: "fieldSources", type: "object", description: "par champ : persona | user_answer | team_assumption | slider" }
+
+  - id: "schema-mandate"
+    fields:
+      - { name: "sessionId", type: "string", required: true }
+      - { name: "version", type: "integer", required: true }
+      - { name: "mandate", type: "object", schema_ref: "schema-mandate-create-request", required: true }
+      - { name: "riskProfile", type: "integer", required: true, description: "= min(riskTolerance, riskCapacity) (R1)" }
+      - { name: "effectiveMaxLossPct", type: "number", required: true, description: "saisi ou défaut par horizon" }
+      - { name: "warnings", type: "array", items_type: "string", description: "contrôle de cohérence (ex. horizon contredit l'objectif)" }
+      - { name: "changedFields", type: "array", items_type: "string", description: "champs modifiés depuis la version précédente" }
+      - { name: "confirmedAt", type: "string", required: true }
+
+  - id: "schema-mandate-list"
+    fields:
+      - { name: "items", type: "array", items_ref: "schema-mandate", required: true }
+
+  - id: "schema-run-create-request"
+    fields:
+      - { name: "mandateVersion", type: "integer", required: true }
+
+  - id: "schema-evidence"
+    description: "Élément du registre de preuves d'un run. Seule source des chiffres et citations affichés."
+    fields:
+      - { name: "id", type: "string", required: true, description: "EV-nn ou KB-nn" }
+      - { name: "kind", type: "string", enum: ["metric", "etf_fact", "regulation", "assumption"], required: true }
+      - { name: "label", type: "string", required: true, description: "ex. Volatilité annualisée, scénario 1" }
+      - { name: "value", type: "number", description: "valeur brute (metric, etf_fact, assumption)" }
+      - { name: "formatted", type: "string", description: "valeur affichée, ex. 15,2 %" }
+      - { name: "scenario", type: "integer", description: "0, 1 ou 2 si applicable" }
+      - { name: "method", type: "string", description: "formule ou méthode, ex. écart-type × √252" }
+      - { name: "window", type: "string", description: "période, ex. 2021-11-12/2026-11-12" }
+      - { name: "currency", type: "string" }
+      - { name: "source", type: "string", required: true, description: "jeu de données versionné, fiche émetteur ou document KB" }
+      - { name: "asOf", type: "string" }
+      - { name: "document", type: "string", description: "regulation : titre du document" }
+      - { name: "section", type: "string", description: "regulation : section citée" }
+      - { name: "excerpt", type: "string", description: "regulation : extrait court" }
+      - { name: "jurisdiction", type: "string", description: "regulation : CA ou province" }
+      - { name: "url", type: "string" }
+      - { name: "caveats", type: "array", items_type: "string" }
+
+  - id: "schema-scenario"
+    fields:
+      - { name: "index", type: "integer", enum: [0, 1, 2], required: true, description: "0 actuel, 1 idée telle quelle, 2 alternative" }
+      - { name: "label", type: "string", required: true }
+      - { name: "description", type: "string", description: "alternative : formulée par catégorie d'actifs, jamais comme recommandation d'un titre (R5)" }
+      - { name: "proxyNote", type: "string", description: "ex. « exposition large US approchée par SPY pour le calcul »" }
+      - { name: "allocation", type: "array", description: "{ label, weight } par catégorie" }
+      - { name: "metrics", type: "object", description: "par mesure : identifiant EV-nn (volatility, maxDrawdown, stress2022, stressRates, stressCrypto, topSingleWeight, techWeightLookThrough)" }
+      - { name: "verdict", type: "string", enum: ["pass", "warn", "fail"], required: true }
+
+  - id: "schema-rule-verdict"
+    fields:
+      - { name: "rule", type: "string", required: true, description: "R1..R10" }
+      - { name: "scenario", type: "integer" }
+      - { name: "status", type: "string", enum: ["pass", "warn", "fail", "not_verified"], required: true }
+      - { name: "reasonCode", type: "string", required: true, description: "ex. MAX_LOSS_EXCEEDED, CONCENTRATION_HIGH" }
+      - { name: "evidence", type: "array", items_type: "string", description: "EV-nn" }
+      - { name: "citations", type: "array", items_type: "string", description: "KB-nn, rempli par agent-auditor" }
+      - { name: "threshold", type: "object", description: "{ value, nature: text | team_assumption }" }
+      - { name: "messageEn", type: "string", description: "une phrase, formulée par agent-auditor (anglais)" }
+      - { name: "message", type: "string", description: "messageEn traduit dans userLanguage par agent-orchestrator" }
+
+  - id: "schema-narrative"
+    description: "Texte du rédacteur. Il ne contient aucun chiffre écrit à la main : seulement des emplacements {EV-nn} et {KB-nn}."
+    fields:
+      - { name: "sections", type: "array", required: true, description: "4 sections : { key: data_used | why | limits | what_would_change, textEn (version de référence, agent-writer), text (traduction dans userLanguage par agent-orchestrator; = textEn si en) }" }
+      - { name: "language", type: "string", required: true, description: "userLanguage de text" }
+      - { name: "hiddenSentences", type: "array", description: "{ section, reason } : phrases masquées par module-verifier" }
+
+  - id: "schema-verifier-report"
+    fields:
+      - { name: "placeholdersResolved", type: "integer", required: true }
+      - { name: "placeholdersTotal", type: "integer", required: true }
+      - { name: "handwrittenNumbers", type: "integer", required: true, description: "chiffres hors registre détectés (phrases masquées)" }
+      - { name: "forbiddenPhrases", type: "integer", required: true, description: "recommandation ou promesse détectée (motifs en anglais et en français)" }
+      - { name: "placeholdersMatch", type: "boolean", required: true, description: "mêmes emplacements dans textEn et text" }
+
+  - id: "schema-run"
+    fields:
+      - { name: "runId", type: "string", required: true }
+      - { name: "sessionId", type: "string", required: true }
+      - { name: "mandateVersion", type: "integer", required: true }
+      - { name: "status", type: "string", enum: ["partial", "done", "error"], required: true }
+      - { name: "datasetVersion", type: "string", required: true }
+      - { name: "userLanguage", type: "string", required: true }
+      - { name: "scenarios", type: "array", items_ref: "schema-scenario", required: true }
+      - { name: "verdicts", type: "array", items_ref: "schema-rule-verdict", required: true }
+      - { name: "evidence", type: "array", items_ref: "schema-evidence", required: true }
+      - { name: "narrative", type: "object", schema_ref: "schema-narrative", description: "présent quand status = done" }
+      - { name: "verifier", type: "object", schema_ref: "schema-verifier-report", description: "présent quand status = done" }
+      - { name: "jurisdictionNotices", type: "array", items_type: "string", description: "mentions de la province (R9)" }
+      - { name: "explanation", type: "object", schema_ref: "schema-explanation", description: "étapes et contrôles observés (journal d'exécution)" }
+      - { name: "createdAt", type: "string", required: true }
+      - { name: "completedAt", type: "string" }
+
+# ==========================================
+# 4. LES BASES DE DONNÉES (DynamoDB : données applicatives)
+# ==========================================
+databases:
+  - id: "db-users"
+    type: "DynamoDB"
+    tables:
+      - name: "Users"
+        partition_key: "userId"
+        attributes: ["username", "displayName", "baseCurrency", "investorProfile", "createdAt"]
+        notes: "Aucun mot de passe : Cognito."
+
+  - id: "db-conversations"
+    type: "DynamoDB"
+    tables:
+      - name: "Conversations"
+        partition_key: "userId"
+        sort_key: "sessionId"
+        attributes: ["title", "createdAt", "updatedAt"]
+        notes: "Index local sur updatedAt pour trier par récence."
+
+  - id: "db-messages"
+    type: "DynamoDB"
+    tables:
+      - name: "Messages"
+        partition_key: "sessionId"
+        sort_key: "messageId"
+        attributes: ["userId", "role", "content", "status", "createdAt", "explanation"]
+        notes: "explanation est stocké avec le message de l'assistant. Si un item approche 400 Ko, déplacer explanation dans une table à part."
+
+  - id: "db-portfolios"
+    type: "DynamoDB"
+    tables:
+      - name: "Portfolios"
+        partition_key: "userId"
+        sort_key: "portfolioId"
+        attributes: ["name", "baseCurrency", "holdings", "updatedAt"]
+        notes: "holdings = liste de { ticker, quantity, avgCost }. Une version plus riche avec transactions est hors périmètre."
+
+  - id: "db-analyses"
+    type: "DynamoDB"
+    tables:
+      - name: "Analyses"
+        partition_key: "sessionId"
+        sort_key: "itemKey"
+        attributes: ["userId", "type", "version", "mandate", "riskProfile", "effectiveMaxLossPct", "warnings", "changedFields", "confirmedAt", "runId", "mandateVersion", "status", "datasetVersion", "userLanguage", "scenarios", "verdicts", "evidence", "narrative", "verifier", "jurisdictionNotices", "explanation", "createdAt", "completedAt"]
+        notes: "itemKey = MANDATE#<version sur 3 chiffres> ou RUN#<runId>. type = mandate | run. Vérifier userId à chaque lecture. Si un run approche 400 Ko, déplacer evidence dans S3. Le repository stocke tous les champs de schema-mandate et schema-run (userId, type et itemKey ne sont jamais renvoyés)."
+
+# ==========================================
+# 5. LE STOCKAGE DES DONNÉES DE MARCHÉ (S3, lecture seule à l'exécution)
+# ==========================================
+storage:
+  - id: "storage-dataset"
+    type: "S3 (bucket privé)"
+    format: "Parquet (colonnes), un dossier daté et figé par version"
+    layout:
+      - path: "dataset/{version}/manifest.json"
+        content: "source, date d'extraction, liste des tickers, devises, traitements, version"
+      - path: "dataset/{version}/universe.parquet"
+        content: "une ligne par actif : asset_id, ticker, name, asset_class, market, currency, sector + indicateurs précalculés (rendement 1 an, volatilité 1 an, baisse maximale 1 an)"
+      - path: "dataset/{version}/prices/{ticker}.parquet"
+        content: "date, open, high, low, close, adj_close, volume, currency"
+      - path: "dataset/{version}/prices_all/year=YYYY/*.parquet"
+        content: "mêmes colonnes, tous les titres, par année (analyses croisées)"
+      - path: "dataset/{version}/fx/usdcad.parquet"
+        content: "date, usdcad, cadusd"
+      - path: "dataset/{version}/macro/macro.parquet"
+        content: "date, series_id, value, unit, frequency, label, source"
+      - path: "dataset/{version}/corporate_actions.parquet"
+        content: "dividendes et fractionnements par date ex"
+      - path: "dataset/{version}/etf_enriched.json"
+        content: "pour les 9 FNB seulement : sectorWeights, topHoldings, countryWeights, merPct, exclusions (ESGV); chaque valeur avec sourceUrl et asOfDate (fiche émetteur). Aucun indicateur ESG inventé pour les actions."
+    read_by: ["srv-agent-runtime"]
+    written_by: ["job-ingestion"]
+    notes:
+      - "La version lue est fixée par une variable d'environnement de la Lambda. Elle est citée dans explanation.sources."
+      - "adj_close sert aux rendements. close n'est ajusté que pour les fractionnements. Les prix sont dans la devise de cotation (.TO = CAD, le reste = USD)."
+      - "Pas de remplissage ni d'alignement de calendrier dans les données : les outils doivent signaler les jours sans cours."
+      - "Ne pas mettre les CSV dans le dépôt public (conditions d'utilisation de Yahoo). Mettre le script d'ingestion et une note dans le README."
+      - "macro.parquet porte une colonne publication_date pour les séries mensuelles (IPC, chômage) : aucune valeur n'est utilisée avant cette date (R10)."
+
+  - id: "storage-kb-corpus"
+    type: "S3 (bucket privé, même bucket que storage-dataset sous un autre préfixe, ou bucket dédié)"
+    layout:
+      - path: "kb/{version}/<fichier>"
+        content: "documents réglementaires (PDF, TXT) copiés depuis docs/for_KB/"
+      - path: "kb/{version}/<fichier>.metadata.json"
+        content: "{ metadataAttributes: { juridiction, regulateur, sujets[], date_version, langue, type_document, source_url, date_recuperation } }"
+    read_by: ["srv-bedrock-kb"]
+    written_by: ["job-kb-sync"]
+    notes:
+      - "La documentation du Datathon n'est pas dans ce corpus."
+      - "Vérifier les conditions de réutilisation de chaque site avant toute redistribution."
+
+jobs:
+  - id: "job-ingestion"
+    name: "Script d'ingestion du jeu de données"
+    type: "script exécuté une fois (portable ou tâche AWS), hors API"
+    owner_agent: "Agent-Data"
+    reads_from: ["ext-yahoo-finance", "ext-bank-of-canada", "ext-fred"]
+    writes_to: ["storage-dataset"]
+    base: "alphaforge_starter/build_dataset.py (jeu fourni : 31 actifs, 2021-11-12 à 2026-11-12), élargi par l'équipe (2026-11-14) à environ 250 actifs (FNB canadiens courants dont XSP.TO et ZEQT.TO, S&P/TSX 60, grandes capitalisations et FNB américains, 3 cryptos) sur 10 ans; liste de candidats dans data/ingestion/universe.yaml, chaque ticker validé à l'ingestion (SOLUTION.md section 10)"
+    outputs: ["Parquet par ticker", "universe.parquet avec indicateurs", "manifest.json"]
+    deadline_note: "Le compte AWS d'équipe est supprimé le 2026-11-16 en fin de journée : code sur GitHub, données sur les portables."
+
+  - id: "job-kb-sync"
+    name: "Envoi du corpus réglementaire et synchronisation de la Knowledge Base"
+    type: "script exécuté à la demande (aws s3 sync + StartIngestionJob), hors API"
+    owner_agent: "Agent-Infra"
+    reads_from: ["docs/for_KB/ (dépôt)"]
+    writes_to: ["storage-kb-corpus"]
+    notes: "Relancer l'ingestion de la KB après chaque modification du corpus."
+
+external_sources:
+  - id: "ext-yahoo-finance"
+    name: "Yahoo Finance via yfinance"
+    used_by: ["job-ingestion"]
+    limits: "non officiel, limites de débit possibles, adj_close change si on retélécharge"
+  - id: "ext-bank-of-canada"
+    name: "Banque du Canada (API Valet)"
+    used_by: ["job-ingestion"]
+    provides: "taux USD/CAD, taux directeur, rendements, IPC canadien"
+  - id: "ext-fred"
+    name: "FRED (Réserve fédérale de Saint-Louis)"
+    used_by: ["job-ingestion"]
+    provides: "taux américains, IPC, chômage"
+
+# ==========================================
+# 6. LES AGENTS (registre; permissions appliquées dans le code)
+# ==========================================
+agents:
+  # Tous les agents : Strands Agents SDK (Python) + modèles Amazon Bedrock. name = id de l'agent, maxTokens toujours fixé.
+  - id: "agent-orchestrator"
+    name: "Orchestrateur"
+    status: "retenu"
+    role: "Seule voix face à l'utilisateur. Détecte userLanguage et traduit chaque message de l'utilisateur en anglais avant toute action; tout ce qu'il transmet aux outils et aux autres composants est en anglais; traduit dans userLanguage tout texte affiché (réponse, quickReplies, narrative, motifs de verdict, mentions), en conservant les emplacements {EV-nn}/{KB-nn} et sans traduire les extraits réglementaires. Lit la session (portefeuille, profil, province), détecte ce qui manque, pose au plus une étape de questions (quickReplies), propose le mandat, attend sa confirmation, puis lance l'analyse. Répond aux questions de suivi à partir du registre. Ne calcule jamais de tête et ne nomme jamais un titre comme recommandation."
+    runs_in: "srv-agent-runtime"
+    model: "Claude Sonnet 5.5 via Bedrock, région us-east-1 (profil d'inférence global.anthropic.claude-sonnet-5-5, testé par l'équipe; lu dans la config)"
+    max_tokens: 1024
+    allowed_tools: ["tool-get-portfolio", "tool-get-profile", "tool-search-assets", "tool-propose-mandate", "tool-read-evidence"]
+    system_prompt_language: "en"
+    system_prompt_must_include: "If the user's message is not in English, translate it into English before doing anything else; all tool calls and all communication with other components are in English. When replying to the user, answer in the user's language (userLanguage), keep every {EV-nn}/{KB-nn} placeholder unchanged, and never translate quoted regulatory excerpts." 
+    delegates_to: []
+    limits: { max_agent_cycles: 6, timeout_seconds: 25 }
+    fail_mode: "closed"
+    fail_mode_note: "Mandat incomplet : il pose la question ou propose des valeurs par défaut marquées team_assumption, à confirmer."
+    owner_agent: "Agent-Backend-Agents"
+
+  - id: "agent-auditor"
+    name: "Auditeur de convenance"
+    status: "retenu"
+    replaces: "agent-governance"
+    system_prompt_language: "en"
+    role: "Travaille en anglais (requêtes KB et motifs en anglais). Ne décide pas des verdicts (module-rules le fait). Pour chaque verdict, cherche dans la Knowledge Base le passage qui le fonde (filtre juridiction ∈ {CA, province}), l'inscrit au registre (KB-nn) et formule le motif en une phrase."
+    runs_in: "srv-agent-runtime"
+    model: "Claude Sonnet 5.5 via Bedrock, région us-east-1 (profil d'inférence global.anthropic.claude-sonnet-5-5, testé par l'équipe; lu dans la config)"
+    max_tokens: 1024
+    allowed_tools: ["tool-search-regulation", "tool-read-evidence"]
+    limits: { max_tool_calls: 8, timeout_seconds: 20 }
+    fail_mode: "closed"
+    fail_mode_note: "Aucun passage trouvé : le verdict reste affiché avec « fondement : hypothèse d'équipe » ou not_verified. Jamais de citation inventée."
+    owner_agent: "Agent-Backend-Agents"
+
+  - id: "agent-writer"
+    name: "Rédacteur"
+    status: "retenu"
+    system_prompt_language: "en"
+    role: "Rédige en anglais (textEn) 4 sections (données utilisées, pourquoi ce verdict, limites, ce qui changerait la réponse) à partir du registre seulement; agent-orchestrator les traduit. N'écrit aucun chiffre : seulement des emplacements {EV-nn} et {KB-nn}."
+    runs_in: "srv-agent-runtime"
+    model: "Claude Sonnet 5.5 via Bedrock, région us-east-1 (profil d'inférence global.anthropic.claude-sonnet-5-5, testé par l'équipe; lu dans la config)"
+    max_tokens: 2048
+    allowed_tools: ["tool-read-evidence"]
+    limits: { max_tool_calls: 3, timeout_seconds: 25 }
+    fail_mode: "open"
+    fail_mode_note: "En cas d'échec, le run reste utilisable (scénarios, verdicts, citations) avec status = error sur narrative."
+    owner_agent: "Agent-Backend-Agents"
+
+  - id: "agent-analyst"
+    status: "retiré (v0.4.0)"
+    note: "Le calcul est fait par module-engine (code). Un LLM ne calcule pas."
+
+  - id: "agent-governance"
+    status: "retiré (v0.4.0)"
+    note: "Remplacé par agent-auditor (citations KB) + module-rules (verdicts en code)."
+
+  # Pas d'agent d'explicabilité dédié ni d'agent garde-fou : explanation est construit à partir du journal d'exécution, narrative par agent-writer, le filtrage par srv-bedrock-guardrails.
+
+# ==========================================
+# 6 bis. LES MODULES DE CODE (déterministes, sans LLM)
+# ==========================================
+modules:
+  - id: "module-engine"
+    name: "Moteur de calcul"
+    runs_in: "srv-agent-runtime"
+    role: "Construit les scénarios 0/1/2 et calcule : rendement, volatilité annualisée, pire baisse, tests de résistance (2022, krach COVID 2020 dérivé de SPY, hausse des taux dérivée de V39079/DFF, krach crypto dérivé de BTC-USD), concentration par titre, secteur, pays et devise (avec composition des FNB), corrélations. Chaque résultat est inscrit au registre (EV-nn)."
+    uses_tools: ["tool-get-prices", "tool-get-macro", "tool-compute-metrics", "tool-get-portfolio", "tool-portfolio-impact", "tool-stress-test", "tool-concentration"]
+    rules:
+      - "adj_close, conversion en CAD avec report du dernier taux; devise native aussi affichée."
+      - "Annualisation √252 (actions, FNB) et √365 (crypto); portefeuilles sur l'intersection des jours ouvrés nord-américains."
+      - "Alternative (scénario 2) : même montant, actif risqué remplacé par une catégorie compatible avec le profil, ou poche plafonnée (hypothèse d'équipe). Le FNB utilisé pour le calcul est signalé comme approximation (proxyNote)."
+    owner_agent: "Agent-Backend-Agents"
+
+  - id: "module-rules"
+    name: "Règles de convenance R1-R10"
+    runs_in: "srv-agent-runtime"
+    role: "Applique R1 à R10 (voir rules_catalog) au mandat et aux scénarios; produit les verdicts sans citation. Seuils d'hypothèse dans un fichier de configuration."
+    uses_tools: ["tool-check-rules"]
+    owner_agent: "Agent-Backend-Agents"
+
+  - id: "module-verifier"
+    name: "Vérificateur"
+    runs_in: "srv-agent-runtime"
+    role: "Contrôle chaque phrase du texte final affiché (text, dans userLanguage) : mêmes emplacements que textEn, emplacements EV/KB existants, aucun chiffre écrit à la main hors constantes du mandat, aucune formule de recommandation ou de promesse. Une phrase fautive est masquée et signalée; pas de nouvelle tentative bloquante."
+    owner_agent: "Agent-Backend-Agents"
+
+# ==========================================
+# 7. LES OUTILS (interface entre agents et données)
+# ==========================================
+tools:
+  - id: "tool-search-assets"
+    name: "search_assets"
+    description: "Cherche des actifs de l'univers par nom ou symbole."
+    used_by: ["agent-orchestrator"]
+    params:
+      - { name: "query", type: "string", required: true }
+      - { name: "asset_class", type: "string", required: false }
+    returns: "liste de { ticker, name, assetClass, sector, currency } (20 maximum)"
+    reads: ["storage-dataset: universe.parquet"]
+
+  - id: "tool-get-prices"
+    name: "get_prices"
+    description: "Prix ajustés (adj_close) d'un actif, dans sa devise de cotation."
+    used_by: ["module-engine"]
+    params:
+      - { name: "ticker", type: "string", required: true, validation: "doit exister dans universe.parquet" }
+      - { name: "start", type: "string", required: true, format: "YYYY-MM-DD" }
+      - { name: "end", type: "string", required: true, format: "YYYY-MM-DD, au plus 5 ans après start" }
+      - { name: "frequency", type: "string", enum: ["daily", "weekly", "monthly"], default: "daily" }
+    returns: "{ ticker, currency, frequency, adjusted, points: [[date, valeur]], source, notes[] } avec 260 points maximum (bascule en hebdomadaire ou mensuel au-delà)"
+    reads: ["storage-dataset: prices/{ticker}.parquet"]
+    behavior:
+      - "Un jour sans cours (férié, week-end) n'est pas inventé : la note dit quel dernier cours a été utilisé."
+      - "Ticker inconnu : message qui dit quoi corriger et propose les plus proches, pas d'exception."
+
+  - id: "tool-get-macro"
+    name: "get_macro"
+    description: "Série macroéconomique ou taux de change USD/CAD."
+    used_by: ["module-engine"]
+    params:
+      - { name: "series_id", type: "string", required: true, validation: "présent dans macro.parquet ou 'USDCAD'" }
+      - { name: "start", type: "string", required: true, format: "YYYY-MM-DD" }
+      - { name: "end", type: "string", required: true, format: "YYYY-MM-DD" }
+    returns: "{ series_id, unit, frequency, points, source, notes[] }"
+    reads: ["storage-dataset: macro/macro.parquet", "storage-dataset: fx/usdcad.parquet"]
+    behavior:
+      - "Les données mensuelles sont datées du mois de référence, pas de leur publication : l'outil le signale dans notes."
+
+  - id: "tool-compute-metrics"
+    name: "compute_metrics"
+    description: "Calcule des indicateurs sur un ou plusieurs actifs et renvoie des chiffres (jamais les lignes brutes)."
+    used_by: ["module-engine"]
+    params:
+      - { name: "tickers", type: "array", items_type: "string", required: true, validation: "20 maximum, tous dans l'univers" }
+      - { name: "start", type: "string", required: true, format: "YYYY-MM-DD" }
+      - { name: "end", type: "string", required: true, format: "YYYY-MM-DD" }
+      - { name: "metrics", type: "array", items_type: "string", enum: ["total_return", "volatility", "max_drawdown", "correlation"], required: true }
+    returns: "{ metrics: { ticker: { total_return, volatility, max_drawdown } }, correlation: matrice, period, assumptions[], source }"
+    reads: ["storage-dataset: prices/{ticker}.parquet", "storage-dataset: fx/usdcad.parquet"]
+    behavior:
+      - "Utilise adj_close. Les séries sont alignées sur les dates communes et la méthode est écrite dans assumptions."
+      - "Rendements exprimés dans la devise de cotation, ou convertis si demandé."
+
+  - id: "tool-get-portfolio"
+    name: "get_portfolio"
+    description: "Positions du portefeuille de l'utilisateur courant."
+    used_by: ["agent-orchestrator", "module-engine"]
+    params: []  # userId et portfolioId viennent du contexte de la requête, jamais du modèle
+    returns: "{ portfolioId, baseCurrency, holdings: [{ ticker, quantity, avgCost }] }"
+    reads: ["db-portfolios"]
+
+  - id: "tool-get-profile"
+    name: "get_profile"
+    description: "Profil investisseur de l'utilisateur courant."
+    used_by: ["agent-orchestrator"]
+    params: []  # userId vient du contexte
+    returns: "schema-investor-profile, ou null si non rempli (l'orchestrateur pose alors les questions de cadrage)"
+    reads: ["db-users"]
+
+  - id: "tool-propose-mandate"
+    name: "propose_mandate"
+    description: "Valide un brouillon de mandat (schema-mandate-create-request) et le joint au message de l'assistant (mandateDraft). Ne confirme rien : la confirmation passe par api-mandates-create."
+    used_by: ["agent-orchestrator"]
+    params:
+      - { name: "draft", type: "object", required: true, validation: "schema-mandate-create-request; tickers dans l'univers" }
+    returns: "{ valid, errors[], riskProfile, effectiveMaxLossPct, warnings[] }"
+    reads: ["storage-dataset: universe.parquet"]
+
+  - id: "tool-read-evidence"
+    name: "read_evidence"
+    description: "Lit le registre de preuves du dernier run de la session (ou un élément précis)."
+    used_by: ["agent-orchestrator", "agent-auditor", "agent-writer"]
+    params:
+      - { name: "evidence_id", type: "string", required: false, description: "EV-nn ou KB-nn; absent = registre complet résumé" }
+    returns: "schema-evidence ou liste"
+    reads: ["db-analyses"]
+
+  - id: "tool-portfolio-impact"
+    name: "portfolio_impact"
+    description: "Construit les scénarios 0/1/2 d'un mandat et calcule leurs mesures."
+    used_by: ["module-engine"]
+    params:
+      - { name: "mandate_version", type: "integer", required: true }
+    returns: "scenarios + éléments EV-nn"
+    reads: ["db-portfolios", "db-analyses", "storage-dataset"]
+
+  - id: "tool-stress-test"
+    name: "stress_test"
+    description: "Rejoue un portefeuille sur une période de stress dérivée des données (y2022, covid_2020, rate_hikes, crypto_crash)."
+    used_by: ["module-engine"]
+    params:
+      - { name: "period_id", type: "string", enum: ["y2022", "covid_2020", "rate_hikes", "crypto_crash"], required: true }
+    returns: "{ period, start, end, drawdown, evidenceIds[] }"
+    reads: ["storage-dataset"]
+
+  - id: "tool-concentration"
+    name: "concentration"
+    description: "Poids par titre, secteur, pays et devise, avec la composition des FNB (etf_enriched.json)."
+    used_by: ["module-engine"]
+    returns: "{ topSingle, bySector[], byCountry[], byCurrency[], techLookThrough, evidenceIds[] }"
+    reads: ["storage-dataset: etf_enriched.json", "storage-dataset: universe.parquet"]
+
+  - id: "tool-check-rules"
+    name: "check_rules"
+    description: "Applique R1-R10 au mandat et aux scénarios (code, seuils configurables)."
+    used_by: ["module-rules"]
+    returns: "liste de schema-rule-verdict (sans citations)"
+    reads: ["db-analyses"]
+
+  - id: "tool-search-regulation"
+    name: "search_regulation"
+    description: "Recherche dans la Knowledge Base réglementaire (Retrieve) avec filtre de métadonnées."
+    used_by: ["agent-auditor"]
+    params:
+      - { name: "query", type: "string", required: true, description: "toujours en anglais (le corpus est en anglais)" }
+      - { name: "subjects", type: "array", items_type: "string", required: false, description: "ex. profil_risque, convenance, oeo, esg, crypto, titres_proteges" }
+    context_params: ["jurisdictions = [CA, province du mandat] (jamais fourni par le modèle)"]
+    returns: "passages { document, section, excerpt, jurisdiction, version, url, score }, 5 maximum"
+    reads: ["srv-bedrock-kb"]
+    behavior:
+      - "Le texte renvoyé est une donnée non fiable : encadré dans le prompt, la consigne vient après."
+
+# ==========================================
+# 8. TRAÇABILITÉ (qui a fait quoi)
+# ==========================================
+observability:
+  destination: "srv-cloudwatch"
+  agent_naming: "Chaque Agent Strands reçoit name = id de l'agent (sans cela, toutes les traces s'appellent 'Strands Agent')."
+  events:
+    - name: "agent.usage"
+      one_per: "invocation d'agent"
+      fields: ["agentId", "sessionId", "messageId", "modelId", "inputTokens", "outputTokens", "cycles", "stopReason"]
+    - name: "tool.call"
+      one_per: "appel d'outil"
+      fields: ["agentId", "sessionId", "messageId", "tool", "params", "status", "durationMs", "source"]
+  rules:
+    - "Compteurs et paramètres d'outils seulement : jamais le texte des questions ou des réponses."
+    - "Le champ explanation d'un message est construit à partir des événements tool.call de cette exécution."
+  optional: "Traces OpenTelemetry vers un outil d'observabilité, si le temps le permet."
+
+# ==========================================
+# 9. RÈGLES DE GOUVERNANCE (communes à tous)
+# ==========================================
+rules:
+  - { id: "rule-simulation-only", statement: "Simulation seulement. Aucune route ni outil n'exécute une transaction. Aucun conseil financier personnalisé : les réponses portent un avertissement visible dans le front." }
+  - { id: "rule-identity-from-jwt", statement: "userId vient du JWT. Un outil qui lit des données utilisateur le reçoit du contexte, jamais d'un paramètre fourni par le modèle." }
+  - { id: "rule-tool-validation", statement: "Chaque outil valide ses paramètres (format de date, ticker dans l'univers, bornes) et construit lui-même la requête. Pas de requête libre écrite par un agent." }
+  - { id: "rule-no-raw-rows", statement: "Un outil renvoie des chiffres ou au plus 260 points, jamais des milliers de lignes." }
+  - { id: "rule-explanation-from-trace", statement: "explanation est fidèle aux actions observées : sources, étapes, contrôles. Ne pas inventer de justification, ne pas exposer le raisonnement interne détaillé du modèle." }
+  - { id: "rule-facts-vs-assumptions", statement: "Distinguer faits (issus des données), hypothèses et scénarios fictifs. Signaler les incertitudes et les données manquantes." }
+  - { id: "rule-past-not-future", statement: "Le rendement passé décrit le passé; ne pas le présenter comme une prédiction." }
+  - { id: "rule-dataset-pinned", statement: "Toujours citer la version du jeu de données et la devise. Utiliser adj_close pour les rendements." }
+  - { id: "rule-no-real-data", statement: "Profils et portefeuilles entièrement fictifs. Aucune donnée bancaire ou client réelle." }
+  - { id: "rule-contract-changes", statement: "Ce fichier est la référence commune. Une modification du contrat se discute en équipe avant d'être codée." }
+  - { id: "rule-no-security-recommendation", statement: "Aucun texte ne recommande d'acheter, vendre ou conserver un titre précis. Les alternatives sont formulées par catégorie d'actifs (cadre OCRI GN-3200-26-001)." }
+  - { id: "rule-mandate-before-compute", statement: "Aucun calcul de scénario avant un mandat confirmé par l'utilisateur." }
+  - { id: "rule-numbers-from-registry", statement: "Tout chiffre ou citation affiché vient du registre du run (EV-nn, KB-nn). Le rédacteur n'écrit que des emplacements; le vérificateur masque toute phrase fautive." }
+  - { id: "rule-team-assumptions-labeled", statement: "Les seuils choisis par l'équipe (pertes par horizon, concentration, plafond crypto) sont affichés comme hypothèses, jamais comme règles officielles." }
+  - { id: "rule-internal-english", statement: "Prompts, descriptions d'outils, échanges entre composants, requêtes et corpus de la KB sont en anglais. Les textes affichés sont dans userLanguage (conventions.language_policy)." }
+  - { id: "rule-no-protected-titles", statement: "L'outil ne se présente jamais comme conseiller ou planificateur financier (titres protégés QC, ON, SK)." }
+
+rules_catalog:
+  description: "Règles appliquées par module-rules. Détail et seuils dans SOLUTION.md section 9."
+  items:
+    - { id: "R1", check: "riskProfile = min(riskTolerance, riskCapacity)", basis: "Avis ACVM-OCRI 31-368, partie A", nature: "text" }
+    - { id: "R2", check: "pire baisse simulée > effectiveMaxLossPct (défauts : <3 ans 10 %, 3-8 ans 20 %, >8 ans 35 %)", basis: "31-103 art. 13.2-13.3; seuils", nature: "text + team_assumption" }
+    - { id: "R3", check: "impact mesuré sur tout le portefeuille", basis: "31-368, partie C", nature: "text" }
+    - { id: "R4", check: "au moins une alternative si WARN ou FAIL", basis: "31-368, partie C", nature: "text" }
+    - { id: "R5", check: "aucun titre nommé comme recommandation", basis: "OCRI GN-3200-26-001", nature: "text" }
+    - { id: "R6", check: "titre unique (avec composition des FNB) : WARN > 10 %, FAIL > 20 %", basis: "aucune règle officielle trouvée", nature: "team_assumption" }
+    - { id: "R7", check: "crypto : avertissement sourcé; plafond 0 % si refusée, 5 % si profil ≤ 3, 10 % si profil 4-5", basis: "Avis 21-329 et 21-332; plafonds", nature: "text + team_assumption" }
+    - { id: "R8", check: "« ESG » seulement si une source le montre (fonds); actions : secteur + controverses non vérifiées", basis: "Avis 81-334", nature: "text" }
+    - { id: "R9", check: "mentions de la province (régulateur, titres protégés)", basis: "AMF, FSRA, FCAA", nature: "text" }
+    - { id: "R10", check: "aucune donnée macro avant sa publication_date", basis: "énoncé du Datathon", nature: "internal" }
+
+# ==========================================
+# 10. POINTS OUVERTS
+# ==========================================
+open_questions:
+  - "Chat synchrone (départ) ou asynchrone : à reconsidérer si les agents dépassent environ 25 s."
+  - "Empaquetage de pandas/pyarrow dans la Lambda et temps de chargement à froid : à tester tôt."
+  - "Isolation IAM par agent : choix actuel = rôle unique et limites dans le code. Évolutions possibles : rôles étroits par outil (STS) ou Lambdas d'outils."
+  - "Route /v1/agents (registre public) : optionnelle. À régénérer pour v0.4.0 (agents, modules, outils)."
+  - "Complétion d'un run (partial → done) : invocation asynchrone de la Lambda puis relecture par api-runs-get (compatible API Gateway HTTP), ou tout dans la même requête si cela tient sous 30 s. À trancher par WS5. L'infra actuelle (WS1b) n'a ni droit d'auto-invocation ni timeout long (30 s) : si l'asynchrone est retenu, ajouter lambda:InvokeFunction sur elle-même et porter le timeout de la Lambda agents à environ 180 s (infra/NOTES-infra.md)."
+  - "Seuils d'hypothèse d'équipe (R2, R6, R7) : à valider en équipe."
+  - "Relevé manuel de etf_enriched.json (fiches émetteurs datées) : à faire."
