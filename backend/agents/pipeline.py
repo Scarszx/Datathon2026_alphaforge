@@ -227,7 +227,8 @@ def complete_run(
                     user_id=user_id,
                 ) as verifier_span:
                     cleaned, hidden, verifier_report = verify_narrative(
-                        sections_t, registry.ids(), mandate, set(store.universe().index), _held_tickers(user_id, mandate))
+                        sections_t, registry.ids(), mandate, set(store.universe().index), _held_tickers(user_id, mandate),
+                        {h["symbol"] for s in run["scenarios"] for h in s.get("holdings") or []})
                     verifier_report["placeholdersMatch"] = verifier_report["placeholdersMatch"] and match
                     telemetry.set_span_output(verifier_span, verifier_report)
                 shown = " ".join(s["text"] for s in cleaned)

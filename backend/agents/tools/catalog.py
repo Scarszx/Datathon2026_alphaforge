@@ -1,4 +1,4 @@
-"""Les 14 outils du contrat (section tools), en fonctions pures du contexte.
+"""Les 15 outils du contrat (section tools), en fonctions pures du contexte.
 
 Chaque outil valide ses paramètres et construit lui-même sa lecture
 (rule-tool-validation). Une erreur attendue est renvoyée comme
@@ -21,6 +21,7 @@ import pandas as pd
 
 from backend.agents.data.store import NON_INVESTABLE_CLASSES
 from backend.agents.engine import analytics as an
+from backend.agents.engine import optimizer
 from backend.agents.engine.concentration import concentration as concentration_of
 from backend.agents.engine.scenarios import holding_values_cad, run_engine
 from backend.agents.engine.stress import PERIOD_IDS, derive_period
@@ -181,6 +182,25 @@ def get_profile(ctx: RequestContext) -> dict[str, Any]:
     return {"investorProfile": {k: v for k, v in profile.items() if k != "riskLevel"} if profile else profile}
 
 
+def _check_build_preferences(ctx: RequestContext, mandate: dict[str, Any]) -> str | None:
+    """Industries exclues ou préférées du mode build : noms exacts du jeu, minimums atteignables (None si tout va bien)."""
+    preferences = mandate.get("preferences") or {}
+    excluded = list(preferences.get("excludedIndustries") or [])
+    preferred = [{"industry": p["industry"], "minWeight": (p["minWeight"] / 100.0 if p.get("minWeight") is not None else None)}
+                 for p in preferences.get("preferredIndustries") or []]
+    universe = ctx.store.universe()
+    known = sorted(set(universe["industry"].dropna())) if "industry" in universe.columns else []
+    for name in excluded + [p["industry"] for p in preferred]:
+        if name not in known:
+            close = difflib.get_close_matches(name, known, n=5, cutoff=0.4)
+            return f"Unknown industry '{name}'. Use the dataset's English industry names" + (f", for example: {', '.join(close)}." if close else ".")
+    try:
+        optimizer.check_preferences(universe, excluded, preferred)
+    except optimizer.OptimizerError as error:
+        return str(error)
+    return None
+
+
 def propose_mandate(ctx: RequestContext, draft: dict[str, Any]) -> dict[str, Any]:
     """Valide un brouillon (schema-mandate-create-request) ; ne confirme rien."""
     if isinstance(draft, str):
@@ -205,6 +225,12 @@ def propose_mandate(ctx: RequestContext, draft: dict[str, Any]) -> dict[str, Any
         unknown.append(mandate["subjectTicker"])
     if unknown:
         return {"valid": False, "errors": [f"Unknown ticker(s): {', '.join(unknown)}. Use search_assets."]}
+    if mandate["mode"] == "build":
+        if mandate.get("operations") or mandate.get("subjectTicker"):
+            return {"valid": False, "errors": ["build describes a portfolio to construct: no operations and no subjectTicker."]}
+        problem = _check_build_preferences(ctx, mandate)
+        if problem:
+            return {"valid": False, "errors": [problem]}
     if mandate["mode"] in ("add_asset", "rebalance") and not mandate.get("operations"):
         return {"valid": False, "errors": ["operations must describe the tested idea for add_asset and rebalance."]}
     if mandate["mode"] == "diagnose" and not mandate.get("subjectTicker"):
@@ -379,6 +405,37 @@ def market_stats(ctx: RequestContext, tickers: list[str], start: str, end: str) 
     }
 
 
+def optimize_portfolio(ctx: RequestContext, risk_profile: int, excluded_industries: list[str] | None = None,
+                       preferred_industries: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+    """Construit un portefeuille moyenne-variance (aperçu, rien n'est enregistré). minWeight en % (ou null)."""
+    if isinstance(risk_profile, bool) or not isinstance(risk_profile, int) or not 1 <= risk_profile <= 5:
+        return _error("risk_profile must be an integer from 1 to 5.")
+    preferred = []
+    for item in preferred_industries or []:
+        if not isinstance(item, dict) or not isinstance(item.get("industry"), str):
+            return _error("preferred_industries must be a list of { industry, minWeight }.")
+        minimum = item.get("minWeight")
+        preferred.append({"industry": item["industry"], "minWeight": None if minimum is None else float(minimum) / 100.0})
+    try:
+        result = optimizer.optimize_portfolio(ctx.store, risk_profile, list(excluded_industries or []), preferred)
+    except optimizer.OptimizerError as error:
+        return _error(str(error))
+    return {
+        "holdings": [{"symbol": h.symbol, "name": h.name, "industry": h.industry, "weight": round(h.weight * 100, 2),
+                      "beta": round(h.beta, 2), "expected_return": round(h.expected_return * 100, 2)} for h in result.holdings],
+        "by_industry": {k: round(v * 100, 2) for k, v in result.by_industry.items()},
+        "expected_return": round(result.expected_return * 100, 2), "volatility": round(result.volatility * 100, 2),
+        "beta": round(result.beta, 2), "utility": round(result.utility, 4), "risk_aversion": result.aversion,
+        "period": an.window_label(*result.window),
+        "assumptions": [
+            "Mean-variance model: mu from the CAPM against ^GSPC, Ledoit-Wolf covariance, daily adjclose returns in the listing currency.",
+            "Expected returns are a model of the observed window, not a forecast.",
+            f"Candidates: U.S.-listed equities with an industry in the dataset ({result.universe_size} stocks).",
+        ],
+        "source": ctx.store.source_label("prices"),
+    }
+
+
 def _current_weights(ctx: RequestContext) -> dict[str, float] | dict[str, Any]:
     portfolio = portfolios_repo.get_portfolio(ctx.user_id, ctx.portfolio_id)
     if portfolio is None:
@@ -470,6 +527,7 @@ TOOL_FUNCTIONS = {
     "get_macro": get_macro,
     "compute_metrics": compute_metrics,
     "market_stats": market_stats,
+    "optimize_portfolio": optimize_portfolio,
     "get_portfolio": get_portfolio,
     "get_profile": get_profile,
     "propose_mandate": propose_mandate,

@@ -21,6 +21,7 @@ import pandas as pd
 
 from backend.agents.data.store import DataStore
 from backend.agents.engine import analytics as an
+from backend.agents.engine import optimizer
 from backend.agents.engine.concentration import by_asset_class, concentration, top_sector
 from backend.agents.engine.registry import EvidenceRegistry
 from backend.agents.engine.stress import LABELS as STRESS_LABELS
@@ -34,6 +35,12 @@ PORTFOLIO_METHOD = (
 )
 VOL_METHOD = "Standard deviation of daily returns x sqrt(252) (equities, ETFs) or sqrt(365) (crypto)."
 DD_METHOD = "Largest peak-to-trough decline of the value index over the window."
+HOLDING_LABEL_PREFIX = "Holding "  # preuves par titre du mode build : le rédacteur ne les lit pas (une ligne de portefeuille n'est pas un récit)
+BUILD_METHOD = (
+    "Mean-variance model U = w'mu - (A/2) w'Sigma w: mu from the CAPM (beta against the S&P 500 index, risk-free rate), "
+    "Sigma from the Ledoit-Wolf covariance of daily returns, constraints on single-stock and industry weights. "
+    "Expected returns are a model of the past window, not a forecast."
+)
 PAST_CAVEATS = ["Past performance describes the past; it does not predict future returns."]
 SURVIVOR_CAVEAT = "Survivorship bias: the asset universe was selected in 2026."
 
@@ -63,6 +70,8 @@ class ScenarioAnalysis:
     proxy_note: str | None = None
     notes: list[str] = field(default_factory=list)
     names: dict[str, str] = field(default_factory=dict)  # symbole d'approximation -> libellé de la catégorie (texte visible)
+    holdings: list[dict[str, Any]] = field(default_factory=list)  # mode build : titres construits (symbole, poids, preuves)
+    parameters: list[dict[str, Any]] = field(default_factory=list)  # mode build : paramètres utilisés (libellé, valeur, origine)
 
     def shown(self, tickers: list[str]) -> list[str]:
         """Noms à afficher : la catégorie à la place du symbole d'approximation."""
@@ -347,6 +356,109 @@ def _record_scenario_metrics(
     )
 
 
+def _fmt2(value: float, language: str) -> str:
+    text = f"{value:.2f}"
+    return text.replace(".", ",") if language == "fr" else text
+
+
+def _build_scenario(
+    store: DataStore, mandate_item: dict[str, Any], positions0: dict[str, float], registry: EvidenceRegistry,
+    start: pd.Timestamp, end: pd.Timestamp,
+) -> tuple[ScenarioAnalysis | None, str | None]:
+    """Mode build : scénario 1 = portefeuille moyenne-variance construit à partir des paramètres du mandat."""
+    mandate = mandate_item["mandate"]
+    preferences = mandate.get("preferences") or {}
+    preferred = [
+        {"industry": p["industry"], "minWeight": p["minWeight"] / 100.0 if p.get("minWeight") is not None else None}
+        for p in preferences.get("preferredIndustries") or []
+    ]
+    try:
+        result = optimizer.optimize_portfolio(
+            store, int(mandate_item["riskProfile"]), preferences.get("excludedIndustries") or [], preferred
+        )
+    except optimizer.OptimizerError as error:
+        return None, str(error)
+    language = registry.language
+    source = store.source_label("prices") + " (Yahoo Finance via yfinance)"
+    window = an.window_label(result.window[0], result.window[1])
+    as_of = end.date().isoformat()
+    total = sum(positions0.values()) or 100_000.0
+    positions = {h.symbol: h.weight * total for h in result.holdings}
+    scenario = ScenarioAnalysis(1, "Constructed portfolio", positions, _weights(positions))
+    scenario.description = (
+        "Simulation built from your parameters with a mean-variance model; it is not a recommendation to buy or hold any security."
+    )
+    caveats = list(PAST_CAVEATS) + [SURVIVOR_CAVEAT, "Expected returns are a CAPM model of the observed window, not a forecast."]
+    cfg = result.config
+    common = dict(scenario=1, window=window, source=source, as_of=as_of)
+
+    def pct(value: float) -> float:
+        return value * 100.0
+
+    scenario.evidence["expectedReturn"] = registry.add(
+        kind="metric", label="Expected annual return of the constructed portfolio (CAPM, model)", value=pct(result.expected_return),
+        method=f"Weighted CAPM expected return. {BUILD_METHOD}", currency="USD", caveats=caveats, key="buildExpectedReturn", **common,
+    )
+    scenario.evidence["beta"] = registry.add(
+        kind="metric", label="Beta of the constructed portfolio against the S&P 500 index", value=result.beta,
+        formatted=_fmt2(result.beta, language), unit="",
+        method="Weighted beta = covariance with the index daily returns / variance of the index, listing currency.",
+        caveats=caveats, key="buildBeta", **common,
+    )
+    scenario.evidence["utility"] = registry.add(
+        kind="metric", label="Mean-variance utility of the constructed portfolio", value=result.utility,
+        formatted=_fmt2(result.utility, language), unit="", method=BUILD_METHOD, caveats=caveats, key="buildUtility", **common,
+    )
+    aversion_id = registry.add(
+        kind="assumption", label=f"Risk aversion A used by the model (from risk profile {result.risk_profile})",
+        value=result.aversion, formatted=_fmt2(result.aversion, language), unit="",
+        method="Table of team assumptions by risk profile (1 to 5): a lower profile means a higher aversion.",
+        source=source, window=window, as_of=as_of, key="buildAversion",
+    )
+    registry.add(
+        kind="assumption", label="Risk-free rate used by the model (team assumption)", value=pct(cfg["riskFreeRate"]),
+        method="Fixed team assumption in optimizer_config.json.", source=source, window=window, as_of=as_of, key="buildRiskFree",
+    )
+    scenario.parameters = [
+        {"key": "riskAversion", "value": result.aversion, "riskProfile": result.risk_profile, "evidence": aversion_id},
+        {"key": "maxWeight", "value": pct(cfg["maxWeight"])},
+        {"key": "industryCap", "value": pct(cfg["industryCap"])},
+        {"key": "preferredIndustryCap", "value": pct(cfg["preferredIndustryCap"])},
+        {"key": "windowYears", "value": cfg["windowYears"]},
+    ]
+    if result.excluded_industries:
+        scenario.parameters.append({"key": "excludedIndustries", "value": result.excluded_industries})
+    if result.preferred_industries:
+        scenario.parameters.append({"key": "preferredIndustries", "value": result.preferred_industries})
+    for holding in result.holdings:
+        label = f"{HOLDING_LABEL_PREFIX}{holding.symbol}"
+        weight_id = registry.add(
+            kind="metric", label=f"{label}: weight in the constructed portfolio", value=pct(holding.weight),
+            method=f"Optimizer weight, rounded; positions under {pct(cfg['minPositionWeight']):.1f}% are dropped. {BUILD_METHOD}",
+            caveats=caveats, key=f"holding:{holding.symbol}:weight", **common,
+        )
+        beta_id = registry.add(
+            kind="metric", label=f"{label}: beta against the S&P 500 index", value=holding.beta,
+            formatted=_fmt2(holding.beta, language), unit="", method="Covariance with the index / variance of the index, daily returns.",
+            caveats=caveats, key=f"holding:{holding.symbol}:beta", **common,
+        )
+        expected_id = registry.add(
+            kind="metric", label=f"{label}: expected annual return (CAPM, model)", value=pct(holding.expected_return),
+            method=f"risk-free rate + beta x (index return - risk-free rate). {BUILD_METHOD}", caveats=caveats,
+            key=f"holding:{holding.symbol}:expected", **common,
+        )
+        scenario.holdings.append({
+            "symbol": holding.symbol, "name": holding.name, "industry": holding.industry,
+            "weight": round(pct(holding.weight), 2),
+            "evidence": {"weight": weight_id, "beta": beta_id, "expectedReturn": expected_id},
+        })
+    scenario.notes.append(
+        f"The model was estimated on {result.observations} common trading days over {result.universe_size} stocks "
+        f"({window}); candidates are U.S.-listed equities with an industry in the dataset."
+    )
+    return scenario, None
+
+
 def run_engine(
     store: DataStore,
     mandate_item: dict[str, Any],
@@ -395,7 +507,13 @@ def run_engine(
     operations = mandate.get("operations") or []
     s0 = ScenarioAnalysis(0, "Current portfolio", positions0, _weights(positions0))
     scenarios.append(s0)
-    if operations:
+    if mandate.get("mode") == "build":
+        built, build_error = _build_scenario(store, mandate_item, positions0, registry, start, end)
+        if built is not None:
+            scenarios.append(built)
+        else:
+            warnings.append(f"The portfolio could not be constructed: {build_error}")
+    elif operations:
         positions1 = apply_operations(store, positions0, operations, end, base_currency)
         s1 = ScenarioAnalysis(1, "Idea as stated", positions1, _weights(positions1))
         s1.idea_assets = _idea_assets(store, operations, start, end)
@@ -515,6 +633,10 @@ def public_scenarios(result: EngineResult, verdicts_by_scenario: dict[int, str])
             item["description"] = scenario.description
         if scenario.proxy_note:
             item["proxyNote"] = scenario.proxy_note
+        if scenario.holdings:
+            item["holdings"] = scenario.holdings
+        if scenario.parameters:
+            item["parameters"] = scenario.parameters
         # scenario.notes (données manquantes) vont dans run.explanation.limitations :
         # schema-scenario n'a pas de champ pour elles.
         store_free.append(item)

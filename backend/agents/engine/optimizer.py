@@ -156,6 +156,43 @@ def _clean_preferences(excluded: list[str] | None, preferred: list[dict[str, Any
     return excluded_set, minimums
 
 
+def candidate_universe(universe: pd.DataFrame, config: dict[str, Any]) -> pd.DataFrame:
+    """Actions avec industrie, cotées sur les marchés de la configuration (même devise : USD par défaut)."""
+    if "industry" not in universe.columns:
+        return universe.iloc[0:0]
+    return universe[
+        (universe["asset_class"].astype(str).str.lower() == "equity")
+        & universe["industry"].notna()
+        & universe["market"].isin(config["universeMarkets"])
+    ]
+
+
+def _check_reachable(industries: np.ndarray, excluded: list[str], minimums: dict[str, float], config: dict[str, Any]) -> None:
+    is_excluded = np.isin(industries, excluded)
+    for industry, minimum in minimums.items():
+        available = int(((industries == industry) & ~is_excluded).sum())
+        limit = min(config["preferredIndustryCap"], available * config["maxWeight"])
+        if minimum > limit + 1e-9:
+            raise OptimizerError(
+                f"Industry '{industry}': a minimum of {minimum:.0%} is not reachable "
+                f"({available} eligible stocks, at most {config['maxWeight']:.0%} each, cap {config['preferredIndustryCap']:.0%})."
+            )
+    if int((~is_excluded).sum()) * config["maxWeight"] < 1.0 - 1e-9:
+        raise OptimizerError("Too few eligible stocks once the excluded industries are removed.")
+
+
+def check_preferences(universe: pd.DataFrame, excluded: list[str] | None, preferred: list[dict[str, Any]] | None,
+                      config: dict[str, Any] | None = None) -> None:
+    """Contrôles de faisabilité sans calcul (avant la confirmation du mandat); OptimizerError sinon.
+    `preferred` : [{industry, minWeight en fraction | None}]."""
+    cfg = {**load_config(), **(config or {})}
+    candidates = candidate_universe(universe, cfg)
+    if candidates.empty:
+        raise OptimizerError("No candidate with an industry in this dataset version.")
+    excluded_list, minimums = _clean_preferences(excluded, preferred, set(candidates["industry"]), cfg)
+    _check_reachable(candidates["industry"].to_numpy(), excluded_list, minimums, cfg)
+
+
 def optimize_portfolio(store: DataStore, risk_profile: int, excluded_industries: list[str] | None = None,
                        preferred_industries: list[dict[str, Any]] | None = None,
                        config: dict[str, Any] | None = None) -> OptimizationResult:
@@ -165,11 +202,7 @@ def optimize_portfolio(store: DataStore, risk_profile: int, excluded_industries:
     universe = store.universe()
     if MARKET_INDEX not in universe.index:
         raise OptimizerError(f"Market index {MARKET_INDEX} is missing from this dataset version.")
-    candidates = universe[
-        (universe["asset_class"].astype(str).str.lower() == "equity")
-        & universe["industry"].notna()
-        & universe["market"].isin(cfg["universeMarkets"])
-    ] if "industry" in universe.columns else universe.iloc[0:0]
+    candidates = candidate_universe(universe, cfg)
     if candidates.empty:
         raise OptimizerError("No candidate with an industry in this dataset version.")
     excluded, minimums = _clean_preferences(
@@ -199,17 +232,8 @@ def optimize_portfolio(store: DataStore, risk_profile: int, excluded_industries:
     is_excluded = np.isin(industries, excluded)
     is_preferred = np.isin(industries, list(minimums))
     max_weight = cfg["maxWeight"]
-    for industry, minimum in minimums.items():
-        available = int(((industries == industry) & ~is_excluded).sum())
-        limit = min(cfg["preferredIndustryCap"], available * max_weight)
-        if minimum > limit + 1e-9:
-            raise OptimizerError(
-                f"Industry '{industry}': a minimum of {minimum:.0%} is not reachable "
-                f"({available} eligible stocks, at most {max_weight:.0%} each, cap {cfg['preferredIndustryCap']:.0%})."
-            )
+    _check_reachable(industries, excluded, minimums, cfg)
     keep = ~is_excluded
-    if int(keep.sum()) * max_weight < 1.0 - 1e-9:
-        raise OptimizerError("Too few eligible stocks once the excluded industries are removed.")
 
     groups: list[tuple[np.ndarray, float | None, float | None]] = []
     for industry in pd.unique(industries[keep]):

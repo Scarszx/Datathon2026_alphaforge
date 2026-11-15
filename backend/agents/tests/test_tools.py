@@ -1,4 +1,4 @@
-"""Les 14 outils sur le mini-jeu : validation, plafonds du contrat, contexte jamais fourni par le modèle."""
+"""Les 15 outils sur le mini-jeu : validation, plafonds du contrat, contexte jamais fourni par le modèle."""
 
 from __future__ import annotations
 
