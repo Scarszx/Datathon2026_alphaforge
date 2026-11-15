@@ -6,6 +6,7 @@ import type { Mandate, MandateCreateRequest, Run } from "../../api/types";
 import EvidenceText from "./EvidenceText";
 import MandateCard from "./MandateCard";
 import SimulationPanel from "./SimulationPanel";
+import { LangContext, t as tr } from "../../lib/i18n";
 
 afterEach(cleanup);
 
@@ -114,6 +115,43 @@ describe("SimulationPanel (affichage progressif partial → done)", () => {
     render(<SimulationPanel run={null} lang="fr" />);
     expect(screen.getByText(/Aucune analyse pour l'instant/)).toBeTruthy();
     expect(screen.getByText(/pas un conseil financier/)).toBeTruthy();
+  });
+});
+
+describe("Explication et libellés des métriques (contrat : explanation toujours affichée)", () => {
+  const EXPLANATION = {
+    sources: [{ id: "prices_daily", dataset: "prices/RY.TO.parquet@2026-11-14", asOf: "2026-11-14" }],
+    steps: [{ agentId: "agent-orchestrator", tool: "get_portfolio", status: "ok" as const, durationMs: 12 }],
+    assumptions: ["Volatilité annualisée sur 252 jours."],
+    limitations: ["Le rendement passé ne prédit pas le futur."],
+  };
+
+  it("affiche l'explication du run (sources, étapes, hypothèses, limites) dans le panneau", () => {
+    const { container } = render(<SimulationPanel run={{ ...DONE, explanation: EXPLANATION }} lang="fr" />);
+    expect(container.querySelector("details.expl summary")?.textContent).toContain("Explication");
+    expect(screen.getByText("prices_daily")).toBeTruthy();
+    expect(screen.getByText("get_portfolio")).toBeTruthy();
+    expect(screen.getByText("Volatilité annualisée sur 252 jours.")).toBeTruthy();
+    expect(screen.getByText("Le rendement passé ne prédit pas le futur.")).toBeTruthy();
+  });
+
+  it("traduit les libellés fixes de l'explication en anglais", () => {
+    const { container } = render(
+      <LangContext.Provider value="en">
+        <SimulationPanel run={{ ...DONE, userLanguage: "en", explanation: EXPLANATION }} lang="en" />
+      </LangContext.Provider>,
+    );
+    expect(container.querySelector("details.expl summary")?.textContent).toContain("Explanation");
+    expect(screen.getByText("Assumptions")).toBeTruthy();
+    expect(screen.getByText("Limitations")).toBeTruthy();
+  });
+
+  it("connaît les métriques émises par le back (totalReturn, stressCovid2020, cryptoWeight)", () => {
+    for (const lang of ["fr", "en"] as const) {
+      for (const key of ["totalReturn", "stressCovid2020", "cryptoWeight", "volatility", "maxDrawdown", "stress2022", "stressRates", "stressCrypto", "topSingleWeight", "techWeightLookThrough"]) {
+        expect(tr(`sim.metric.${key}`, lang)).not.toBe(`sim.metric.${key}`);
+      }
+    }
   });
 });
 

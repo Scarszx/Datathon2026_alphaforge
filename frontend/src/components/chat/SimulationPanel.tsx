@@ -4,6 +4,7 @@
 import { useState } from "react";
 import type { RuleVerdict, Run, Scenario } from "../../api/types";
 import { t, type Lang } from "../../lib/i18n";
+import Explanation from "../Explanation";
 import EvidenceText, { EvidenceBadge } from "./EvidenceText";
 
 const SCENARIO_LABEL_KEY = ["sim.scenario.current", "sim.scenario.idea", "sim.scenario.alternative"] as const;
@@ -162,6 +163,8 @@ export default function SimulationPanel({ run, lang }: { run: Run | null; lang: 
                 </div>
               </>
             )}
+
+            {run.explanation && <div style={{ marginTop: 12 }}><Explanation data={run.explanation} /></div>}
           </>
         )}
       </div>
