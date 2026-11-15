@@ -81,7 +81,7 @@ export default function MandateColumn({
                 onChange={(e) => setLoss(Number(e.target.value))} disabled={busy} />
             </div>
             <button type="button" className="btn" disabled={busy || !dirty} onClick={run}>
-              {busy ? t("chat.runInProgress", lang) : dirty ? t("col.whatIfRun", lang) : t("col.whatIfRun", lang)}
+              {busy ? t("chat.runInProgress", lang) : t("col.whatIfRun", lang)}
             </button>
           </>
         )}
