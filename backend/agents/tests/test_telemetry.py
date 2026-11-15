@@ -106,7 +106,7 @@ def test_trace_span_hierarchy_and_context_propagation(store, scripts, monkeypatc
                                     {
                                         "content": {"text": "Excerpt"},
                                         "location": {"s3Location": {"uri": "s3://b/CA_31-368.pdf"}},
-                                        "metadata": {"juridiction": "CA"},
+                                        "metadata": {"juridiction": "CA", "regulateur": "CSA"},
                                         "score": 0.91,
                                     }
                                 ]

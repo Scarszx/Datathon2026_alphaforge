@@ -176,3 +176,13 @@ def test_manifeste_et_rapport(corpus):
 def test_refuse_un_dossier_de_sortie_non_vide(tmp_path):
     (tmp_path / "x").write_text("déjà là")
     assert build.main(["--source", str(SOURCE), "--out", str(tmp_path), "--version", "v"]) == 2
+
+
+def test_citations_fixees_embarquees_sont_celles_du_corpus_construit(corpus):
+    """Le fichier du zip (backend/agents/data/fixed_citations.json) doit rester celui du script, sinon R5/R9 citeraient un texte périmé."""
+    built = json.loads((corpus / "fixed_citations.json").read_text())
+    embedded = json.loads((ROOT / "backend" / "agents" / "data" / "fixed_citations.json").read_text())
+    assert built == embedded
+    assert [c["section"] for c in built["R5"]] == ["s. 2.1.1 Decision-making supports", "s. 3.3 Safeguards for Decision-Making Supports"]
+    assert set(built["R9"]) == {"QC", "ON", "SK"} and built["R9"]["SK"][0]["status"] == "projet"
+    assert all(len(c["excerpt"]) <= kb.MAX_EXCERPT_CHARS for c in built["R5"] + sum(built["R9"].values(), []))

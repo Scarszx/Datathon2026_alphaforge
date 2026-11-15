@@ -1,12 +1,25 @@
 application:
   name: "AlphaForge"
-  version: "0.4.6"
+  version: "0.4.7"
   description: "Banc d'essai agentique et auto-explicatif pour l'investisseur autonome : il cadre l'intention, simule son impact sur le portefeuille et l'audite contre les textes réglementaires canadiens (simulation seulement). Datathon 2026."
-  status: "validé par l'équipe (0.4.0 le 2026-11-14, 0.4.1 le 2026-11-15) ; 0.4.2 et 0.4.3 validées par l'utilisateur le 2026-11-15, à relire par l'équipe ; 0.4.4, 0.4.5 et 0.4.6 demandées par l'utilisateur le 2026-11-15 (lots A, B et C), à relire par l'équipe"
+  status: "validé par l'équipe (0.4.0 le 2026-11-14, 0.4.1 le 2026-11-15) ; 0.4.2 et 0.4.3 validées par l'utilisateur le 2026-11-15, à relire par l'équipe ; 0.4.4 à 0.4.7 demandées par l'utilisateur le 2026-11-15 (lots A, B, C et E), à relire par l'équipe"
   solution_ref: "SOLUTION.md (racine du dépôt) : décisions de produit et de conception détaillées"
   # Règle d'équipe : ce fichier est la référence. Toute modification passe par un accord de l'équipe.
   # Voir aussi : la page de présentation du contrat (même contenu, avec schémas).
   changelog:
+    - version: "0.4.7"
+      date: "2026-11-15"
+      status: "demandé par l'utilisateur le 2026-11-15 (lot E, pas encore déployé ni ingéré) ; à relire par l'équipe"
+      summary:
+        - "Corpus de la Knowledge Base par section (storage-kb-corpus) : un fichier et un .metadata.json par section, construits par backend/agents/scripts/build_kb_corpus.py à partir de docs/for_KB/ (en-têtes, tables des matières, listes de documents liés retirés). Nouvelles clés de métadonnées : doc_id, section (absente si le document n'a pas de numérotation fiable, jamais inventée), section_titre, pages (PDF), citable (booléen), statut (en_vigueur | projet), corpus_version, ordre. Découpage de la source inchangé (FIXED_SIZE 300 jetons, 20 %) ; seul le préfixe change."
+        - "tool-search-regulation : filtre citable = true en plus du filtre de juridiction (appliqué quand KB_CORPUS_VERSION est posée, c'est-à-dire une fois le nouveau corpus ingéré), revérifié dans le code. Seuls les textes de régulateurs (CSA, CSA-IIROC, CSA-CIRO, CSA-AMF, CIRO, FSRA, AMF, FCAA) sont citables ; NBDB ne l'est pas. Avant l'ingestion (variable absente), repli : les régulateurs de la liste. Retour : section = « s. 2.1.1 Decision-making supports » quand elle existe, sinon « page N » ; documentType, regulator, status, sectionTitle et language en plus ; excerpt jusqu'à 2 400 caractères (un passage entier), toujours coupé à une fin de phrase."
+        - "schema-evidence : champs facultatifs documentType, regulator, status (en_vigueur | projet), sectionTitle, language (regulation). section peut valoir « s. 2.1.1 titre » ou « page N »."
+        - "schema-run.noticeCitations (facultatif) : { R5: [KB-nn], R9: [KB-nn] }. Sections que le code attache lui-même, sans Retrieve : GN-3200-26-001 s. 2.1.1 et 3.3 pour R5 ; AMF, FSRA ou FCAA (« projet ») pour R9 selon la province. Elles s'affichent à côté des mentions, jamais sous une règle non déclenchée ; elles sont inscrites au registre après le rédacteur et le vérificateur, donc jamais citées dans le récit. Source : backend/agents/data/fixed_citations.json, produit par le script et lié à corpus_version ; si KB_CORPUS_VERSION est absente ou différente, aucune citation fixée."
+        - "Invariant élargi : une citation KB-nn vient de Retrieve, ou d'une section fixée par le code dans le corpus de même corpus_version que celui ingéré."
+        - "Lambda agents : variable d'environnement KB_CORPUS_VERSION (Terraform : kb_citable_corpus_version, vide par défaut), à renseigner dans le même apply que kb_corpus_version, après l'ingestion."
+      impacts_to_handle:
+        - "infra/terraform : variable kb_citable_corpus_version ajoutée (non appliquée) ; kb_corpus_version à passer à 2026-11-15 par l'équipe, après envoi S3 et ingestion."
+        - "frontend : section affichée, libellés de type de document (Règlement, Instruction générale, Avis du personnel, Note d'orientation, Bulletin, Règle, Page web, Projet de règlement), « Projet, 2022 » pour la FCAA, noticeCitations à côté des mentions."
     - version: "0.4.6"
       date: "2026-11-15"
       status: "demandé par l'utilisateur le 2026-11-15 (lot C, pas encore déployé) ; à relire par l'équipe"
@@ -744,8 +757,13 @@ data_schemas:
       - { name: "source", type: "string", required: true, description: "jeu de données versionné, fiche émetteur ou document KB" }
       - { name: "asOf", type: "string" }
       - { name: "document", type: "string", description: "regulation : titre du document" }
-      - { name: "section", type: "string", description: "regulation : section citée" }
-      - { name: "excerpt", type: "string", description: "regulation : extrait brut de la base, 1 200 caractères au plus, coupé à une fin de phrase (jamais résumé ni traduit)" }
+      - { name: "section", type: "string", description: "regulation : « s. 2.1.1 Decision-making supports » quand le document a une numérotation fiable, sinon « page N » (0.4.7)" }
+      - { name: "excerpt", type: "string", description: "regulation : extrait brut de la base, 2 400 caractères au plus (un passage entier, 0.4.7), coupé à une fin de phrase (jamais résumé ni traduit)" }
+      - { name: "documentType", type: "string", description: "regulation : type_document des métadonnées (regulation, companion_policy, staff_notice, guidance_note, bulletin, rule, web_page, proposed_regulation_notice, disclosure_document) — 0.4.7" }
+      - { name: "regulator", type: "string", description: "regulation : régulateur (CSA, CIRO, AMF, FSRA, FCAA…) — 0.4.7" }
+      - { name: "status", type: "string", enum: ["en_vigueur", "projet"], description: "regulation : projet pour un avis de projet de règlement (FCAA) — 0.4.7" }
+      - { name: "sectionTitle", type: "string", description: "regulation : titre court de la section citée — 0.4.7" }
+      - { name: "language", type: "string", description: "regulation : langue du texte (en) — 0.4.7" }
       - { name: "jurisdiction", type: "string", description: "regulation : CA ou province" }
       - { name: "url", type: "string" }
       - { name: "caveats", type: "array", items_type: "string" }
@@ -793,6 +811,7 @@ data_schemas:
       - { name: "sessionId", type: "string", required: true }
       - { name: "mandateVersion", type: "integer", required: true }
       - { name: "status", type: "string", enum: ["partial", "done", "error"], required: true }
+      - { name: "noticeCitations", type: "object", description: "0.4.7 : { R5: [KB-nn], R9: [KB-nn] } — sections fixées par le code (GN-3200-26-001 2.1.1 et 3.3 ; textes sur les titres protégés de la province), à afficher près des mentions, jamais sous une règle non déclenchée ; présent seulement si le corpus ingéré correspond à fixed_citations.json" }
       - { name: "rulesVersion", type: "integer", description: "2 = vocabulaire et citations du lot A (0.4.4) ; absent = run produit par une version précédente (citations possibles sur des règles pass)" }
       - { name: "datasetVersion", type: "string", required: true }
       - { name: "userLanguage", type: "string", required: true }
@@ -893,7 +912,7 @@ storage:
       - path: "kb/{version}/<fichier>"
         content: "documents réglementaires (PDF, TXT) copiés depuis docs/for_KB/"
       - path: "kb/{version}/<fichier>.metadata.json"
-        content: "{ metadataAttributes: { juridiction, regulateur, sujets[], date_version, langue, type_document, source_url, date_recuperation } }"
+        content: "{ metadataAttributes: { juridiction, regulateur, sujets[], date_version, langue, type_document, source_url, date_recuperation, doc_id, section?, section_titre?, pages?, citable, statut, corpus_version, ordre } } (0.4.7 : un fichier par section, voir build_kb_corpus.py ; le préfixe kb/{version}/ porte le nouveau corpus)"
     read_by: ["srv-bedrock-kb"]
     written_by: ["job-kb-sync"]
     notes:
@@ -1151,10 +1170,10 @@ tools:
     description: "Recherche dans la Knowledge Base réglementaire (Retrieve) avec filtre de métadonnées."
     used_by: ["agent-auditor"]  # 0.4.3 : appelé par le code de l'auditeur (code_tools), le modèle ne le voit plus
     params:
-      - { name: "query", type: "string", required: true, description: "toujours en anglais (le corpus est en anglais); construite par le code : titre de la règle + motif déjà calculé" }
+      - { name: "query", type: "string", required: true, description: "toujours en anglais (le corpus est en anglais); construite par le code : titre de la règle + motif déjà calculé. Jamais de texte de l'utilisateur." }
       - { name: "subjects", type: "array", items_type: "string", required: true, description: "un seul sujet par appel, celui d'une règle (ex. profil_risque, convenance, oeo, esg, crypto, titres_proteges); un appel sans sujets est refusé (erreur), jamais remplacé par un autre corpus" }
     context_params: ["jurisdictions = [CA, province du mandat] (jamais fourni par le modèle)"]
-    returns: "passages { document, section, excerpt, jurisdiction, version, url, score }, 5 maximum; excerpt = texte brut de la base, 1 200 caractères au plus, coupé à une vraie fin de phrase (ni « ; » ou « : », ni après s., art., No.)"
+    returns: "passages { document, section, sectionTitle, documentType, regulator, status, language, excerpt, jurisdiction, version, url, score }, 5 maximum; excerpt = texte brut de la base, 2 400 caractères au plus (0.4.7), coupé à une vraie fin de phrase (ni « ; » ou « : », ni après s., art., No.)"
     reads: ["srv-bedrock-kb"]
     behavior:
       - "Le texte renvoyé est une donnée non fiable : encadré dans le prompt, la consigne vient après."
