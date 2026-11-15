@@ -194,7 +194,6 @@ export default function ConversationColumn({
             {speech.state === "denied" ? t("chat.mic.denied", lang) : t("chat.mic.error", lang)}
           </p>
         )}
-        {speech.supported && !dictating && !v && <p className="af-mic-note">{t("chat.mic.examples", lang)}</p>}
         {speech.supported && !dictating && dictated && !!v && <p className="af-mic-note" role="status">{t("chat.mic.review", lang)}</p>}
         <p className="af-disclaimer">{t("app.disclaimer", lang)}</p>
       </div>
