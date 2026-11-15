@@ -53,7 +53,7 @@ passe les deux dossiers explicitement jusqu'à sa mise à jour par l'intégratio
 - `PUT /holdings` et `POST /mandates` valident les tickers contre la copie
   embarquée `tickers.json`, autorisée par le contrat pour `srv-api-light`.
 - `POST /mandates` lit les seuils de perte maximale par défaut selon l'horizon
-  dans `mandate_defaults.json` (ou via `RULES_CONFIG_PATH` si défini).
+  dans `backend/common/mandate_defaults.json` (ou via `RULES_CONFIG_PATH` si défini).
 
 Voir `NOTES-api.md` pour les hypothèses et les points à coordonner avec
 l'équipe.
