@@ -1,0 +1,29 @@
+{
+  "_comment": "PROPOSITION à faire relire par l'équipe (V5) : sujets par section. 'default' : 'inherit' = sujets du document (la section est listée dans le rapport) ou une liste explicite. 'sections' : préfixe de section (le plus long gagne) -> sujets. Doit rester dans kb.KNOWN_SUBJECTS ; un nouveau sujet oblige à mettre à jour KNOWN_SUBJECTS, RULE_SUBJECTS, la docstring de search_regulation et les tests.",
+  "documents": {
+    "CA_CIRO_GN-3200-26-001": {
+      "default": "inherit",
+      "sections": {
+        "2.1.1": ["aide_decision", "recommandation", "oeo"],
+        "2.1": ["recommandation", "oeo"],
+        "3.2": ["aide_decision", "recommandation", "oeo"],
+        "3.3": ["aide_decision", "recommandation", "oeo"],
+        "3": ["aide_decision", "oeo"],
+        "2.2": ["oeo"], "2.3": ["oeo"], "2.4": ["oeo"], "1": ["oeo"], "4": ["oeo"], "5": ["oeo"]
+      }
+    },
+    "CA_CIRO_bulletin-26-0059": {"default": "inherit"},
+    "CA_31-368": {
+      "default": ["convenance"],
+      "sections": {"A": ["kyc", "profil_risque"], "A.1": ["kyc", "profil_risque"], "B": ["convenance"], "C": ["convenance"], "C.2": ["convenance", "profil_risque"], "C.4": ["convenance", "profil_risque"], "D": ["instruction"]}
+    },
+    "CA_31-103CP": {
+      "default": ["instruction"],
+      "sections": {"13.2.1": ["convenance"], "13.2": ["kyc", "profil_risque"], "13.3": ["convenance", "profil_risque"], "13.1": ["convenance"]}
+    },
+    "CA_31-103": {
+      "default": ["reglement"],
+      "sections": {"13.2.1": ["convenance", "reglement"], "13.2": ["kyc", "reglement"], "13.3": ["convenance", "reglement"]}
+    }
+  }
+}

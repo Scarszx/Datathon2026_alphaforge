@@ -1,0 +1,108 @@
+{
+  "_comment": "Règles de nettoyage et de découpage par document (lot E1). Clé = préfixe de fichier (comme kb.DOCUMENT_TITLES). numbering : 'levels' = motifs de titre numérotés (groupes nommés num et title) ; sans 'levels', le texte est découpé par groupes de pages ('page_group') sans numéro inventé. drop_line_regex : lignes de mise en page retirées. preamble_until : tout ce qui précède cette ligne est retiré (en-tête de page web). drop_section_title_regex : sections retirées (listes de documents liés). boundary_regex : lignes qui terminent une section sans en ouvrir une (titres de partie, annexes). must_contain / must_not_contain : contrôles sur le texte nettoyé (apostrophes normalisées).",
+  "documents": {
+    "CA_CIRO_GN-3200-26-001": {
+      "levels": [
+        "^(?P<num>\\d+(?:\\.\\d+){0,3})\\.?\\s+(?P<title>[A-Z][A-Za-z()\\-’' ,]{2,70})$"
+      ],
+      "preamble_until": "^Executive Summary$",
+      "preamble_title": "Executive Summary",
+      "drop_line_regex": [
+        "^Source: https?://",
+        "^Retrieved \\d{4}-",
+        "^Breadcrumb$",
+        "^HOME$",
+        "^/ NEWSROOM",
+        "^Type:$",
+        "^Table of contents$"
+      ],
+      "drop_section_title_regex": [
+        "Previous Guidance Note",
+        "Related Documents"
+      ],
+      "footnotes": "txt_numbered_lines",
+      "must_contain": [
+        "takes no position on whether that output is suitable for that client",
+        "applies both to each individual support and to their collective output"
+      ],
+      "must_not_contain": [
+        "Source: https://www.ciro.ca",
+        "/ NEWSROOM / PUBLICATIONS /",
+        "This Guidance Note replaces",
+        "Table of contents"
+      ]
+    },
+    "CA_CIRO_bulletin-26-0059": {
+      "levels": [
+        "^(?P<num>\\d+(?:\\.\\d+){0,2})\\.?\\s+(?P<title>[A-Z][A-Za-z()\\-’' ,]{2,70})$"
+      ],
+      "preamble_until": "^Background$",
+      "preamble_title": "Introduction",
+      "drop_line_regex": [
+        "^Source: https?://",
+        "^Retrieved \\d{4}-",
+        "^Breadcrumb$",
+        "^HOME$",
+        "^/ NEWSROOM",
+        "^Type:$",
+        "^Table of contents$"
+      ],
+      "drop_section_title_regex": [
+        "Previous Guidance Note",
+        "Related Documents"
+      ],
+      "must_not_contain": [
+        "Source: https://www.ciro.ca",
+        "/ NEWSROOM / PUBLICATIONS /",
+        "Table of contents"
+      ]
+    },
+    "CA_31-368": {
+      "levels": [
+        "^(?P<num>[A-D])\\.\\s{2,}(?P<title>[A-Z][^\\n]{2,140})$",
+        "^(?P<num>\\d{1,2})\\.\\s{2,}(?P<title>[A-Z][^\\n]{2,140})$"
+      ],
+      "boundary_regex": [
+        "^Appendix",
+        "^Annex"
+      ],
+      "must_contain": [
+        "a client's overall risk profile should reflect the lower of the two"
+      ],
+      "preamble_title": "Introduction and background"
+    },
+    "CA_31-103CP": {
+      "levels": [
+        "^(?P<num>\\d{1,2}\\.\\d{1,2}(?:\\.\\d{1,2})?)\\s{1,8}(?P<title>[A-Z][^\\n]{2,100})$"
+      ],
+      "boundary_regex": [
+        "^Part \\d+\\s+[A-Z]",
+        "^Appendix",
+        "^Annex"
+      ],
+      "must_contain": [
+        "The risk profile for a client should reflect the lower of"
+      ]
+    },
+    "CA_31-103": {
+      "levels": [
+        "^(?P<num>\\d{1,2}\\.\\d{1,2}(?:\\.\\d{1,2})?)\\.?\\s{1,8}(?P<title>[A-Z“][^\\n]{2,100})$"
+      ],
+      "boundary_regex": [
+        "^PART \\d+",
+        "^(?:APPENDIX|Appendix)",
+        "^(?:FORM|Form) 31-103F"
+      ],
+      "drop_line_regex": [
+        "^Last amendment in force",
+        "^on [A-Z][a-z]+ \\d+, \\d{4}$",
+        "^This document has official status"
+      ]
+    },
+    "SK_FCAA_FPFA-proposed-regulations-notice": {
+      "must_contain": [
+        "has not yet been proclaimed into force"
+      ]
+    }
+  }
+}
