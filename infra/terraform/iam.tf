@@ -159,12 +159,19 @@ data "aws_iam_policy_document" "agents" {
   }
 
   # srv-bedrock-guardrails : filtre d'entrée et de sortie (ApplyGuardrail, ou
-  # guardrail passé à l'invocation du modèle).
+  # guardrail passé à l'invocation du modèle). Le tier STANDARD des sujets
+  # évalue via l'inférence multi-région : le rôle doit autoriser le profil de
+  # guardrail de la région source et de chaque région de destination du profil
+  # us.guardrail.v1:0 (us-east-1, us-east-2, us-west-2).
   statement {
     sid       = "GuardrailApply"
     effect    = "Allow"
     actions   = ["bedrock:ApplyGuardrail"]
-    resources = [aws_bedrock_guardrail.this.guardrail_arn]
+    resources = concat(
+      [aws_bedrock_guardrail.this.guardrail_arn],
+      [for r in ["us-east-1", "us-east-2", "us-west-2"] :
+        "arn:aws:bedrock:${r}:${local.account_id}:guardrail-profile/us.guardrail.v1:0"]
+    )
   }
 
   # Complétion d'un run (partial -> done) : la Lambda s'invoque elle-même en
