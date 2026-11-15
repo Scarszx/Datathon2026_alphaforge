@@ -1,22 +1,32 @@
 import type { Explanation as Expl } from "../api/types";
 import { useT } from "../lib/i18n";
+import { ruleBadgeClass, ruleLabel } from "../lib/ruleLabels";
 
 /** Affiche tel quel le champ explanation renvoyé par le back (contrat : toujours affiché).
- *  Libellés fixes traduits ; sources, étapes, hypothèses et limites viennent du back. */
+ *  Libellés fixes traduits ; sources, étapes, hypothèses et limites viennent du back.
+ *  0.4.4 : les contrôles portent reasonCode et scenario ; l'agentId reste dans « Étapes exécutées ». */
 export default function Explanation({ data, defaultOpen = false }: { data: Expl; defaultOpen?: boolean }) {
-  const { t } = useT();
+  const { t, lang } = useT();
   const checks = data.checks ?? [];
   return (
     <details className="expl" open={defaultOpen}>
       <summary>
         {t("expl.title")}
-        {checks.length > 0 && checks.map((c, i) => <span key={i} className={`badge ${c.status}`} title={c.message}>{t(`expl.status.${c.status}`)}</span>)}
+        {checks.length > 0 && checks.map((c, i) => {
+          const status = c.status;
+          return <span key={i} className={ruleBadgeClass(c.reasonCode ?? "", status)} title={c.message}>{ruleLabel(c.reasonCode ?? "", status, lang)}</span>;
+        })}
       </summary>
       <div className="expl-body">
         {checks.length > 0 && (
           <section>
             <h4>{t("expl.checks")}</h4>
-            <ul>{checks.map((c, i) => <li key={i}><span className={`badge ${c.status}`}>{t(`expl.status.${c.status}`)}</span> <code>{c.rule}</code> ({c.agentId}) : {c.message}</li>)}</ul>
+            <ul>{checks.map((c, i) => (
+              <li key={i}>
+                <span className={ruleBadgeClass(c.reasonCode ?? "", c.status)}>{ruleLabel(c.reasonCode ?? "", c.status, lang)}</span>{" "}
+                <code>{c.rule}</code>{c.scenario !== undefined ? ` · ${t("proof.scenario")} ${c.scenario}` : ""} : {c.message}
+              </li>
+            ))}</ul>
           </section>
         )}
         {data.sources.length > 0 && (

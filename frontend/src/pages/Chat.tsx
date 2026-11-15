@@ -168,6 +168,28 @@ export default function Chat() {
     return () => clearTimeout(timer);
   }, [run, runId]);
 
+  /* --- comparaison par catégorie (lot B) : nouvelle version du mandat puis analyse, comme les curseurs. */
+  const runCompare = useCallback(async (req: { compareCategory?: import("./../lib/comparisonCategories").ComparisonCategoryId }) => {
+    const sid = activeRef.current;
+    const base = mandate?.mandate;
+    if (!sid || !base || busy) return;
+    const next: MandateCreateRequest = { ...base, ...req };
+    if (!req.compareCategory) delete (next as { compareCategory?: string }).compareCategory;
+    await confirmMandate(next);
+  }, [mandate, busy, confirmMandate]);
+
+  /* --- ancien run (sans rulesVersion) : relance de l'analyse sur le même mandat (lot A). */
+  const rerunOld = useCallback(async (mandateVersion: number) => {
+    const sid = activeRef.current;
+    if (!sid || busy) return;
+    setBusy(true);
+    try {
+      const r = await createRun(sid, mandateVersion);
+      if (activeRef.current !== sid) return;
+      setRun(r); setRunId(r.runId);
+    } catch (e) { setError(errorText(e)); } finally { setBusy(false); }
+  }, [busy]);
+
   /* --- langue d'affichage : userLanguage de la conversation active --- */
   useEffect(() => {
     const conv = sessions.find((c) => c.sessionId === activeId);
@@ -206,7 +228,10 @@ export default function Chat() {
           <ConversationColumn messages={messages} evidence={evidence} busy={busy} lang={lang}
             onSend={(text) => void send(text)} onQuickReply={(text) => void send(text)}
             onConfirmDraft={(m) => void confirmMandate(m)} />
-          <SimulationPanel run={run} lang={lang} />
+          <SimulationPanel run={run} lang={lang} busy={busy}
+            compareCategory={mandate?.mandate.compareCategory}
+            onCompare={(req) => void runCompare(req)}
+            onRerun={run ? () => void rerunOld(run.mandateVersion) : undefined} />
         </div>
         {loading && <p className="muted small chat-loading">Chargement…</p>}
         {error && <div className="chat-error" role="alert"><p className="error">{error}</p></div>}

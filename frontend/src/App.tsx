@@ -22,7 +22,6 @@ export default function App() {
       <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login />} />
       <Route path="/inscription" element={<Register />} />
-      <Route path="/test-risque" element={<Navigate to="/#profil" replace />} />
       <Route path="/chat" element={<Private><Chat /></Private>} />
       <Route path="/portefeuille" element={<Private><Portfolio /></Private>} />
       <Route path="/marches" element={<Private><Markets /></Private>} />

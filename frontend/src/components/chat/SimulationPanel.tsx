@@ -1,27 +1,26 @@
-/* Panneau de simulation (colonne 3 de /chat) : scénarios 0/1/2 côte à côte, verdicts R1-R10 avec badge KB,
- * les 4 rubriques de narrative, le score du vérificateur, les mentions R9 et la mention permanente.
+/* Panneau de simulation (colonne 3 de /chat) : scénarios 0/1/2 côte à côte, règles R1-R10 avec
+ * libellé par motif (lot A), les 4 rubriques du récit, le score du vérificateur, les mentions R9,
+ * les citations fixées de R5/R9 (lot E2) et les mentions fixes du lot D.
  * Affichage progressif : tout ce qui existe en status = partial s'affiche déjà ; le reste arrive à done. */
 import { useState } from "react";
 import type { RuleVerdict, Run, Scenario } from "../../api/types";
 import { t, type Lang } from "../../lib/i18n";
+import { ruleBadgeClass, ruleLabel, scenarioRuleSummary } from "../../lib/ruleLabels";
 import Explanation from "../Explanation";
 import EvidenceText, { EvidenceBadge } from "./EvidenceText";
+import CompareCategory, { CompareCategoryButton } from "./CompareCategory";
 
 const SCENARIO_LABEL_KEY = ["sim.scenario.current", "sim.scenario.idea", "sim.scenario.alternative"] as const;
 
-function Pill({ status, lang }: { status: string; lang: Lang }) {
-  const cls = status === "pass" ? "up" : status === "fail" ? "down" : status === "warn" ? "warn" : "";
-  return <span className={`pill ${cls}`}>{t(`sim.verdict.${status}`, lang) ?? status}</span>;
-}
-
-/** Une colonne de scénario : label, pastille, répartition, mesures résolues depuis run.evidence. */
+/** Une colonne de scénario : label, décompte des règles (calculé ici, plus de pastille), répartition, mesures. */
 function ScenarioCard({ run, s, lang }: { run: Run; s: Scenario; lang: Lang }) {
   const metric = (evId?: string) => run.evidence.find((e) => e.id === evId);
+  const summary = scenarioRuleSummary(run.verdicts, s.index, lang);
   return (
     <div className="scenario-card">
       <div className="scenario-head">
         <strong>{s.label}</strong>
-        <Pill status={s.verdict} lang={lang} />
+        <span className="badge">{summary}</span>
       </div>
       <div className="muted small">{t(SCENARIO_LABEL_KEY[s.index], lang)}</div>
       {s.description && <p className="small" style={{ marginTop: 6 }}>{s.description}</p>}
@@ -60,13 +59,17 @@ function ScenarioCard({ run, s, lang }: { run: Run; s: Scenario; lang: Lang }) {
   );
 }
 
-/** Verdicts R1-R10, avec badge KB quand la citation est là (status done). */
+/** Règles R1-R10 : libellé par motif (lot A), badge neutre pour « non déclenchée »,
+ *  citations seulement pour une règle déclenchée (lot A : les anciens runs en contiennent sur des pass). */
 function RuleTable({ run, lang }: { run: Run; lang: Lang }) {
   const byScenario = new Map<number, RuleVerdict[]>();
   for (const v of run.verdicts) {
     const k = v.scenario ?? -1;
     (byScenario.get(k) ?? byScenario.set(k, []).get(k)!).push(v);
   }
+  // Les citations sous une règle non déclenchée se liraient comme un accord (GN-3200-26-001, 2.1.1).
+  const citationsOf = (v: RuleVerdict): string[] =>
+    v.status === "warn" || v.status === "fail" ? (v.citations ?? []) : [];
   return (
     <>
       <h3 className="section-title">{t("sim.rules", lang)}</h3>
@@ -74,21 +77,23 @@ function RuleTable({ run, lang }: { run: Run; lang: Lang }) {
         <div key={sc} style={{ marginBottom: 12 }}>
           {sc >= 0 && <div className="muted small">{t(SCENARIO_LABEL_KEY[sc] ?? "", lang)}</div>}
           <table className="tbl">
-            <thead><tr><th>{t("sim.rule.reasonCode", lang)}</th><th>{t("sim.rules", lang)}</th><th style={{ textAlign: "right" }} /></tr></thead>
+            <thead><tr><th>{t("sim.rules", lang)}</th><th /></tr></thead>
             <tbody>
               {list.map((v, i) => (
                 <tr key={i}>
-                  <td className="small"><strong>{v.rule}</strong><br /><span className="muted small">{v.reasonCode}</span></td>
                   <td className="small">
+                    <strong>{v.rule}</strong> <span className={ruleBadgeClass(v.reasonCode, v.status)}>{ruleLabel(v.reasonCode, v.status, lang)}</span>
+                    <br />
                     {v.message ?? v.messageEn ?? ""}
                     {v.threshold && (
                       <span className="muted small"> · {t("sim.rule.threshold", lang)} : {v.threshold.value}
                         {v.threshold.nature === "team_assumption" ? ` (${t("app.teamAssumption", lang)})` : ""}
                       </span>
                     )}
-                    {v.citations?.length ? <span> {v.citations.map((c) => <EvidenceBadge key={c} ev={run.evidence.find((e) => e.id === c)} lang={lang} />)}</span> : null}
                   </td>
-                  <td style={{ textAlign: "right" }}><Pill status={v.status} lang={lang} /></td>
+                  <td style={{ textAlign: "right" }}>
+                    {citationsOf(v).map((c) => <EvidenceBadge key={c} ev={run.evidence.find((e) => e.id === c)} lang={lang} />)}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -101,8 +106,46 @@ function RuleTable({ run, lang }: { run: Run; lang: Lang }) {
 
 const SECTION_ORDER = ["data_used", "why", "limits", "what_would_change"] as const;
 
-export default function SimulationPanel({ run, lang }: { run: Run | null; lang: Lang }) {
+/** Citations fixées par le code du backend (lot E2) : à côté des mentions, jamais sous une règle. */
+function NoticeCitations({ run, lang, rule, titleKey }: { run: Run; lang: Lang; rule: "R5" | "R9"; titleKey: string }) {
+  const ids = run.noticeCitations?.[rule];
+  if (!ids?.length) return null;
+  return (
+    <div style={{ marginTop: 6 }}>
+      <p className="muted small" style={{ marginBottom: 4 }}>{t(titleKey, lang)}</p>
+      <div className="suggest">
+        {ids.map((id) => <EvidenceBadge key={id} ev={run.evidence.find((e) => e.id === id)} lang={lang} />)}
+      </div>
+    </div>
+  );
+}
+
+/** Mentions fixes du lot D : affichées à chaque affichage de résultats, y compris en partial. */
+function FixedNotices({ run, lang }: { run: Run; lang: Lang }) {
+  return (
+    <div className="notice" role="note">
+      <p className="small pre">{t("app.fixedNotice.decisions", lang)}<br />
+        {t("app.fixedNotice.simulation", lang)}<br />
+        {t("app.fixedNotice.generic", lang)}<br />
+        {(t("app.fixedNotice.universe", lang) as string).replace("{datasetVersion}", run.datasetVersion)}</p>
+    </div>
+  );
+}
+
+export default function SimulationPanel({ run, lang, compareCategory, onCompare, onRerun, busy }: {
+  run: Run | null;
+  lang: Lang;
+  /** compareCategory du mandat confirmé actuel (lot B) : sert au bouton « Retirer la comparaison ». */
+  compareCategory?: string;
+  /** Présent = le bouton de comparaison est actif ; reçoit la nouvelle version du mandat à confirmer. */
+  onCompare?: (req: { compareCategory?: import("../../lib/comparisonCategories").ComparisonCategoryId }) => void;
+  /** Ancien run (sans rulesVersion) : relance l'analyse sur le même mandat. */
+  onRerun?: () => void;
+  busy?: boolean;
+}) {
   const narrative = run?.narrative;
+  const [choosing, setChoosing] = useState(false);
+  const hasComparison = !!run?.scenarios.some((s) => s.index === 2);
   return (
     <aside className="sim-panel" aria-label={t("sim.title", lang)}>
       <div className="sim-scroll">
@@ -112,6 +155,7 @@ export default function SimulationPanel({ run, lang }: { run: Run | null; lang: 
         {run?.jurisdictionNotices?.length ? (
           <div className="banner warn">
             <p className="small">{run.jurisdictionNotices.map((n, i) => <span key={i} className="pre">{n}<br /></span>)}</p>
+            <NoticeCitations run={run} lang={lang} rule="R9" titleKey="sim.notice.fixedR9" />
           </div>
         ) : null}
 
@@ -121,11 +165,31 @@ export default function SimulationPanel({ run, lang }: { run: Run | null; lang: 
 
         {run && run.status !== "error" && (
           <>
+            {(run.rulesVersion ?? 0) < 2 && (
+              <div className="banner warn">
+                <p className="small">{t("sim.oldRun", lang)}</p>
+                {onRerun && <button type="button" className="btn-ghost" disabled={busy} onClick={onRerun}>{t("sim.rerun", lang)}</button>}
+              </div>
+            )}
             <h2 className="section-title" style={{ marginTop: 12 }}>{t("sim.scenarios", lang)}</h2>
-            <div className="scenario-grid">
+            <div className={`scenario-grid${run.scenarios.length < 3 ? " two" : ""}`}>
               {run.scenarios.map((s) => <ScenarioCard key={s.index} run={run} s={s} lang={lang} />)}
             </div>
             {run.status === "partial" && <p className="muted small">{t("sim.partialHint", lang)}</p>}
+            <FixedNotices run={run} lang={lang} />
+            <NoticeCitations run={run} lang={lang} rule="R5" titleKey="sim.notice.fixedR5" />
+            {onCompare && (
+              <CompareCategoryButton lang={lang} busy={busy} onOpen={() => setChoosing(true)} />
+            )}
+            {onCompare && choosing && (
+              <CompareCategory
+                lang={lang}
+                currentId={compareCategory as import("../../lib/comparisonCategories").ComparisonCategoryId | undefined}
+                onClose={() => setChoosing(false)}
+                onChoose={(id) => { setChoosing(false); onCompare({ compareCategory: id }); }}
+                onRemove={() => { setChoosing(false); onCompare({}); }}
+              />
+            )}
 
             {run.verdicts.length > 0 && <RuleTable run={run} lang={lang} />}
 

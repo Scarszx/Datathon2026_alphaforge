@@ -96,25 +96,67 @@ describe("SimulationPanel (affichage progressif partial → done)", () => {
   it("en partial : scénarios et verdicts visibles, explication et vérificateur absents", () => {
     render(<SimulationPanel run={PARTIAL} lang="fr" />);
     expect(screen.getByText("Idée telle quelle")).toBeTruthy();
-    expect(screen.getAllByText("MAX_LOSS_EXCEEDED").length).toBeGreaterThan(0);
-    expect(screen.queryByText("Pourquoi ce verdict")).toBeNull();
+    expect(screen.getAllByText("seuil dépassé").length).toBeGreaterThan(0); // libellé du motif, plus le code brut
+    expect(screen.queryByText("Ce qui a déclenché les règles")).toBeNull();
     expect(screen.queryByText("Vérificateur")).toBeNull();
     expect(screen.getByText(/Scénarios et verdicts affichés dès maintenant/)).toBeTruthy();
   });
 
   it("en done : rubriques de l'explication et score du vérificateur affichés", () => {
     render(<SimulationPanel run={DONE} lang="fr" />);
-    expect(screen.getByText("Pourquoi ce verdict")).toBeTruthy();
+    expect(screen.getByText("Ce qui a déclenché les règles")).toBeTruthy();
     expect(screen.getByText(/Emplacements résolus/)).toBeTruthy();
     expect(screen.getByText("2/2")).toBeTruthy();
     // La mesure du récit vient du registre, pas du texte : le badge EV-02 est rendu, pas le nombre du texte.
     expect(screen.getAllByRole("button", { name: "EV-02" }).length).toBeGreaterThan(0);
   });
 
+  it("aucune citation sous une règle non déclenchée, même si citations est non vide", () => {
+    const oldRun: Run = {
+      ...PARTIAL,
+      rulesVersion: 1, // run d'avant le lot A : citations possibles sous un pass
+      evidence: [...PARTIAL.evidence, { id: "KB-01", kind: "regulation", label: "Avis 31-368", excerpt: "[simulé]", jurisdiction: "CA", source: "démo" }],
+      verdicts: [
+        { rule: "R2", scenario: 1, status: "fail", reasonCode: "MAX_LOSS_EXCEEDED", evidence: ["EV-02"], citations: ["KB-01"], messageEn: "Triggered." },
+        { rule: "R3", scenario: 0, status: "pass", reasonCode: "PORTFOLIO_LEVEL_IMPACT", evidence: ["EV-01"], citations: ["KB-01"], messageEn: "Not triggered." },
+      ],
+    };
+    render(<SimulationPanel run={oldRun} lang="fr" />);
+    expect(screen.getAllByRole("button", { name: "KB-01" }).length).toBe(1); // seulement sous la règle déclenchée
+  });
+
+  it("ancien run sans rulesVersion : bandeau « version précédente »", () => {
+    const legacy: Run = { ...PARTIAL, rulesVersion: undefined };
+    render(<SimulationPanel run={legacy} lang="fr" />);
+    expect(screen.getByText(/version précédente/)).toBeTruthy();
+  });
+
   it("sans run : message d'accueil et mention permanente", () => {
     render(<SimulationPanel run={null} lang="fr" />);
     expect(screen.getByText(/Aucune analyse pour l'instant/)).toBeTruthy();
     expect(screen.getByText(/pas un conseil financier/)).toBeTruthy();
+  });
+
+  it("mentions fixes du lot D affichées en partial, avec la version du jeu et la phrase fixe", () => {
+    render(<SimulationPanel run={PARTIAL} lang="fr" />);
+    expect(screen.getByText(/Vous prenez seul vos décisions/)).toBeTruthy();
+    expect(screen.getByText(/AlphaForge ne se prononce pas sur ce qui vous convient\./)).toBeTruthy();
+    expect(screen.getByText(/jeu de données demo/)).toBeTruthy();
+  });
+
+  it("décompte des règles par scénario calculé côté interface, plus de pastille", () => {
+    const run: Run = {
+      ...PARTIAL,
+      verdicts: [
+        { rule: "R1", scenario: 1, status: "fail", reasonCode: "IDEA_EXCEEDS_RISK_PROFILE", evidence: [], citations: [], messageEn: "" },
+        { rule: "R2", scenario: 1, status: "warn", reasonCode: "MAX_LOSS_NEAR_LIMIT", evidence: [], citations: [], messageEn: "" },
+        { rule: "R3", scenario: 1, status: "pass", reasonCode: "PORTFOLIO_LEVEL_IMPACT", evidence: [], citations: [], messageEn: "" },
+        { rule: "R6", scenario: 0, status: "pass", reasonCode: "CONCENTRATION_OK", evidence: [], citations: [], messageEn: "" },
+      ],
+    };
+    render(<SimulationPanel run={run} lang="fr" />);
+    expect(screen.getAllByText(/1 règle déclenchée, 1 à vérifier/).length).toBeGreaterThan(0);
+    expect(screen.getByText("aucune règle déclenchée")).toBeTruthy();
   });
 });
 

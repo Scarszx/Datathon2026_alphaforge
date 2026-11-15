@@ -1,11 +1,24 @@
 /* Rendu des textes avec emplacements {EV-nn}/{KB-nn} : chaque emplacement devient un badge cliquable
  * qui ouvre la carte de preuve (run.evidence). Règle du contrat : un emplacement inconnu n'affiche jamais
- * de chiffre ; le front ne fabrique aucune valeur. */
+ * de chiffre ; le front ne fabrique aucune valeur.
+ * Lot E2 : section affichée telle quelle, type de document, régulateur, « Projet, <année> » ;
+ * lot A : principe dont s'inspire la règle, avec la mention des personnes inscrites pour
+ * 31-103, 31-103CP et 31-368. */
 import { useState } from "react";
 import type { Evidence } from "../../api/types";
 import { t, type Lang } from "../../lib/i18n";
 
 const PLACEHOLDER = /\{(EV|KB)-(\d+)\}/g;
+
+/* Documents dont le texte décrit une obligation des personnes inscrites (lot A, point 6). */
+const REGISTRANT_OBLIGATION = /31-103|31-103CP|31-368/;
+
+/** « Projet, 2022 » pour un avis de projet de règlement (FCAA). */
+function statusLabel(ev: Evidence, lang: Lang): string | undefined {
+  if (ev.status !== "projet") return undefined;
+  const year = ev.asOf ? ev.asOf.slice(0, 4) : "";
+  return (t("proof.regulationTypeProposed", lang) as string).replace("{year}", year);
+}
 
 /** Un emplacement dans le texte, résolu ou non. */
 export function EvidenceBadge({ ev, lang }: { ev: Evidence | undefined; lang: Lang }) {
@@ -53,8 +66,27 @@ export function ProofCard({ ev, lang, onClose }: { ev: Evidence; lang: Lang; onC
             {row("asOf", ev.asOf)}
             {ev.kind === "regulation" && (
               <>
+                <div className="proof-row">
+                  <span className="muted small" />
+                  <span className="pre"><strong>{t("sim.notice.principleTitle", lang)}</strong></span>
+                </div>
                 {row("document", ev.document)}
+                {row("documentType", ev.documentType ? t(`proof.regulationType.${ev.documentType}`, lang) : undefined)}
+                {row("regulator", ev.regulator)}
+                {row("status", statusLabel(ev, lang))}
                 {row("section", ev.section)}
+                {ev.sectionTitle && (
+                  <div className="proof-row">
+                    <span className="muted small" />
+                    <span className="pre muted small">{ev.sectionTitle}</span>
+                  </div>
+                )}
+                {REGISTRANT_OBLIGATION.test(ev.document ?? "") && (
+                  <div className="proof-row">
+                    <span className="muted small" />
+                    <p className="small notice pre" style={{ margin: 0 }}>{t("sim.notice.registeredObligation", lang)}</p>
+                  </div>
+                )}
                 {ev.excerpt && (
                   <div className="proof-row">
                     <span className="muted small">{t("proof.excerpt", lang)}</span>

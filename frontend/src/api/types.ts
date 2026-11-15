@@ -1,7 +1,7 @@
 /* Types du contrat d'API AlphaForge v0.4.0 (section data_schemas). Toute modification passe par l'équipe. */
 
 export type Currency = "CAD" | "USD";
-export type RiskLevel = "low" | "low_moderate" | "moderate" | "high";
+export type RiskLevel = "low" | "low_moderate" | "moderate" | "high"; // ancienne échelle (0.4.6) : plus envoyée, gardé pour la compatibilité de lecture
 
 export type ErrorCode =
   | "UNAUTHORIZED" | "FORBIDDEN" | "VALIDATION_ERROR" | "CONVERSATION_NOT_FOUND"
@@ -13,8 +13,9 @@ export type Jurisdiction =
   | "CA" | "QC" | "ON" | "BC" | "AB" | "SK" | "MB" | "NB" | "NS" | "PE" | "NL" | "YT" | "NT" | "NU";
 
 export type InvestorProfile = {
-  riskLevel: RiskLevel;
-  /* v0.4.0 : tolérance et capacité de perte séparées (1 à 5), et province (règle R1, avis 31-368) */
+  /* v0.4.6 : une seule échelle 1 à 5 ; riskLevel (ancienne échelle à quatre libellés) n'est plus envoyé.
+   * Les profils anciens sans riskCapacity restent lisibles (affiché « à compléter »). */
+  riskLevel?: RiskLevel;
   riskTolerance?: number;
   riskCapacity?: number;
   province?: Jurisdiction;
@@ -50,6 +51,9 @@ export type ExplanationStep = {
 };
 export type ExplanationCheck = {
   agentId: string; rule: string; status: "pass" | "warn" | "fail" | "not_verified"; message: string;
+  /* 0.4.4 : motif calculé par module-rules et scénario (0, 1, 2) si la règle porte sur un scénario. */
+  reasonCode?: string;
+  scenario?: number;
 };
 export type Explanation = {
   sources: ExplanationSource[];
@@ -132,6 +136,9 @@ export type MandateCreateRequest = {
   userLanguage: string; // ISO 639-1 ; tous les champs texte du mandat sont en anglais
   operations?: MandateOperation[];
   subjectTicker?: string;
+  /* 0.4.5 : comparaison par catégorie d'actifs demandée par l'utilisateur (scénario 2).
+   * L'orchestrateur ne le met jamais ; seul le bouton de comparaison du front le pose. */
+  compareCategory?: "short-term-bonds" | "aggregate-bonds" | "balanced-allocation" | "canadian-equity" | "us-equity" | "global-equity";
   fieldSources?: Record<string, "persona" | "user_answer" | "team_assumption" | "slider">;
 };
 
@@ -169,9 +176,16 @@ export type Evidence = {
   jurisdiction?: string;
   url?: string;
   caveats?: string[];
+  /* 0.4.7 : champs portés par le nouveau corpus par section (absents des anciens runs). */
+  documentType?: "regulation" | "companion_policy" | "staff_notice" | "guidance_note" | "bulletin" | "rule" | "web_page" | "proposed_regulation_notice" | "disclosure_document";
+  regulator?: string;
+  status?: "en_vigueur" | "projet";
+  sectionTitle?: string;
+  language?: string;
 };
 
-/* schema-scenario : 0 actuel, 1 idée telle quelle, 2 alternative */
+/* schema-scenario : 0 actuel, 1 idée telle quelle, 2 comparaison par catégorie (0.4.5, sur demande).
+ * 0.4.4 : le front ne lit plus `verdict` — le décompte des règles vient de run.verdicts. */
 export type Scenario = {
   index: 0 | 1 | 2;
   label: string;
@@ -179,7 +193,7 @@ export type Scenario = {
   proxyNote?: string;
   allocation?: Slice[];
   metrics?: Record<string, string>; // mesure -> identifiant EV-nn
-  verdict: "pass" | "warn" | "fail";
+  verdict?: "pass" | "warn" | "fail"; // ancien backend : présent mais ignoré
 };
 
 /* schema-rule-verdict : R1..R10 */
@@ -194,6 +208,10 @@ export type RuleVerdict = {
   messageEn?: string;
   message?: string; // traduit dans userLanguage par agent-orchestrator
 };
+
+/* 0.4.7 : sections fixées par le code du backend (R5, R9), présentes seulement si le corpus ingéré
+ * correspond à fixed_citations.json. À afficher près des mentions, jamais sous une règle non déclenchée. */
+export type NoticeCitations = { R5?: string[]; R9?: string[] };
 
 /* schema-narrative : 4 sections, emplacements {EV-nn}/{KB-nn} seulement, aucun chiffre écrit à la main */
 export type NarrativeSectionKey = "data_used" | "why" | "limits" | "what_would_change";
@@ -220,11 +238,15 @@ export type Run = {
   sessionId: string;
   mandateVersion: number;
   status: RunStatus;
+  /* 0.4.4 : 2 = vocabulaire et citations du lot A. Absent = run produit par une version précédente :
+   * l'interface ignore ses citations de règles pass/not_verified et le signale. */
+  rulesVersion?: number;
   datasetVersion: string;
   userLanguage: string;
   scenarios: Scenario[];
   verdicts: RuleVerdict[];
   evidence: Evidence[];
+  noticeCitations?: NoticeCitations;
   narrative?: Narrative;
   verifier?: VerifierReport;
   jurisdictionNotices?: string[];
