@@ -26,7 +26,7 @@ Les chantiers déjà terminés en v0.3.0 (✅) restent valables. Leurs compléme
 ```
 ✅ WS0 socle ─► ✅ WS0b socle v0.4 (séquentiel, court, sur main)
                       │
-                      ├──► ✅ WS1 infra  + WS1b infra v0.4 (Analyses, KB, Guardrail, IAM, routes)  ─┐
+                      ├──► ✅ WS1 infra  + ✅ WS1b infra v0.4 (Analyses, KB, Guardrail, IAM, routes) ─┐
                       ├──► ✅ WS2 db     + ✅ WS2b db v0.4 (repository analyses)                    ─┤
                       ├──►    WS3 data   (inclut publication_date et etf_enriched.json)              ─┼──► intégration (humain)
                       ├──► ✅ WS4 api    + WS4b api v0.4 (mandats, registre)                         ─┤
@@ -43,7 +43,7 @@ Les chantiers déjà terminés en v0.3.0 (✅) restent valables. Leurs compléme
 | ✅ WS0 socle | `main` | racine (`.gitignore`), `backend/common/` (squelette), `pyproject.toml` | contrat |
 | ✅ WS0b socle v0.4 | `main` | `backend/common/config.py`, `backend/common/http.py`, `backend/common/ids.py`, `backend/common/repositories/analyses.py` (signatures), tests WS0 associés | contrat v0.4.0 |
 | ✅ WS1 infra | `ws/infra` | `infra/` | WS0 |
-| WS1b infra v0.4 | `ws/infra-v4` | `infra/` | WS0b |
+| ✅ WS1b infra v0.4 | `ws/infra-v4` | `infra/` | WS0b |
 | ✅ WS2 db | `ws/db` | `backend/common/repositories/`, `backend/common/tests/` | WS0 |
 | ✅ WS2b db v0.4 | `ws/db-v4` | `backend/common/repositories/analyses.py`, `backend/common/tests/test_repo_analyses.py` | WS0b |
 | WS3 data | `ws/data` | `data/` | contrat (storage) |
@@ -56,7 +56,6 @@ Les chantiers déjà terminés en v0.3.0 (✅) restent valables. Leurs compléme
 
 ```bash
 cd /home/rr-djk/Documents/hackathons/Datathon2026_alphaforge
-git worktree add ../alphaforge-infra-v4 -b ws/infra-v4
 git worktree add ../alphaforge-data     -b ws/data
 git worktree add ../alphaforge-api-v4   -b ws/api-v4
 git worktree add ../alphaforge-agents   -b ws/agents
@@ -73,7 +72,7 @@ Attention :
 1. `terraform plan` puis `apply`, par une seule personne.
 2. Exécuter l'ingestion (WS3) et téléverser le jeu de données dans le bucket (préfixe = `DATASET_VERSION`), y compris `etf_enriched.json`.
 3. **Knowledge Base :** envoyer `docs/for_KB/` vers `s3://<bucket>/kb/<version>/` (fichiers et `.metadata.json`), puis lancer l'ingestion de la KB (`job-kb-sync`). C'est l'étape la plus longue : à lancer en premier.
-4. Vérifier l'accès à Claude Sonnet 5.5 dans us-east-1 (déjà testé par l'équipe), créer le Guardrail s'il n'est pas dans Terraform, créer les comptes Cognito des personas.
+4. Vérifier l'accès à Claude Sonnet 5.5 dans us-east-1 (déjà testé par l'équipe) et **activer Titan Text Embeddings V2** (embeddings de la KB). Le Guardrail est créé par Terraform. Créer les comptes Cognito des personas.
 5. Tests de bout en bout :
    - login, conversation et portefeuille ;
    - message de cadrage, puis confirmation du mandat ;
@@ -152,7 +151,24 @@ Définition de fini : pytest passe, et WS2b, WS4b et WS5 peuvent coder contre ce
 
 Ce chantier a mis en place Cognito, DynamoDB (Users, Conversations, Messages, Portfolios), S3 (jeu de données et front), les deux Lambdas, IAM, API Gateway HTTP, CloudWatch, `infra/scripts/build_lambdas.sh` et `infra/README.md`. Le prompt d'origine est en annexe, à la fin de ce fichier.
 
-## WS1b infra v0.4
+## ✅ WS1b infra v0.4 — terminé
+
+Fusionné dans `main` (`1fc329f`), worktree supprimé. `terraform fmt` et `terraform validate` passent. Ce qui a été livré :
+- la table `Analyses` et les 4 routes de mandats et de runs (17 routes au total) ;
+- les variables d'environnement de WS0b ;
+- les droits IAM : `Retrieve` limité à la KB, `ApplyGuardrail` limité au Guardrail ;
+- la Knowledge Base sur **S3 Vectors** (Titan Text Embeddings V2, 1024 dimensions, passages de 300 tokens) ;
+- le Guardrail (3 sujets refusés et renseignements bancaires bloqués, version publiée) ;
+- `infra/scripts/kb_sync.sh`.
+
+Les hypothèses sont dans `infra/NOTES-infra.md`. À retenir pour les autres chantiers :
+- **WS5** : la complétion d'un run (partial → done) est à trancher. L'infra n'a **ni droit d'auto-invocation ni timeout long** (30 s, comme l'API Gateway). Si l'invocation asynchrone est retenue, revenir à l'infra : ajouter `lambda:InvokeFunction` sur la Lambda agents elle-même et porter son timeout à environ 180 s.
+- **Intégration** : activer l'accès à **Titan Text Embeddings V2** en plus de Claude Sonnet 5.5, sinon l'ingestion de la KB échoue.
+- **Tester tôt les faux positifs du Guardrail** : le sujet « recommandation personnalisée » face à une simulation, et le détecteur `US_BANK_ACCOUNT_NUMBER` face aux nombres. Le filtre `PROMPT_ATTACK` n'est pas activé : à discuter.
+- `MODEL_ANALYST` et `MODEL_GOVERNANCE` sont retirés de l'infra, et de `backend/common/config.py` sur `main`.
+
+Prompt d'origine :
+
 
 ```text
 Chantier : infrastructure du contrat v0.4.0. Dossier attribué : infra/ uniquement. Ne lance pas apply.
