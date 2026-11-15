@@ -68,7 +68,7 @@ JUDGEMENT_PATTERNS = [
     r"\bconformément à \{(?:KB|EV)-\d{2,}\}", r"\ben phase avec \{(?:KB|EV)-\d{2,}\}",
 ]
 
-# Une phrase où l'outil dit qu'il ne juge pas est conservée (« AlphaForge does not assess whether this suits you »).
+# Une phrase où l'outil dit qu'il ne juge pas est conservée (« Grow does not assess whether this suits you »).
 DISCLAIMER_PATTERN = (
     r"\b(?:does|do|will) not (?:assess|judge|evaluate|determine|say|decide|take a position)\b|\btakes? no position\b"
     r"|\bne (?:se )?prononce(?:nt)? pas\b|\bn'(?:évalue|apprécie|juge|établit) pas\b|\bne (?:juge|détermine|évalue) pas\b"

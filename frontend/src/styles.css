@@ -463,7 +463,7 @@ fieldset.q.missing legend { color: var(--loss-ink); }
   .auth-card .row2 { grid-template-columns: 1fr; }
 }
 
-/* AlphaForge : pages liées au contrat d'API */
+/* Grow : pages liées au contrat d'API */
 .nav { display: flex; gap: 4px; margin-left: 24px; }
 .nav-link { font-size: 14px; font-weight: 500; color: var(--muted); padding: 6px 12px; border-radius: 10px; }
 .nav-link.on, .nav-link:hover { color: var(--ink); background: var(--ghost); }
@@ -493,7 +493,7 @@ fieldset.q.missing legend { color: var(--loss-ink); }
   .nav { margin-left: 8px; }
 }
 
-/* ---------- Assistant AlphaForge : bouton + plein écran ---------- */
+/* ---------- Assistant Grow : bouton + plein écran ---------- */
 .af-fab {
   position: fixed; right: 28px; bottom: 28px; z-index: 70; width: 58px; height: 58px; border-radius: 50%;
   background: var(--ink); color: #fff; display: grid; place-items: center;

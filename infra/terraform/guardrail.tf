@@ -27,15 +27,15 @@
 
 resource "aws_bedrock_guardrail" "this" {
   name        = "${var.name_prefix}-guardrail"
-  description = "AlphaForge input/output filter: trade orders, return promises, personalized regulated advice, banking PII."
+  description = "Grow input/output filter: trade orders, return promises, personalized regulated advice, banking PII."
 
   # Tier STANDARD des sujets refusés : exige l'inférence multi-région.
   cross_region_config {
     guardrail_profile_identifier = "arn:aws:bedrock:${var.aws_region}:${local.account_id}:guardrail-profile/us.guardrail.v1:0"
   }
 
-  blocked_input_messaging   = "This request is outside what AlphaForge can do. It is a simulation and decision-support tool: it cannot place trades, promise returns or give personalized investment advice. You can ask it to simulate the impact of a change on your fictional portfolio instead."
-  blocked_outputs_messaging = "The response was withheld because it could read as a trade order, a return promise or personalized investment advice. AlphaForge only simulates and explains, using its dataset and regulatory sources."
+  blocked_input_messaging   = "This request is outside what Grow can do. It is a simulation and decision-support tool: it cannot place trades, promise returns or give personalized investment advice. You can ask it to simulate the impact of a change on your fictional portfolio instead."
+  blocked_outputs_messaging = "The response was withheld because it could read as a trade order, a return promise or personalized investment advice. Grow only simulates and explains, using its dataset and regulatory sources."
 
   topic_policy_config {
     tier_config {

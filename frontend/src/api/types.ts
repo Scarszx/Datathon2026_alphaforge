@@ -1,4 +1,4 @@
-/* Types du contrat d'API AlphaForge v0.4.0 (section data_schemas). Toute modification passe par l'équipe. */
+/* Types du contrat d'API Grow v0.4.0 (section data_schemas). Toute modification passe par l'équipe. */
 
 export type Currency = "CAD" | "USD";
 export type RiskLevel = "low" | "low_moderate" | "moderate" | "high"; // ancienne échelle (0.4.6) : plus envoyée, gardé pour la compatibilité de lecture

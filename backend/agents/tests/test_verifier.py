@@ -84,9 +84,9 @@ def test_jugements_de_conformite_masques(sentence):
 
 
 @pytest.mark.parametrize("sentence", [
-    "AlphaForge does not assess whether this suits you.",
-    "AlphaForge takes no position on whether the output is suitable for the user.",
-    "AlphaForge ne se prononce pas sur ce qui vous convient.",
+    "Grow does not assess whether this suits you.",
+    "Grow takes no position on whether the output is suitable for the user.",
+    "Grow ne se prononce pas sur ce qui vous convient.",
     "Conformément à la note 31-368, le profil retenu est le plus bas des deux.",
     "The rule was not triggered.", "La règle n'a pas été déclenchée.",
 ])
@@ -97,7 +97,7 @@ def test_phrases_ou_l_outil_ne_juge_pas_conservees(sentence):
 
 def test_les_recommandations_restent_masquees_meme_avec_un_avertissement():
     cleaned, hidden, _ = verify_narrative(
-        [_section("AlphaForge does not assess suitability, but we recommend this fund.")], IDS, MANDATE)
+        [_section("Grow does not assess suitability, but we recommend this fund.")], IDS, MANDATE)
     assert hidden[0]["reason"] == "forbidden_phrase" and cleaned[0]["text"] == ""
 
 

@@ -43,7 +43,7 @@ GENERAL_LIMITATIONS = [
     "Past performance describes the past; it does not predict future returns.",
     "Survivorship bias: the asset universe was selected in 2026.",
     "Educational simulation only: no order is placed and nothing here is personalized financial advice.",
-    "The result would be the same for anyone who gives the same answers; AlphaForge takes no position on what is suitable for the user.",
+    "The result would be the same for anyone who gives the same answers; Grow takes no position on what is suitable for the user.",
 ]
 
 

@@ -86,8 +86,8 @@ describe("i18n : vocabulaire sans jugement (lot A)", () => {
   });
 
   it("la phrase fixe exacte existe en fr et en", () => {
-    expect(FR["app.fixedNotice.generic"]).toContain("AlphaForge ne se prononce pas sur ce qui vous convient.");
-    expect(EN["app.fixedNotice.generic"]).toContain("AlphaForge takes no position on what is suitable for you.");
+    expect(FR["app.fixedNotice.generic"]).toContain("Grow ne se prononce pas sur ce qui vous convient.");
+    expect(EN["app.fixedNotice.generic"]).toContain("Grow takes no position on what is suitable for you.");
   });
 
   it("les anciennes clés de conformité ont disparu", () => {
