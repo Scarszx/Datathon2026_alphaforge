@@ -6,6 +6,7 @@ import AppHeader from "../components/AppHeader";
 import { searchAssets } from "../api/endpoints";
 import { errorText } from "../api/errors";
 import type { Asset } from "../api/types";
+import TickerLogo, { TickerLabel } from "../components/TickerLogo";
 
 const CLASS_LABELS: Record<string, string> = {
   equity: "Action", etf: "FNB", etf_equity: "FNB d'actions", etf_bond: "FNB d'obligations",
@@ -84,7 +85,7 @@ export default function Markets() {
                 <tbody>
                   {items.map((a) => (
                     <tr key={a.ticker} style={{ cursor: "pointer" }} onClick={() => setSelected(a)}>
-                      <td><strong>{a.ticker}</strong></td>
+                      <td><TickerLabel ticker={a.ticker} /></td>
                       <td>{a.name}</td>
                       <td>{labelOf(a)}</td>
                       <td>{a.market ?? "—"}</td>
@@ -101,7 +102,7 @@ export default function Markets() {
         {selected && (
           <section className="profile-card" style={{ padding: "16px 0 32px", marginBottom: 32 }}>
             <div className="eyebrow">Actif sélectionné</div>
-            <div className="big filled" style={{ fontSize: 26 }}>{selected.ticker}</div>
+            <div className="big filled" style={{ fontSize: 26, display: "flex", alignItems: "center", gap: 12 }}><TickerLogo ticker={selected.ticker} size={40} />{selected.ticker}</div>
             <div className="sub">{selected.name}</div>
             <table className="tbl" style={{ marginTop: 12 }}>
               <tbody>

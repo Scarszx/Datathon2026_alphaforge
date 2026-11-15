@@ -707,3 +707,9 @@ fieldset.q.missing legend { color: var(--loss-ink); }
   .dcard.span2, .dash-grid .dcard.span-half:nth-last-child(2) { grid-column: auto; }
   .pf-grid { grid-template-columns: 1fr; }
 }
+/* ---------- Logos des tickers ---------- */
+.ticker-logo { display: inline-grid; place-items: center; flex-shrink: 0; background: #fff; border: 1px solid var(--line); overflow: hidden; vertical-align: middle; }
+.ticker-logo img { display: block; object-fit: contain; }
+.ticker-logo.mono { color: #fff; font-weight: 600; letter-spacing: .3px; border: 0; }
+.ticker-label { display: inline-flex; align-items: center; gap: 10px; vertical-align: middle; min-width: 0; }
+.ticker-text { display: inline-flex; flex-direction: column; line-height: 1.25; min-width: 0; }
