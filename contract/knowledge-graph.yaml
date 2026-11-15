@@ -1,12 +1,23 @@
 application:
-  name: "AlphaForge"
-  version: "0.4.15"
+  name: "Grow"
+  version: "0.4.16"
   description: "Banc d'essai agentique et auto-explicatif pour l'investisseur autonome : il cadre l'intention, simule son impact sur le portefeuille et l'audite contre les textes réglementaires canadiens (simulation seulement). Datathon 2026."
-  status: "validé par l'équipe (0.4.0 le 2026-11-14, 0.4.1 le 2026-11-15) ; 0.4.2 et 0.4.3 validées par l'utilisateur le 2026-11-15, à relire par l'équipe ; 0.4.4 à 0.4.7 demandées par l'utilisateur le 2026-11-15 (lots A, B, C et E), à relire par l'équipe ; 0.4.8 demandée par l'utilisateur le 2026-11-15 (saisie vocale), à relire par l'équipe ; 0.4.9 demandée par l'utilisateur le 2026-11-15 (jeu de données aligné sur le script du collègue), à relire par l'équipe ; 0.4.10 demandée par l'utilisateur le 2026-11-15 (saisie vocale, détection de la langue), à relire par l'équipe; 0.4.11 demandée par l'utilisateur le 2026-11-15 (statistiques de marché), à relire par l'équipe ; 0.4.12 demandée par l'utilisateur le 2026-11-15 (constructeur de portefeuille), à relire par l'équipe ; 0.4.13 demandée par l'utilisateur le 2026-11-15 (inscription sans code de confirmation), à relire par l'équipe ; 0.4.14 demandée par l'utilisateur le 2026-11-15 (modèles des 3 agents passés à Claude Opus 5.5), à relire par l'équipe ; 0.4.15 demandée par l'utilisateur le 2026-11-15 (fiche d'un actif : route déjà codée sur main, ajoutée au contrat), à relire par l'équipe"
+  status: "validé par l'équipe (0.4.0 le 2026-11-14, 0.4.1 le 2026-11-15) ; 0.4.2 et 0.4.3 validées par l'utilisateur le 2026-11-15, à relire par l'équipe ; 0.4.4 à 0.4.7 demandées par l'utilisateur le 2026-11-15 (lots A, B, C et E), à relire par l'équipe ; 0.4.8 demandée par l'utilisateur le 2026-11-15 (saisie vocale), à relire par l'équipe ; 0.4.9 demandée par l'utilisateur le 2026-11-15 (jeu de données aligné sur le script du collègue), à relire par l'équipe ; 0.4.10 demandée par l'utilisateur le 2026-11-15 (saisie vocale, détection de la langue), à relire par l'équipe; 0.4.11 demandée par l'utilisateur le 2026-11-15 (statistiques de marché), à relire par l'équipe ; 0.4.12 demandée par l'utilisateur le 2026-11-15 (constructeur de portefeuille), à relire par l'équipe ; 0.4.13 demandée par l'utilisateur le 2026-11-15 (inscription sans code de confirmation), à relire par l'équipe ; 0.4.14 demandée par l'utilisateur le 2026-11-15 (modèles des 3 agents passés à Claude Opus 5.5), à relire par l'équipe ; 0.4.15 demandée par l'utilisateur le 2026-11-15 (fiche d'un actif : route déjà codée sur main, ajoutée au contrat), à relire par l'équipe ; 0.4.16 demandée par l'utilisateur le 2026-11-15 (premier portefeuille fictif proposé à l'onboarding), à relire par l'équipe"
   solution_ref: "SOLUTION.md (racine du dépôt) : décisions de produit et de conception détaillées"
   # Règle d'équipe : ce fichier est la référence. Toute modification passe par un accord de l'équipe.
   # Voir aussi : la page de présentation du contrat (même contenu, avec schémas).
   changelog:
+    - version: "0.4.16"
+      date: "2026-11-15"
+      status: "demandé par l'utilisateur le 2026-11-15 (code sur la branche ws/onboarding-portfolio, pas encore déployé) ; à relire par l'équipe"
+      summary:
+        - "Premier portefeuille fictif à l'onboarding : après le questionnaire (profil investisseur et montant fictif de départ), le front ouvre /chat et envoie lui-même une demande de construction (mode build) à partir du profil. L'orchestrateur explique la méthode et propose le mandat ; l'utilisateur le confirme ; le run montre le portefeuille construit et un bouton « Adopter ce portefeuille » le copie dans le portefeuille main par api-portfolio-holdings-put (route inchangée)."
+        - "schema-mandate-create-request.buildAmount (facultatif, mode build seulement, nombre > 0, en CAD) : montant fictif à répartir. Absent : valeur actuelle du portefeuille, sinon 100 000 CAD (hypothèse d'équipe, comportement antérieur)."
+        - "schema-scenario.holdings[] : champs facultatifs quantity (poids × montant / (dernier cours × USD/CAD si le titre est coté en USD)), price (dernier cours de clôture, devise de cotation) et currency. Le moteur les calcule ; le front les recopie tels quels (ticker = symbol, quantity, avgCost = price) sans rien calculer."
+        - "scenario.parameters (mode build) : clé amount (montant utilisé, avec son origine)."
+      impacts_to_handle:
+        - "backend : common/validation.py (buildAmount), agents/engine/scenarios.py (montant, quantités), prompt de l'orchestrateur (onboarding, explication de la méthode) ; reconstruire les Lambdas API et agents. Aucune route, aucune table, aucun changement Terraform ni IAM."
+        - "frontend : montant fictif dans le questionnaire d'onboarding, démarrage automatique du chat, bouton « Adopter ce portefeuille » (confirmation si main contient déjà des positions). Le mode démo (api/demo.ts) ne gère pas le mode build."
     - version: "0.4.15"
       date: "2026-11-15"
       status: "demandé par l'utilisateur le 2026-11-15 (code sur main, déployé le 2026-11-15) ; à relire par l'équipe"
@@ -272,6 +283,7 @@ services:
       - "Il remplace chaque emplacement {EV-nn} ou {KB-nn} du texte narratif par la valeur formatée du registre (run.evidence), sous forme de badge cliquable. Il n'affiche jamais un chiffre absent du registre."
       - "Affichage progressif : scénarios et verdicts dès la réponse de api-runs-create, puis citations et texte quand api-runs-get passe à status = done."
       - "Les hypothèses d'équipe (seuils) sont affichées comme telles. Mention permanente : simulation pédagogique, pas un conseil financier."
+      - "Onboarding (0.4.16) : après le questionnaire, ouvrir /chat et envoyer la demande de construction d'un premier portefeuille fictif (mode build, montant choisi). « Adopter ce portefeuille » envoie à api-portfolio-holdings-put les quantity et price du scénario construit, sans les recalculer."
 
   - id: "srv-cognito"
     name: "Amazon Cognito (user pool)"
@@ -868,6 +880,7 @@ data_schemas:
       - { name: "userLanguage", type: "string", required: true, description: "ISO 639-1; langue d'affichage. Tous les champs texte du mandat sont en anglais (language_policy)." }
       - { name: "operations", type: "array", items_ref: "schema-operation", description: "vide pour diagnose" }
       - { name: "subjectTicker", type: "string", description: "titre étudié en mode diagnose" }
+      - { name: "buildAmount", type: "number", description: "mode build seulement (0.4.16) : montant fictif à répartir, en CAD, > 0. Absent : valeur actuelle du portefeuille, sinon 100 000 CAD (hypothèse d'équipe)." }
       - { name: "compareCategory", type: "string", enum: ["short-term-bonds", "aggregate-bonds", "balanced-allocation", "canadian-equity", "us-equity", "global-equity"], description: "comparaison par catégorie d'actifs demandée par l'utilisateur (0.4.5) : identifiant de la catégorie choisie, absent = pas de scénario 2. Jamais mis par l'orchestrateur. Liste dans backend/common/comparison_categories.json." }
       - { name: "fieldSources", type: "object", description: "par champ : persona | user_answer | team_assumption | slider" }
 
@@ -931,8 +944,8 @@ data_schemas:
       - { name: "proxyNote", type: "string", description: "ex. « Broad U.S. equity is approximated by a fund of the dataset for the calculation only. » Sans symbole (0.4.5)." }
       - { name: "allocation", type: "array", description: "{ label, weight } par catégorie" }
       - { name: "metrics", type: "object", description: "par mesure : identifiant EV-nn (volatility, maxDrawdown, stress2022, stressRates, stressCrypto, topSingleWeight, techWeightLookThrough)" }
-      - { name: "holdings", type: "array", description: "mode build seulement (0.4.12) : { symbol, name, industry, weight (%), evidence: { weight, beta, expectedReturn } } par titre construit, trié par poids" }
-      - { name: "parameters", type: "array", description: "mode build seulement (0.4.12) : paramètres utilisés { key, value, evidence? } (riskAversion avec riskProfile, plafonds, fenêtre, industries exclues et préférées)" }
+      - { name: "holdings", type: "array", description: "mode build seulement (0.4.12) : { symbol, name, industry, weight (%), evidence: { weight, beta, expectedReturn }, quantity?, price?, currency? } par titre construit, trié par poids. quantity, price (dernier cours de clôture, devise de cotation) et currency (0.4.16) servent à adopter le portefeuille sans calcul côté front" }
+      - { name: "parameters", type: "array", description: "mode build seulement (0.4.12) : paramètres utilisés { key, value, evidence? } (riskAversion avec riskProfile, plafonds, fenêtre, industries exclues et préférées, amount en 0.4.16)" }
       - { name: "verdict", type: "string", enum: ["pass", "warn", "fail"], required: true }
 
   - id: "schema-rule-verdict"

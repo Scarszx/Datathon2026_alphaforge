@@ -1,4 +1,4 @@
-# SOLUTION — AlphaForge AI (Datathon PolyFinances 2026)
+# SOLUTION — Grow (Datathon PolyFinances 2026)
 
 > **But de ce document.** Ce fichier décrit la solution retenue par l'équipe le 2026-11-14. Il donne à un agent ou à un coéquipier, dans une autre session, tout le contexte pour poursuivre dans la même direction sans refaire les débats.
 >
@@ -49,7 +49,7 @@
 ## 2. Proposition de valeur
 
 **Phrase de pitch :**
-> « Sur une plateforme de courtage autonome, l'investisseur voit ce qu'il possède, mais il est seul au moment de tester une idée. AlphaForge lui ouvre une session de simulation : on clarifie son objectif, on mesure l'impact réel sur son portefeuille, et un auditeur ancré dans les textes de l'ACVM et de l'OCRI lui signale quand l'idée met son objectif en danger. Chaque chiffre et chaque règle citée renvoient à leur source. »
+> « Sur une plateforme de courtage autonome, l'investisseur voit ce qu'il possède, mais il est seul au moment de tester une idée. Grow lui ouvre une session de simulation : on clarifie son objectif, on mesure l'impact réel sur son portefeuille, et un auditeur ancré dans les textes de l'ACVM et de l'OCRI lui signale quand l'idée met son objectif en danger. Chaque chiffre et chaque règle citée renvoient à leur source. »
 
 **Pourquoi c'est la bonne direction :**
 - **Ça reprend la méthode de l'atelier.**
@@ -134,6 +134,7 @@ Tous les modes passent par le même flux. Seuls changent les calculs lancés et 
 | **B. Rééquilibrer / tester une allocation** | « Mon portefeuille est trop canadien, et si je basculais vers les actions américaines ? » | exposition par pays, secteur et devise, composition des FNB, corrélations | R3, R6, R7 | Amira : gain de diversification, mais nouvelle concentration tech signalée |
 | **C. Diagnostic d'un titre** | « Parle-moi de SHOP.TO et de sa place dans mon portefeuille » | volatilité, pire baisse, sensibilité aux taux, corrélation avec les positions | R5, R8, R10 | Mateo (préférence ESG dans le mandat) |
 | **Et si…** | « Et si mon horizon était de 10 ans ? » | relance des étapes 3 à 5 | toutes | n'importe lequel |
+| **D. Premier portefeuille (onboarding)** | Fin du questionnaire d'un nouvel inscrit : « Construis-moi un premier portefeuille fictif de 50 000 $ à partir de mon profil » (envoyé par le front) | mode `build` (contrat 0.4.12) sur un montant fictif choisi (`buildAmount`, 0.4.16) | R1, R2, R3, R5, R6 | l'orchestrateur explique la méthode ; après confirmation du mandat et calcul, « Adopter ce portefeuille » copie les titres, quantités et prix du scénario dans le portefeuille `main` (simulation, aucun conseil) |
 | **Hors cadre** | « Achète pour moi », « Garantis-moi 20 % » | aucun | Guardrails | refus expliqué et reformulation (« voulez-vous simuler cet ajout ? ») ; le message refusé n'entre pas dans l'historique |
 
 **Scénario vedette de la vidéo** : un utilisateur du Québec avec un portefeuille de 92 000 $ (XIU.TO 30 k, RY.TO 8 k, TD.TO 9 k, XBB.TO 30 k, ZST.TO 15 k ; RY et TD sous 10 % pour que R6 reste en PASS dès l'état actuel, TD à 9,8 %) veut ajouter 15 000 $ de NVDA pour un condo dans 3 ans. Le déroulé : une question de cadrage, le mandat (capacité faible, donc profil faible), le scénario 1 en FAIL avec la citation de 31-368, l'alternative par catégorie en PASS, un clic sur une preuve, puis le curseur d'horizon passé à 10 ans qui fait basculer le verdict. Ensuite, un contraste avec Amira en mode B.
