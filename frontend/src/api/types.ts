@@ -157,6 +157,7 @@ export type MandateCreateRequest = {
   subjectTicker?: string;
   /* 0.4.5 : comparaison par catégorie d'actifs demandée par l'utilisateur (scénario 2).
    * L'orchestrateur ne le met jamais ; seul le bouton de comparaison du front le pose. */
+  buildAmount?: number; // 0.4.16 : mode build, montant fictif en CAD
   compareCategory?: "short-term-bonds" | "aggregate-bonds" | "balanced-allocation" | "canadian-equity" | "us-equity" | "global-equity";
   fieldSources?: Record<string, "persona" | "user_answer" | "team_assumption" | "slider">;
 };
@@ -212,8 +213,11 @@ export type BuiltHolding = {
   industry: string;
   weight: number; // %
   evidence: { weight: string; beta: string; expectedReturn: string };
+  quantity?: number; // 0.4.16 : calculé par le moteur (poids x montant / cours), recopié tel quel par « Adopter »
+  price?: number; // dernier cours de clôture, devise de cotation (= avgCost)
+  currency?: string;
 };
-export type BuildParameter = { key: string; value: number | string[] | { industry: string; minWeight?: number | null }[]; riskProfile?: number; evidence?: string };
+export type BuildParameter = { key: string; value: number | string[] | { industry: string; minWeight?: number | null }[]; riskProfile?: number; evidence?: string; currency?: string; origin?: "user" | "portfolio" | "default" };
 
 export type Scenario = {
   index: 0 | 1 | 2;

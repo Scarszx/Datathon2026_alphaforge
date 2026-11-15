@@ -5,6 +5,7 @@ import { t, warningText, type Lang } from "../../lib/i18n";
 import { categoryOf } from "../../lib/comparisonCategories";
 import { provinceName } from "../../lib/risk";
 import { levelName } from "../../lib/riskScale";
+import { amount } from "../../lib/format";
 import TickerLogo from "../TickerLogo";
 
 export function FieldSourceTag({ field, mandate, lang }: { field: string; mandate: MandateCreateRequest; lang: Lang }) {
@@ -35,6 +36,9 @@ export default function MandateCard({ mandate, confirmed, lang }: { mandate: Man
           {mandate.compareCategory && (
             <tr><td>{t("sim.scenario.alternative", lang)}</td><td>{categoryOf(mandate.compareCategory)?.label[lang] ?? mandate.compareCategory} <FieldSourceTag field="compareCategory" mandate={mandate} lang={lang} /></td></tr>
           )}
+          {mandate.buildAmount ? (
+            <tr><td>{t("mandate.buildAmount", lang)}</td><td>{amount(mandate.buildAmount, "CAD", 0)}</td></tr>
+          ) : null}
           {mandate.preferences?.excludedIndustries?.length ? (
             <tr><td>{t("mandate.excludedIndustries", lang)}</td><td>{mandate.preferences.excludedIndustries.join(", ")}</td></tr>
           ) : null}
