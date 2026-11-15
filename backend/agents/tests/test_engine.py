@@ -279,6 +279,10 @@ def test_mode_build_scenario_construit_et_preuves(store, build_config):
     # les libellés visibles ne nomment aucun symbole (les symboles ne sont que dans la liste du scénario)
     labels = " ".join([built.label, built.description or ""] + [i["label"] for i in registry.items if not i["label"].startswith("Holding ")])
     assert "NVDA" not in labels and "AAPL" not in labels
+    # Une lettre seule est un symbole boursier (A, T, C…) : aucun libellé visible ne doit en contenir (R5 sur le vrai jeu)
+    import re
+
+    assert not re.search(r"(?<![A-Za-z0-9.\-])[A-Z](?![A-Za-z0-9\-])", labels), labels
 
 
 def test_mode_build_portefeuille_vide_utilise_un_montant_notionnel(store, build_config):

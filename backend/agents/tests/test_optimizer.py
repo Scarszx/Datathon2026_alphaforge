@@ -172,3 +172,10 @@ def test_identique_au_script_de_l_equipe(fake):
     assert np.abs(mine - w).max() < 5e-3
     assert result.expected_return == pytest.approx(float(w @ mu), abs=2e-3)
     assert result.volatility == pytest.approx(float((w @ sigma @ w) ** 0.5), abs=2e-3)
+
+
+def test_positions_abandonnees_sans_depasser_le_plafond(fake):
+    """Après l'abandon des petites positions, le plafond par titre tient toujours (pas de simple renormalisation)."""
+    result = optimize_portfolio(fake, risk_profile=3, config={"minPositionWeight": 0.02})
+    weights = np.array([h.weight for h in result.holdings])
+    assert weights.sum() == pytest.approx(1.0) and weights.max() <= 0.10 + 1e-6 and weights.min() >= 0.02 - 1e-6

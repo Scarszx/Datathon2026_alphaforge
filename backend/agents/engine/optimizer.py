@@ -235,25 +235,37 @@ def optimize_portfolio(store: DataStore, risk_profile: int, excluded_industries:
     _check_reachable(industries, excluded, minimums, cfg)
     keep = ~is_excluded
 
-    groups: list[tuple[np.ndarray, float | None, float | None]] = []
-    for industry in pd.unique(industries[keep]):
-        mask = (industries == industry)[keep]
-        cap = cfg["preferredIndustryCap"] if industry in minimums else cfg["industryCap"]
-        groups.append((mask, cap, minimums.get(industry) or None))
     mu_values = mu.to_numpy()
     mu_perceived = mu_values + cfg["preferredBonus"] * is_preferred
-    try:
-        solution = solve_mean_variance(
-            sigma[np.ix_(keep, keep)], mu_perceived[keep], aversion, np.full(int(keep.sum()), max_weight), groups
+
+    def solve(active: np.ndarray) -> np.ndarray:
+        """Poids sur les titres `active` (les autres à 0), contraintes d'industrie incluses."""
+        groups: list[tuple[np.ndarray, float | None, float | None]] = []
+        for industry in pd.unique(industries[active]):
+            mask = (industries == industry)[active]
+            cap = cfg["preferredIndustryCap"] if industry in minimums else cfg["industryCap"]
+            groups.append((mask, cap, minimums.get(industry) or None))
+        solved = solve_mean_variance(
+            sigma[np.ix_(active, active)], mu_perceived[active], aversion, np.full(int(active.sum()), max_weight), groups
         )
+        full = np.zeros(len(symbols))
+        full[active] = np.round(solved, 6)
+        return full
+
+    try:
+        weights = solve(keep)
     except ValueError as error:
         raise OptimizerError(
             "No portfolio satisfies all the constraints (weight and industry limits, minimums, exclusions)."
         ) from error
-
-    weights = np.zeros(len(symbols))
-    weights[keep] = np.round(solution, 6)
-    weights[weights < cfg["minPositionWeight"]] = 0.0
+    small = (weights < cfg["minPositionWeight"]) & keep
+    if small.any():
+        # Positions trop petites abandonnées : on résout de nouveau sans elles (au lieu de renormaliser, ce qui ferait
+        # dépasser le plafond par titre). Repli sur la renormalisation du script si le problème devient infaisable.
+        try:
+            weights = solve(keep & ~small)
+        except ValueError:
+            weights = np.where(small, 0.0, weights)
     weights = weights / weights.sum()
 
     expected = float(weights @ mu_values)

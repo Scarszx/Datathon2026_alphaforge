@@ -400,7 +400,7 @@ def _build_scenario(
         method=f"Weighted CAPM expected return. {BUILD_METHOD}", currency="USD", caveats=caveats, key="buildExpectedReturn", **common,
     )
     scenario.evidence["beta"] = registry.add(
-        kind="metric", label="Beta of the constructed portfolio against the S&P 500 index", value=result.beta,
+        kind="metric", label="Beta of the constructed portfolio against the broad market index", value=result.beta,
         formatted=_fmt2(result.beta, language), unit="",
         method="Weighted beta = covariance with the index daily returns / variance of the index, listing currency.",
         caveats=caveats, key="buildBeta", **common,
@@ -410,7 +410,7 @@ def _build_scenario(
         formatted=_fmt2(result.utility, language), unit="", method=BUILD_METHOD, caveats=caveats, key="buildUtility", **common,
     )
     aversion_id = registry.add(
-        kind="assumption", label=f"Risk aversion A used by the model (from risk profile {result.risk_profile})",
+        kind="assumption", label=f"Risk aversion coefficient used by the model (from risk profile {result.risk_profile})",
         value=result.aversion, formatted=_fmt2(result.aversion, language), unit="",
         method="Table of team assumptions by risk profile (1 to 5): a lower profile means a higher aversion.",
         source=source, window=window, as_of=as_of, key="buildAversion",
@@ -438,7 +438,7 @@ def _build_scenario(
             caveats=caveats, key=f"holding:{holding.symbol}:weight", **common,
         )
         beta_id = registry.add(
-            kind="metric", label=f"{label}: beta against the S&P 500 index", value=holding.beta,
+            kind="metric", label=f"{label}: beta against the broad market index", value=holding.beta,
             formatted=_fmt2(holding.beta, language), unit="", method="Covariance with the index / variance of the index, daily returns.",
             caveats=caveats, key=f"holding:{holding.symbol}:beta", **common,
         )
