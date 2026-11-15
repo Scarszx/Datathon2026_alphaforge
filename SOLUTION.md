@@ -242,7 +242,10 @@ Le prompt système de l'orchestrateur, rédigé en anglais, contient donc explic
   - les promesses de rendement ;
   - les demandes de conseil personnalisé réglementé ;
   - les données personnelles (renseignements bancaires).
-- **À tester tôt** : il peut produire des faux positifs sur le vocabulaire financier normal.
+- **Faux positifs confirmés par le banc de fumée du 2026-11-14** : « Et si j'ajoute 10 % de XIU… » et « Compare XSP and ZEQT for my portfolio » (en anglais et en français) étaient bloqués. Correction en cours dans `ws/smoke-fixes` :
+  - définitions des sujets affinées (hypothèses et comparaisons exclues) ;
+  - un blocage **par sujet** sur un texte qui n'est pas en anglais n'est retenu que s'il se confirme sur la traduction anglaise ;
+  - un blocage pour **renseignement personnel** sur le texte d'origine reste final.
 - **Remplace l'idée d'un agent « intake guard »**, qui a été écartée.
 
 ## 8. Schémas de données (proposés, à aligner sur `contract/knowledge-graph.yaml`)
@@ -421,6 +424,7 @@ Les seuils marqués « hypothèse » vivent dans un fichier de configuration (pa
 | **Bedrock Guardrails** | Filtre d'entrée et de sortie |
 | **DynamoDB** | Sessions, portefeuilles, mandats versionnés, registres, résultats. Les sessions de démo peuvent être rejouées si Bedrock ou le réseau flanche |
 | **CloudWatch** | Jetons et durée par composant, traces affichées si le temps le permet |
+| **Langfuse** (hors AWS, optionnel) | Traces OpenTelemetry de Strands (`backend/agents/telemetry.py`, fail-open), projet https://us.cloud.langfuse.com. Clé secrète dans `.env` en local et dans SSM sur AWS. Voir `AGENTS.md`. Le texte des prompts y est envoyé : données fictives seulement (règle du contrat à préciser) |
 
 **Calcul :** nos propres outils Python (`@tool` de Strands). **Pas de serveur MCP** (décision prise). AgentCore Code Interpreter n'est pas retenu pour le MVP.
 
