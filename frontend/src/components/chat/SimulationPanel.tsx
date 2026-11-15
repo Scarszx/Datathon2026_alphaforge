@@ -22,10 +22,11 @@ function ScenarioCard({ run, s, lang }: { run: Run; s: Scenario; lang: Lang }) {
         <strong>{s.label}</strong>
         <span className="badge">{summary}</span>
       </div>
-      <div className="muted small">{t(SCENARIO_LABEL_KEY[s.index], lang)}</div>
+      <div className="muted small">{t(s.holdings?.length ? "sim.scenario.built" : SCENARIO_LABEL_KEY[s.index], lang)}</div>
       {s.description && <p className="small" style={{ marginTop: 6 }}>{s.description}</p>}
       {s.proxyNote && <p className="muted small" style={{ marginTop: 4 }}>{s.proxyNote}</p>}
-      {s.allocation?.length ? (
+      {s.holdings?.length ? <BuiltPortfolio run={run} s={s} lang={lang} /> : null}
+      {s.allocation?.length && !s.holdings?.length ? (
         <>
           <div className="section-title" style={{ margin: "10px 0 4px" }}>{t("sim.allocation", lang)}</div>
           {s.allocation.map((a) => (
@@ -61,6 +62,48 @@ function ScenarioCard({ run, s, lang }: { run: Run; s: Scenario; lang: Lang }) {
 
 /** Règles R1-R10 : libellé par motif (lot A), badge neutre pour « non déclenchée »,
  *  citations seulement pour une règle déclenchée (lot A : les anciens runs en contiennent sur des pass). */
+/** Mode build : portefeuille construit en liste à puces (pas de graphique), chaque chiffre relié à sa preuve EV-nn. */
+function BuiltPortfolio({ run, s, lang }: { run: Run; s: Scenario; lang: Lang }) {
+  const ev = (id?: string) => run.evidence.find((e) => e.id === id);
+  const fmt = (template: string, values: Record<string, string | number | undefined>) =>
+    Object.entries(values).reduce((text, [k, v]) => text.replace(`{${k}}`, String(v ?? "")), template);
+  const paramText = (p: NonNullable<Scenario["parameters"]>[number]) => {
+    const value = Array.isArray(p.value)
+      ? (p.value as (string | { industry: string; minWeight?: number | null })[])
+          .map((x) => (typeof x === "string" ? x : x.minWeight ? `${x.industry} (${t("mandate.minWeight", lang)} ${Math.round(x.minWeight * 100)} %)` : x.industry))
+          .join(", ")
+      : p.value;
+    return fmt(t(`sim.built.${p.key}`, lang), { value, riskProfile: p.riskProfile });
+  };
+  return (
+    <>
+      <p className="muted small" style={{ marginTop: 6 }}>{t("sim.built.notice", lang)}</p>
+      <div className="section-title" style={{ margin: "10px 0 4px" }}>{t("sim.built.holdings", lang)}</div>
+      <ul className="built-holdings small">
+        {s.holdings!.map((h) => (
+          <li key={h.symbol}>
+            <strong>{h.symbol}</strong> — {h.name} ({h.industry}) : {ev(h.evidence.weight)?.formatted ?? `${h.weight.toFixed(1)} %`}{" "}
+            <EvidenceBadge ev={ev(h.evidence.weight)} lang={lang} />
+            <span className="muted">
+              {" · "}{t("sim.built.beta", lang)} {ev(h.evidence.beta)?.formatted}
+              {" · "}{t("sim.built.expected", lang)} {ev(h.evidence.expectedReturn)?.formatted}
+            </span>{" "}
+            <EvidenceBadge ev={ev(h.evidence.expectedReturn)} lang={lang} />
+          </li>
+        ))}
+      </ul>
+      {s.parameters?.length ? (
+        <>
+          <div className="section-title" style={{ margin: "10px 0 4px" }}>{t("sim.built.parameters", lang)}</div>
+          <ul className="built-holdings small muted">
+            {s.parameters.map((p) => <li key={p.key}>{paramText(p)}{p.evidence ? <> <EvidenceBadge ev={ev(p.evidence)} lang={lang} /></> : null}</li>)}
+          </ul>
+        </>
+      ) : null}
+    </>
+  );
+}
+
 function RuleTable({ run, lang }: { run: Run; lang: Lang }) {
   const byScenario = new Map<number, RuleVerdict[]>();
   for (const v of run.verdicts) {
@@ -75,7 +118,7 @@ function RuleTable({ run, lang }: { run: Run; lang: Lang }) {
       <h3 className="section-title">{t("sim.rules", lang)}</h3>
       {[...byScenario.entries()].map(([sc, list]) => (
         <div key={sc} style={{ marginBottom: 12 }}>
-          {sc >= 0 && <div className="muted small">{t(SCENARIO_LABEL_KEY[sc] ?? "", lang)}</div>}
+          {sc >= 0 && <div className="muted small">{t(sc === 1 && run.scenarios.find((x) => x.index === 1)?.holdings?.length ? "sim.scenario.built" : SCENARIO_LABEL_KEY[sc] ?? "", lang)}</div>}
           <table className="tbl">
             <thead><tr><th>{t("sim.rules", lang)}</th><th /></tr></thead>
             <tbody>

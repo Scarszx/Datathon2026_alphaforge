@@ -33,6 +33,16 @@ export default function MandateCard({ mandate, confirmed, lang }: { mandate: Man
           {mandate.compareCategory && (
             <tr><td>{t("sim.scenario.alternative", lang)}</td><td>{categoryOf(mandate.compareCategory)?.label[lang] ?? mandate.compareCategory} <FieldSourceTag field="compareCategory" mandate={mandate} lang={lang} /></td></tr>
           )}
+          {mandate.preferences?.excludedIndustries?.length ? (
+            <tr><td>{t("mandate.excludedIndustries", lang)}</td><td>{mandate.preferences.excludedIndustries.join(", ")}</td></tr>
+          ) : null}
+          {mandate.preferences?.preferredIndustries?.length ? (
+            <tr><td>{t("mandate.preferredIndustries", lang)}</td><td>
+              {mandate.preferences.preferredIndustries
+                .map((p) => (p.minWeight ? `${p.industry} (${t("mandate.minWeight", lang)} ${p.minWeight} %)` : p.industry))
+                .join(", ")}
+            </td></tr>
+          ) : null}
           {mandate.subjectTicker && <tr><td>{t("mandate.subject", lang)}</td><td><strong>{mandate.subjectTicker}</strong> <FieldSourceTag field="subjectTicker" mandate={mandate} lang={lang} /></td></tr>}
           {mandate.operations?.length ? (
             <tr><td>{t("mandate.operations", lang)}</td><td>

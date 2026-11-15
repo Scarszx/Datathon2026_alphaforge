@@ -232,7 +232,7 @@ function draftFrom(u: DemoUser, p: Portfolio, mode: MandateMode, text: string): 
   };
 }
 
-const MODE_FR: Record<MandateMode, string> = { add_asset: "l'ajout d'un titre", rebalance: "le rééquilibrage", diagnose: "le diagnostic de votre portefeuille" };
+const MODE_FR: Record<MandateMode, string> = { add_asset: "l'ajout d'un titre", rebalance: "le rééquilibrage", diagnose: "le diagnostic de votre portefeuille", build: "la construction d'un portefeuille" };
 
 const JURISDICTIONS = ["CA", "QC", "ON", "BC", "AB", "SK", "MB", "NB", "NS", "PE", "NL", "YT", "NT", "NU"];
 const OBJECTIVES = ["growth", "income", "preservation", "project", "retirement"];
