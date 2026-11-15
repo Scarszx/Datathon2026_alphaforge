@@ -1,3 +1,4 @@
+import { inLang } from "../lib/format";
 import type { ErrorCode } from "./types";
 
 /** Erreur au format schema-error : { error: { code, message, requestId } } */
@@ -21,11 +22,26 @@ const LABELS: Partial<Record<ErrorCode, string>> = {
   NETWORK: "Le serveur est injoignable. Vérifiez votre connexion.",
 };
 
+const LABELS_EN: Partial<Record<ErrorCode, string>> = {
+  UNAUTHORIZED: "Your session has expired. Please sign in again.",
+  FORBIDDEN: "Access denied.",
+  CONVERSATION_NOT_FOUND: "Conversation not found.",
+  PORTFOLIO_NOT_FOUND: "Portfolio not found.",
+  ASSET_NOT_FOUND: "One of the tickers does not exist in the asset universe.",
+  MANDATE_NOT_FOUND: "Mandate not found.",
+  RUN_NOT_FOUND: "Analysis not found.",
+  MANDATE_NOT_CONFIRMED: "The mandate must be confirmed before the analysis can start.",
+  GUARDRAIL_BLOCKED: "This request cannot be processed (simulation only: no transactions, no promised returns, no personalised advice).",
+  AGENT_TIMEOUT: "The agents took too long to answer. Try again.",
+  NETWORK: "The server is unreachable. Check your connection.",
+};
+
 /** Message affichable : celui du serveur s'il existe, sinon un libellé par code. */
 export function errorText(e: unknown): string {
   if (e instanceof ApiError) {
-    const base = e.message || LABELS[e.code] || "Une erreur est survenue.";
-    return e.requestId ? `${base} (réf. ${e.requestId})` : base;
+    const labels = inLang("fr", "en") === "en" ? LABELS_EN : LABELS;
+    const base = e.message || labels[e.code] || inLang("Une erreur est survenue.", "Something went wrong.");
+    return e.requestId ? `${base} (${inLang("réf.", "ref.")} ${e.requestId})` : base;
   }
-  return "Une erreur est survenue.";
+  return inLang("Une erreur est survenue.", "Something went wrong.");
 }

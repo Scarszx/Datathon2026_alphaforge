@@ -1,3 +1,4 @@
+import { inLang } from "../lib/format";
 import { getAccessToken, signOut } from "./auth";
 import { DEMO, demoRequest } from "./demo";
 import { ApiError } from "./errors";
@@ -53,5 +54,5 @@ export async function request<T>(path: string, o: Opts = {}): Promise<T> {
 function sessionLost() {
   signOut();
   onSessionLost();
-  return new ApiError("UNAUTHORIZED", "Session expirée.", 401);
+  return new ApiError("UNAUTHORIZED", inLang("Session expirée.", "Session expired."), 401);
 }

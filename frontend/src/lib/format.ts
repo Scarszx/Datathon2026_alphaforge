@@ -1,20 +1,30 @@
-/* Formatage fr-CA maison (stable entre serveur et navigateur). */
+/* Formatage maison fr-CA / en-CA (stable entre serveur et navigateur). La langue est posée par LangProvider
+ * (setFormatLang) avant chaque rendu : « 1 234,50 $ » en français, « $1,234.50 » en anglais. */
 
-const NBSP = " ";
-const MONTHS = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
+const NBSP = "\u00a0";
+type L = "fr" | "en";
+let current: L = "fr";
+export function setFormatLang(l: L) { current = l; }
+const MONTHS: Record<L, string[]> = {
+  fr: ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."],
+  en: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+};
+const months = () => MONTHS[current];
+const decSep = () => (current === "en" ? "." : ",");
+const pctUnit = () => (current === "en" ? "%" : NBSP + "%");
 
 export function money(n: number, decimals = 2) {
   const [int, dec] = Math.abs(n).toFixed(decimals).split(".");
-  const grouped = int.replace(/\B(?=(\d{3})+(?!\d))/g, NBSP);
-  return (n < 0 ? "−" : "") + grouped + (dec ? "," + dec : "");
+  const grouped = int.replace(/\B(?=(\d{3})+(?!\d))/g, current === "en" ? "," : NBSP);
+  return (n < 0 ? "−" : "") + grouped + (dec ? decSep() + dec : "");
 }
 
 export function cad(n: number, decimals = 2) {
-  return money(n, decimals) + NBSP + "$";
+  return current === "en" ? (n < 0 ? "−" : "") + "$" + money(Math.abs(n), decimals) : money(n, decimals) + NBSP + "$";
 }
 
 export function pct(n: number) {
-  return (n >= 0 ? "+" : "−") + Math.abs(n).toFixed(2).replace(".", ",") + NBSP + "%";
+  return (n >= 0 ? "+" : "−") + Math.abs(n).toFixed(2).replace(".", decSep()) + pctUnit();
 }
 
 export function signedCad(n: number) {
@@ -23,12 +33,13 @@ export function signedCad(n: number) {
 
 export function shortDate(ts: number, withYear = false) {
   const d = new Date(ts * 1000);
-  return withYear ? `${MONTHS[d.getMonth()]} ${d.getFullYear()}` : `${d.getDate()} ${MONTHS[d.getMonth()]}`;
+  if (withYear) return `${months()[d.getMonth()]} ${d.getFullYear()}`;
+  return current === "en" ? `${months()[d.getMonth()]} ${d.getDate()}` : `${d.getDate()} ${months()[d.getMonth()]}`;
 }
 
 export function fullDate(ts: number) {
   const d = new Date(ts * 1000);
-  return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+  return current === "en" ? `${months()[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}` : `${d.getDate()} ${months()[d.getMonth()]} ${d.getFullYear()}`;
 }
 
 export function clock(ts: number) {
@@ -61,7 +72,7 @@ export function signedAmount(n: number, currency: string) {
 
 /** Pourcentage sans signe (le contrat donne des pourcentages : 9.07 = 9,07 %) */
 export function plainPct(n: number, decimals = 1) {
-  return money(n, decimals) + NBSP + "%";
+  return money(n, decimals) + pctUnit();
 }
 
 /** Date ISO (YYYY-MM-DD ou ISO 8601) → secondes Unix, pour Chart */
@@ -70,5 +81,25 @@ export function toSeconds(iso: string) {
 }
 
 export function dateTimeFr(iso: string) {
-  return new Date(iso).toLocaleDateString("fr-CA", { day: "numeric", month: "short" });
+  return new Date(iso).toLocaleDateString(current === "en" ? "en-CA" : "fr-CA", { day: "numeric", month: "short" });
+}
+
+/** Date et heure complètes dans la langue d'affichage (ex. « Mis à jour : … »). */
+export function localeDateTime(iso: string) {
+  return new Date(iso).toLocaleString(current === "en" ? "en-CA" : "fr-CA");
+}
+
+/** Date du jour en toutes lettres (en-tête du profil). */
+export function todayLong() {
+  return new Date().toLocaleDateString(current === "en" ? "en-CA" : "fr-CA", { weekday: "short", day: "numeric", month: "long", year: "numeric" });
+}
+
+/** Texte dans la langue d'affichage courante, hors composants React (messages d'erreur de l'API, de Cognito). */
+export function inLang(fr: string, en: string) {
+  return current === "en" ? en : fr;
+}
+
+/** Deux-points typographique : « : » précédé d'une espace en français, collé en anglais. */
+export function colon() {
+  return current === "en" ? ":" : " :";
 }
