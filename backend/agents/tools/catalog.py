@@ -19,6 +19,7 @@ from typing import Any
 
 import pandas as pd
 
+from backend.agents.data.store import NON_INVESTABLE_CLASSES
 from backend.agents.engine import analytics as an
 from backend.agents.engine.concentration import concentration as concentration_of
 from backend.agents.engine.scenarios import holding_values_cad, run_engine
@@ -108,7 +109,8 @@ def search_assets(ctx: RequestContext, query: str, asset_class: str | None = Non
     rows = [
         (ticker, row, _norm(ticker), _norm(row["name"]))
         for ticker, row in universe.iterrows()
-        if not asset_class or str(row["asset_class"]).lower() == asset_class.lower()
+        if (not asset_class or str(row["asset_class"]).lower() == asset_class.lower())
+        and str(row["asset_class"]).lower() not in NON_INVESTABLE_CLASSES
     ]
     multi = len(terms) > 1
     per_term = max(MAX_ASSETS // len(terms), 3) if multi else MAX_ASSETS
@@ -198,8 +200,8 @@ def propose_mandate(ctx: RequestContext, draft: dict[str, Any]) -> dict[str, Any
         mandate = validate_mandate_create(draft)
     except ApiError as error:
         return {"valid": False, "errors": [error.message]}
-    unknown = [op["ticker"] for op in mandate.get("operations", []) if not ctx.store.has_ticker(op["ticker"])]
-    if mandate.get("subjectTicker") and not ctx.store.has_ticker(mandate["subjectTicker"]):
+    unknown = [op["ticker"] for op in mandate.get("operations", []) if not ctx.store.is_investable(op["ticker"])]
+    if mandate.get("subjectTicker") and not ctx.store.is_investable(mandate["subjectTicker"]):
         unknown.append(mandate["subjectTicker"])
     if unknown:
         return {"valid": False, "errors": [f"Unknown ticker(s): {', '.join(unknown)}. Use search_assets."]}
@@ -336,7 +338,7 @@ def compute_metrics(ctx: RequestContext, tickers: list[str], start: str, end: st
     result: dict[str, Any] = {
         "metrics": out, "period": f"{start}/{end}",
         "assumptions": [
-            "adj_close; percentages in the listing currency; volatility annualized with sqrt(252) or sqrt(365) for crypto.",
+            "adjclose; percentages in the listing currency; volatility annualized with sqrt(252) or sqrt(365) for crypto.",
         ],
         "source": ctx.store.source_label("prices"),
     }

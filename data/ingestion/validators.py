@@ -32,6 +32,8 @@ MIN_HISTORY_ROWS_DEFAULT: int = 252
 def deduce_market_and_currency(ticker: str) -> tuple[str, str]:
     """Déduit (market, currency) à partir du suffixe du ticker."""
     t = ticker.strip().upper()
+    if t.startswith("^"):
+        return "US", "USD"
     if t.endswith(".TO"):
         return "TSX", "CAD"
     if t.endswith("-USD"):
@@ -55,7 +57,7 @@ def load_universe_candidates(yaml_path: Path) -> list[dict[str, str]]:
             seen.add(ticker)
             market, currency = deduce_market_and_currency(ticker)
             candidates.append({
-                "ticker": ticker,
+                "symbol": ticker,
                 "name": str(item.get("name", ticker)).strip(),
                 "asset_class": str(item.get("asset_class", default_asset_class)).strip(),
                 "market": str(item.get("market", market)).strip(),
@@ -93,7 +95,7 @@ def validate_candidate_prices(
             "rows": 0,
         }
 
-    required_cols = {"date", "open", "high", "low", "close", "adj_close"}
+    required_cols = {"date", "open", "high", "low", "close", "adjclose"}
     if not required_cols.issubset(set(df.columns)):
         return {
             "valid": False,
@@ -103,7 +105,7 @@ def validate_candidate_prices(
             "rows": 0,
         }
 
-    clean = df.dropna(subset=["close", "adj_close"]).copy()
+    clean = df.dropna(subset=["close", "adjclose"]).copy()
     if clean.empty:
         return {
             "valid": False,
@@ -113,7 +115,7 @@ def validate_candidate_prices(
             "rows": 0,
         }
 
-    for price_col in ("open", "high", "low", "close", "adj_close"):
+    for price_col in ("open", "high", "low", "close", "adjclose"):
         vals = pd.to_numeric(clean[price_col], errors="coerce")
         if vals.isna().any() or (vals <= 0).any():
             return {

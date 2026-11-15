@@ -16,7 +16,8 @@
     "AGG",
     "NVDA",
     "AAPL",
-    "BTC-USD"
+    "BTC-USD",
+    "^GSPC"
   ],
   "source": "make_fixtures.py (seeded generator, no market data)"
 }

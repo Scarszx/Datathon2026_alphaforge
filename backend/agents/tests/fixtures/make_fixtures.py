@@ -39,6 +39,7 @@ ASSETS = {
     "NVDA": ("Synthetic NVIDIA", "equity", "NASDAQ", "USD", "Information Technology", 25.0, 0.45, 0.50, 0.9, -0.45, -0.85),
     "AAPL": ("Synthetic Apple", "equity", "NASDAQ", "USD", "Information Technology", 28.0, 0.25, 0.29, 0.9, -0.35, -0.30),
     "BTC-USD": ("Synthetic Bitcoin", "crypto", "Crypto (24/7)", "USD", "Crypto asset", 700.0, 0.60, 0.70, 0.3, -0.55, -1.10),
+    "^GSPC": ("Synthetic S&P 500 index", "index", "US", "USD", "Broad market (U.S.)", 2100.0, 0.09, 0.15, 1.0, -0.40, -0.20),
 }
 
 COVID = ("2020-02-20", "2020-03-23")
@@ -139,12 +140,14 @@ def build() -> None:
         adj = p0 * np.exp(np.cumsum(log_ret))
         frame = pd.DataFrame({
             "date": days.date, "open": adj, "high": adj * 1.01, "low": adj * 0.99,
-            "close": adj * 1.02, "adj_close": adj, "volume": 1_000_000, "currency": currency,
+            "close": adj * 1.02, "adjclose": adj, "volume": 1_000_000, "currency": currency,
         })
         frame.to_parquet(OUT / "prices" / f"{ticker}.parquet", index=False)
         universe_rows.append({
-            "asset_id": f"F{i:02d}", "ticker": ticker, "name": name, "asset_class": asset_class,
+            "asset_id": f"F{i:02d}", "symbol": ticker, "name": name, "asset_class": asset_class,
             "market": mkt, "currency": currency, "sector": sector,
+            "industry": None if asset_class == "crypto" else f"{sector} (synthetic)",
+            "country": None if asset_class == "crypto" else ("Canada" if ticker.endswith(".TO") else "United States"),
         })
     pd.DataFrame(universe_rows).to_parquet(OUT / "universe.parquet", index=False)
 

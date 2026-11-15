@@ -21,21 +21,33 @@ from pathlib import Path
 from typing import Any, Iterable
 
 
+def _symbol_column(columns: Iterable[str], path: Path) -> str:
+    """`symbol` (jeu 0.4.8) ou `ticker` (jeu de départ, jeux antérieurs)."""
+    names = list(columns)
+    for candidate in ("symbol", "ticker"):
+        if candidate in names:
+            return candidate
+    raise ValueError(f"Colonne 'symbol' (ou 'ticker') absente : {path}")
+
+
 def _read_csv(path: Path) -> list[str]:
-    """Lit la colonne ticker d'un CSV (assets_universe ou univers WS3)."""
+    """Lit la colonne symbole d'un CSV (assets_universe ou univers WS3)."""
     with path.open("r", encoding="utf-8-sig", newline="") as file:
         reader = csv.DictReader(file)
-        if reader.fieldnames is None or "ticker" not in reader.fieldnames:
-            raise ValueError(f"Colonne 'ticker' absente : {path}")
-        return [str(row["ticker"]) for row in reader]
+        column = _symbol_column(reader.fieldnames or [], path)
+        return [str(row[column]) for row in reader if str(row.get("asset_class", "")).lower() != "index"]
 
 
 def _read_parquet(path: Path) -> list[str]:
-    """Lit la colonne ticker d'un Parquet. pyarrow est hors runtime."""
+    """Lit la colonne symbole d'un Parquet (indices exclus). pyarrow est hors runtime."""
     import pyarrow.parquet as pq
 
-    table = pq.read_table(path, columns=["ticker"])
-    return [str(value) for value in table.column("ticker").to_pylist()]
+    names = pq.read_schema(path).names
+    column = _symbol_column(names, path)
+    wanted = [column] + (["asset_class"] if "asset_class" in names else [])
+    table = pq.read_table(path, columns=wanted).to_pydict()
+    classes = table.get("asset_class") or [""] * len(table[column])
+    return [str(s) for s, c in zip(table[column], classes) if str(c).lower() != "index"]
 
 
 def _read_tickers(path: Path) -> list[str]:
@@ -63,7 +75,7 @@ def main() -> None:
         "--input",
         required=True,
         type=Path,
-        help="CSV ou Parquet contenant la colonne ticker.",
+        help="CSV ou Parquet contenant la colonne symbol (ou ticker).",
     )
     parser.add_argument(
         "--output",

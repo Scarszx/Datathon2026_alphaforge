@@ -1,7 +1,7 @@
 """Calculs purs sur séries de prix (module-engine), sans E/S ni modèle.
 
 Conventions (contrat module-engine.rules, SOLUTION.md section 10) :
-- rendements à partir de adj_close ; les splits ne sont jamais réappliqués ;
+- rendements à partir de adjclose ; les splits ne sont jamais réappliqués ;
 - conversion en CAD avec le dernier taux USD/CAD connu (report), devise native conservée ;
 - annualisation √252 (actions, FNB) et √365 (crypto), chacun sur son calendrier natif ;
 - portefeuilles sur l'intersection des jours de cotation de leurs actifs hors crypto
@@ -30,8 +30,8 @@ def periods_per_year(ticker: str, asset_class: str | None = None) -> int:
 
 
 def native_series(store: DataStore, ticker: str) -> pd.Series:
-    """adj_close dans la devise de cotation, calendrier natif."""
-    return store.prices(ticker)["adj_close"].astype(float)
+    """adjclose dans la devise de cotation, calendrier natif."""
+    return store.prices(ticker)["adjclose"].astype(float)
 
 
 def listing_currency(store: DataStore, ticker: str) -> str:

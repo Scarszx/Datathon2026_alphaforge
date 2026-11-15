@@ -69,6 +69,17 @@ def test_concentration_avec_composition_des_fnb(store):
     assert unknown["lookThroughComplete"] is False and "AGG" in unknown["caveats"][0]
 
 
+def test_pays_lu_dans_la_colonne_country_du_jeu(store):
+    from backend.agents.engine.concentration import _country_of
+
+    assert store.asset("RY.TO")["country"] == "Canada" and store.asset("BTC-USD")["country"] is None
+    assert _country_of("RY.TO", "equity", "Canada") == "CA"
+    assert _country_of("NVDA", "equity", "United States") == "US"
+    assert _country_of("ASML", "equity", "Netherlands") == "Netherlands"  # pays hors CA/US conservé
+    assert _country_of("RY.TO", "equity") == "CA" and _country_of("NVDA", "equity") == "US"  # repli suffixe
+    assert _country_of("BTC-USD", "crypto", "United States") == "Crypto"
+
+
 def test_fiche_de_fnb_vide_n_est_pas_une_composition(store, monkeypatch):
     """Un gabarit non rempli (listes vides, sans source) ne doit pas faire croire à une transparence."""
     empty = {"ticker": "XIU.TO", "sectorWeights": {}, "countryWeights": {}, "topHoldings": []}
