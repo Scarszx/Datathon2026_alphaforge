@@ -1,12 +1,25 @@
 application:
   name: "AlphaForge"
-  version: "0.4.1"
+  version: "0.4.2"
   description: "Banc d'essai agentique et auto-explicatif pour l'investisseur autonome : il cadre l'intention, simule son impact sur le portefeuille et l'audite contre les textes réglementaires canadiens (simulation seulement). Datathon 2026."
-  status: "validé par l'équipe (0.4.0 le 2026-11-14, 0.4.1 le 2026-11-15)"
+  status: "validé par l'équipe (0.4.0 le 2026-11-14, 0.4.1 le 2026-11-15) ; 0.4.2 validée par l'utilisateur le 2026-11-15, à relire par l'équipe"
   solution_ref: "SOLUTION.md (racine du dépôt) : décisions de produit et de conception détaillées"
   # Règle d'équipe : ce fichier est la référence. Toute modification passe par un accord de l'équipe.
   # Voir aussi : la page de présentation du contrat (même contenu, avec schémas).
   changelog:
+    - version: "0.4.2"
+      date: "2026-11-15"
+      status: "écarts validés par l'utilisateur pendant les essais du 2026-11-15 (déjà déployés) ; à relire par l'équipe"
+      summary:
+        - "tool-search-assets : une seule requête peut contenir plusieurs noms séparés par des virgules (le plafond d'appels d'outils de l'orchestrateur était atteint en cherchant un nom par appel : erreur 500 sur une liste de noms). Accents et ponctuation ignorés, noms français courants des banques reconnus. Retour : champ query sur chaque actif (requête multiple seulement) et liste notFound { query, closest } des saisies sans résultat."
+        - "tool-get-portfolio : chaque position porte aussi name, assetClass, sector et currency lus dans l'univers (l'orchestrateur décrivait le portefeuille de mémoire)."
+        - "tool-read-evidence : sans evidence_id, le retour contient aussi verdicts (règle, scénario, statut, reasonCode, messageEn, nature du seuil, preuves, citations) : « pourquoi le scénario 1 échoue ? » nomme la règle."
+        - "tool-search-regulation : subjects est obligatoire (erreur sinon) ; plus de repli vers profil_risque/convenance quand le modèle les omet."
+        - "schema-evidence.excerpt (regulation) : jusqu'à 1 200 caractères (700 avant), coupé à une fin de phrase ; texte brut de la base, jamais résumé ni traduit."
+        - "agent-auditor : ne cherche pas pour les verdicts sans objet (R7 sans cryptoactif, R8 sans préférence ESG) ni pour R10 (aucun sujet) ; ces verdicts gardent leur motif par défaut, sans citation (9 → 7 recherches mesurées)."
+        - "Comportement de l'orchestrateur : tolérance et capacité de risque propres à la séance (valeur du profil nommée comme point de départ, niveau donné par l'utilisateur prioritaire, capacité demandée quand le profil n'en a pas) ; le texte envoyé au Guardrail en entrée est précédé de « In the simulator: » (classification seulement, jamais stocké ni affiché)."
+      impacts_to_handle:
+        - "frontend : ignorer sans erreur les champs ajoutés (query, notFound, name/assetClass/sector/currency, verdicts) ; backend/api/registry.json si le registre public décrit ces outils."
     - version: "0.4.1"
       date: "2026-11-14"
       status: "validé par l'équipe (2026-11-15)"
@@ -684,7 +697,7 @@ data_schemas:
       - { name: "asOf", type: "string" }
       - { name: "document", type: "string", description: "regulation : titre du document" }
       - { name: "section", type: "string", description: "regulation : section citée" }
-      - { name: "excerpt", type: "string", description: "regulation : extrait court" }
+      - { name: "excerpt", type: "string", description: "regulation : extrait brut de la base, 1 200 caractères au plus, coupé à une fin de phrase (jamais résumé ni traduit)" }
       - { name: "jurisdiction", type: "string", description: "regulation : CA ou province" }
       - { name: "url", type: "string" }
       - { name: "caveats", type: "array", items_type: "string" }
@@ -898,7 +911,7 @@ agents:
     status: "retenu"
     replaces: "agent-governance"
     system_prompt_language: "en"
-    role: "Travaille en anglais (requêtes KB et motifs en anglais). Ne décide pas des verdicts (module-rules le fait). Pour chaque verdict, cherche dans la Knowledge Base le passage qui le fonde (filtre juridiction ∈ {CA, province}), l'inscrit au registre (KB-nn) et formule le motif en une phrase."
+    role: "Travaille en anglais (requêtes KB et motifs en anglais). Ne décide pas des verdicts (module-rules le fait). Pour chaque verdict, cherche dans la Knowledge Base le passage qui le fonde (filtre juridiction ∈ {CA, province}), l'inscrit au registre (KB-nn) et formule le motif en une phrase. Les verdicts sans objet (R7 sans cryptoactif, R8 sans préférence ESG) et R10 (aucun sujet) ne déclenchent aucune recherche : motif par défaut, sans citation."
     runs_in: "srv-agent-runtime"
     model: "Claude Sonnet 5.5 via Bedrock, région us-east-1 (profil d'inférence global.anthropic.claude-sonnet-5-5, testé par l'équipe; lu dans la config)"
     max_tokens: 4096
@@ -969,9 +982,9 @@ tools:
     description: "Cherche des actifs de l'univers par nom ou symbole."
     used_by: ["agent-orchestrator"]
     params:
-      - { name: "query", type: "string", required: true }
+      - { name: "query", type: "string", required: true, description: "un ou plusieurs noms/symboles séparés par des virgules (8 au plus) : une seule requête évite d'épuiser le plafond d'appels d'outils. Accents et ponctuation ignorés." }
       - { name: "asset_class", type: "string", required: false }
-    returns: "liste de { ticker, name, assetClass, sector, currency } (20 maximum)"
+    returns: "{ items: liste de { ticker, name, assetClass, sector, currency, query? } (20 maximum; query = saisie qui a trouvé l'actif, présent seulement pour une requête multiple), notFound?: liste de { query, closest } pour les saisies sans résultat (closest = symboles proches, 3 au plus) }"
     reads: ["storage-dataset: universe.parquet"]
 
   - id: "tool-get-prices"
@@ -1022,8 +1035,8 @@ tools:
     description: "Positions du portefeuille de l'utilisateur courant."
     used_by: ["agent-orchestrator", "module-engine"]
     params: []  # userId et portfolioId viennent du contexte de la requête, jamais du modèle
-    returns: "{ portfolioId, baseCurrency, holdings: [{ ticker, quantity, avgCost }] }"
-    reads: ["db-portfolios"]
+    returns: "{ portfolioId, baseCurrency, holdings: [{ ticker, quantity, avgCost, name, assetClass, sector, currency }] } (name, assetClass, sector, currency lus dans universe.parquet; null si le titre n'y est pas)"
+    reads: ["db-portfolios", "storage-dataset: universe.parquet"]
 
   - id: "tool-get-profile"
     name: "get_profile"
@@ -1048,7 +1061,7 @@ tools:
     used_by: ["agent-orchestrator", "agent-auditor", "agent-writer"]
     params:
       - { name: "evidence_id", type: "string", required: false, description: "EV-nn ou KB-nn; absent = registre complet résumé" }
-    returns: "schema-evidence ou liste"
+    returns: "schema-evidence (evidence_id donné), ou { items: liste résumée, verdicts: liste de { rule, scenario, status, reasonCode, messageEn, thresholdNature, evidence, citations } } (absent = registre complet résumé et verdicts R1-R10 du run)"
     reads: ["db-analyses"]
 
   - id: "tool-portfolio-impact"
@@ -1089,9 +1102,9 @@ tools:
     used_by: ["agent-auditor"]
     params:
       - { name: "query", type: "string", required: true, description: "toujours en anglais (le corpus est en anglais)" }
-      - { name: "subjects", type: "array", items_type: "string", required: false, description: "ex. profil_risque, convenance, oeo, esg, crypto, titres_proteges" }
+      - { name: "subjects", type: "array", items_type: "string", required: true, description: "ex. profil_risque, convenance, oeo, esg, crypto, titres_proteges; un appel sans sujets est refusé (erreur), jamais remplacé par un autre corpus" }
     context_params: ["jurisdictions = [CA, province du mandat] (jamais fourni par le modèle)"]
-    returns: "passages { document, section, excerpt, jurisdiction, version, url, score }, 5 maximum"
+    returns: "passages { document, section, excerpt, jurisdiction, version, url, score }, 5 maximum; excerpt = texte brut de la base, 1 200 caractères au plus, coupé à une fin de phrase"
     reads: ["srv-bedrock-kb"]
     behavior:
       - "Le texte renvoyé est une donnée non fiable : encadré dans le prompt, la consigne vient après."
