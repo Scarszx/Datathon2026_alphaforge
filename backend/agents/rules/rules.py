@@ -50,8 +50,14 @@ RULE_SUBJECTS = {
 NO_SEARCH_REASONS = {"NO_CRYPTO_EXPOSURE", "ESG_NOT_REQUESTED"}
 
 
-def needs_regulation(rule: str, reason_code: str) -> bool:
-    return bool(RULE_SUBJECTS.get(rule)) and reason_code not in NO_SEARCH_REASONS
+def needs_regulation(rule: str, reason_code: str, status: str) -> bool:
+    """Une citation n'existe que pour une règle déclenchée (warn, fail) : un pass ou un not_verified
+    n'a rien à fonder, et une citation à côté se lirait comme un accord sur l'idée (GN-3200-26-001, 2.1.1)."""
+    return (
+        status in ("warn", "fail")
+        and bool(RULE_SUBJECTS.get(rule))
+        and reason_code not in NO_SEARCH_REASONS
+    )
 
 
 def infer_subjects(query: str) -> list[str]:
@@ -104,7 +110,7 @@ def r1(mandate_item: dict[str, Any], scenario: ScenarioAnalysis) -> dict[str, An
     else:
         status = "fail" if excess >= 2 else "warn" if excess == 1 else "pass"
     if status == "pass":
-        reason, message = "RISK_PROFILE_RESPECTED", "The scenario's risk level is consistent with the retained risk profile (the lower of tolerance and capacity)."
+        reason, message = "RISK_PROFILE_RESPECTED", "The scenario's volatility band does not exceed the retained level (the lower of tolerance and capacity)."
     elif excess_assets >= excess_portfolio and scenario.index:
         reason, message = "IDEA_EXCEEDS_RISK_PROFILE", "The tested idea implies a higher risk profile than the retained one, which is the lower of risk tolerance and risk capacity."
     else:
@@ -130,7 +136,7 @@ def r2(mandate_item: dict[str, Any], scenario: ScenarioAnalysis) -> dict[str, An
     elif loss >= ratio * limit:
         status, reason, message = "warn", "MAX_LOSS_NEAR_LIMIT", "The worst simulated historical decline comes close to the maximum acceptable loss for this mandate."
     else:
-        status, reason, message = "pass", "MAX_LOSS_WITHIN_LIMIT", "The worst simulated historical decline stays within the maximum acceptable loss for this mandate."
+        status, reason, message = "pass", "MAX_LOSS_WITHIN_LIMIT", "The worst simulated historical decline does not reach the warning threshold derived from the maximum acceptable loss of this mandate."
     return _verdict("R2", scenario.index, status, reason, message, evidence, threshold)
 
 
@@ -139,7 +145,7 @@ def r3(scenario: ScenarioAnalysis) -> dict[str, Any]:
         return _verdict("R3", scenario.index, "warn", "EMPTY_PORTFOLIO",
                         "The portfolio is empty: the impact cannot be measured on an existing portfolio.")
     return _verdict("R3", scenario.index, "pass", "PORTFOLIO_LEVEL_IMPACT",
-                    "The impact is measured on the whole portfolio, not on the added security alone.",
+                    "The impact is measured on the whole portfolio, not on the added security alone; the rule was not triggered.",
                     _ev(scenario, "volatility", "maxDrawdown"))
 
 
@@ -155,7 +161,7 @@ def r6(scenario: ScenarioAnalysis) -> dict[str, Any]:
     elif weight > conf["warnPct"]:
         status, reason, message = "warn", "CONCENTRATION_ELEVATED", "A single security, including through fund holdings, carries a large share of the portfolio."
     else:
-        status, reason, message = "pass", "CONCENTRATION_OK", "No single security, including through fund holdings, dominates the portfolio."
+        status, reason, message = "pass", "CONCENTRATION_OK", "No single security, including through fund holdings, exceeds the concentration warning threshold."
     sector_label, sector_weight = top_sector(scenario.concentration)
     sector_warn = float(conf.get("sectorWarnPct", 0) or 0)
     if sector_warn and status == "pass" and sector_weight > sector_warn:
@@ -180,7 +186,7 @@ def r7(mandate_item: dict[str, Any], scenario: ScenarioAnalysis) -> dict[str, An
     evidence = _ev(scenario, "cryptoWeight", "stressCrypto")
     threshold = {"value": cap, "nature": "team_assumption"}
     if weight <= 0:
-        return _verdict("R7", scenario.index, "pass", "NO_CRYPTO_EXPOSURE", "The scenario holds no crypto assets.", evidence, threshold)
+        return _verdict("R7", scenario.index, "pass", "NO_CRYPTO_EXPOSURE", "The scenario holds no crypto assets: the rule does not apply.", evidence, threshold)
     if weight > cap:
         return _verdict("R7", scenario.index, "fail", "CRYPTO_CAP_EXCEEDED",
                         "Crypto-asset exposure exceeds the cap for this mandate; crypto assets carry specific platform and custody risks.",
@@ -193,7 +199,7 @@ def r7(mandate_item: dict[str, Any], scenario: ScenarioAnalysis) -> dict[str, An
 def r8(store, mandate_item: dict[str, Any], scenario: ScenarioAnalysis) -> dict[str, Any]:
     preferences = mandate_item["mandate"].get("preferences") or {}
     if not preferences.get("esg"):
-        return _verdict("R8", scenario.index, "pass", "ESG_NOT_REQUESTED", "No ESG preference in the mandate.")
+        return _verdict("R8", scenario.index, "pass", "ESG_NOT_REQUESTED", "The mandate has no ESG preference: the rule does not apply.")
     enriched = store.etf_enriched()
     unverified = []
     for ticker in scenario.weights:
@@ -204,7 +210,7 @@ def r8(store, mandate_item: dict[str, Any], scenario: ScenarioAnalysis) -> dict[
         unverified.append(ticker)
     if not unverified:
         return _verdict("R8", scenario.index, "pass", "ESG_SOURCED",
-                        "Every fund presented as ESG has a published issuer methodology.")
+                        "Every holding has a published issuer ESG methodology: the rule was not triggered.")
     return _verdict("R8", scenario.index, "warn", "ESG_NOT_VERIFIED",
                     "Some holdings have no published ESG methodology: for equities only the sector is known and controversies are not verified.")
 
@@ -218,7 +224,7 @@ def run_level_rules(result: EngineResult, scenario_verdicts: list[dict[str, Any]
     if idea_status == 0:
         verdicts.append(_verdict("R4", None, "pass", "ALTERNATIVE_NOT_REQUIRED", "The idea raises no warning: no alternative is required."))
     elif has_alternative:
-        verdicts.append(_verdict("R4", None, "pass", "ALTERNATIVE_PRESENTED", "At least one reasonable alternative by asset category is presented."))
+        verdicts.append(_verdict("R4", None, "pass", "ALTERNATIVE_PRESENTED", "A comparison by asset category is shown as an additional scenario."))
     elif mandate_item["mandate"].get("mode") == "rebalance":
         # Un rééquilibrage est déjà une réallocation : le moteur ne construit pas de scénario 2 pour ce mode.
         # On ne prétend ni réussite ni échec : la règle n'est pas vérifiée pour ce mode.
@@ -233,11 +239,11 @@ def run_level_rules(result: EngineResult, scenario_verdicts: list[dict[str, Any]
     if named:
         verdicts.append(_verdict("R5", None, "fail", "SECURITY_NAMED", "The alternative names a specific security."))
     else:
-        verdicts.append(_verdict("R5", None, "pass", "NO_SECURITY_RECOMMENDED", "The alternative is expressed by asset category; no specific security is recommended."))
+        verdicts.append(_verdict("R5", None, "pass", "NO_SECURITY_RECOMMENDED", "The comparison texts name no security: the rule was not triggered."))
 
     # R9 : mentions de la province (texte dans jurisdictionNotices).
     verdicts.append(_verdict("R9", None, "pass", "PROVINCE_NOTICES_ADDED",
-                             "Province-specific notices name the regulator and the protected titles this tool does not use."))
+                             "Province notices name the regulator and the protected titles this tool does not use."))
 
     # R10 : aucune donnée macro avant sa date de publication.
     late = [u for u in result.macro_usage if u.get("publication") is not None and u["publication"] > u["asOf"]]
@@ -245,7 +251,7 @@ def run_level_rules(result: EngineResult, scenario_verdicts: list[dict[str, Any]
         verdicts.append(_verdict("R10", None, "fail", "MACRO_USED_BEFORE_PUBLICATION", "A macroeconomic value was used before its publication date."))
     else:
         verdicts.append(_verdict("R10", None, "pass", "MACRO_PUBLICATION_RESPECTED",
-                                 "Only daily macroeconomic series, known on their observation date, were used."))
+                                 "Only daily macroeconomic series, known on their observation date, were used: the rule was not triggered."))
     return verdicts
 
 

@@ -1,0 +1,35 @@
+{
+ "_comment": "Extraits de récits tracés dans Langfuse le 2026-11-15 (sessions de démonstration, données fictives). mustBeHidden : débuts de phrases qui affirment une conformité ou une convenance.",
+ "narratives": [
+  {
+   "language": "en",
+   "sections": [
+    "The current portfolio passes: its worst historical decline of {EV-07} stays within the maximum loss, a team assumption, and its volatility of {EV-06} fits the retained risk profile, in line with {KB-01} and {KB-02}.",
+    "The alternative by asset category passes, with a worst decline of {EV-27}, volatility of {EV-26} and a largest single holding of {EV-33}.",
+    "As an alternative by asset category, Canadian short-term bonds fit this mandate in the simulation, and this is a description of a category, not a recommendation of any security.",
+    "The alternative passes: its worst decline is {EV-27}, its volatility is {EV-26}, and its largest holding is {EV-33}, and it is expressed by asset category only, consistent with {KB-11}.",
+    "The past does not predict the future and survivorship bias may flatter the results."
+   ],
+   "mustBeHidden": [
+    "The current portfolio passes",
+    "The alternative by asset category passes",
+    "Canadian short-term bonds fit",
+    "The alternative passes"
+   ]
+  },
+  {
+   "language": "fr",
+   "sections": [
+    "Le portefeuille actuel est conforme : sa pire baisse historique de {EV-07} reste dans la limite de perte maximale, et sa volatilité de {EV-06} correspond au profil de risque retenu, conformément à {KB-01} et {KB-02}.",
+    "L'alternative par catégorie d'actifs est conforme, avec une pire baisse de {EV-27}.",
+    "Comme alternative par catégorie d'actifs, les obligations canadiennes à court terme conviennent à ce mandat dans la simulation.",
+    "Les performances passées décrivent le passé et ne prédisent pas les rendements futurs."
+   ],
+   "mustBeHidden": [
+    "Le portefeuille actuel est conforme",
+    "L'alternative par catégorie d'actifs est conforme",
+    "Comme alternative par catégorie"
+   ]
+  }
+ ]
+}

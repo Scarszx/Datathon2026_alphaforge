@@ -172,6 +172,8 @@ def test_messages_par_defaut_en_anglais_sans_chiffre(store):
     item, result = _engine(store)
     for verdict in rules.check_rules(store, item, result):
         assert verdict["messageEn"] and not any(ch.isdigit() for ch in verdict["messageEn"])
+
+
 def test_r4_non_applicable_pour_un_reequilibrage(store):
     """Mode B : pas de scénario 2 par construction. R4 n'échoue pas à tort et ne se dit pas réussie : non vérifiée."""
     item, result = _engine(store)
@@ -179,6 +181,8 @@ def test_r4_non_applicable_pour_un_reequilibrage(store):
     result.scenarios = result.scenarios[:2]
     verdict = _by(rules.check_rules(store, item, result), "R4")
     assert verdict["status"] == "not_verified" and verdict["reasonCode"] == "ALTERNATIVE_NOT_APPLICABLE"
+
+
 def test_r6_concentration_sectorielle_avertit_sans_echouer():
     """Un secteur GICS au-delà de 40 % (par transparence) donne WARN ; une catégorie de FNB n'est pas un secteur."""
     concentration = {"topSingle": {"ticker": "A", "weight": 5.0}, "lookThroughComplete": True,
@@ -189,8 +193,32 @@ def test_r6_concentration_sectorielle_avertit_sans_echouer():
     assert verdict["evidence"] == ["EV-2"] and verdict["threshold"] == {"value": 40, "nature": "team_assumption"}
     concentration["bySector"] = [{"label": "Broad market (Canada)", "weight": 70.0}, {"label": "Information Technology", "weight": 25.0}]
     assert rules.r6(scenario)["status"] == "pass"
+
+
 def test_r6_le_titre_unique_reste_prioritaire_sur_le_secteur():
     concentration = {"topSingle": {"ticker": "A", "weight": 25.0}, "lookThroughComplete": True,
                      "bySector": [{"label": "Information Technology", "weight": 60.0}]}
     verdict = rules.r6(_scenario(concentration=concentration, evidence={"topSingleWeight": "EV-1"}))
     assert verdict["status"] == "fail" and verdict["reasonCode"] == "CONCENTRATION_HIGH"
+
+
+def test_seules_les_regles_declenchees_ont_besoin_d_une_citation():
+    for rule, subjects in rules.RULE_SUBJECTS.items():
+        for status in ("pass", "not_verified"):
+            assert rules.needs_regulation(rule, "X", status) is False
+        if subjects:
+            assert rules.needs_regulation(rule, "X", "warn") and rules.needs_regulation(rule, "X", "fail")
+        else:
+            assert rules.needs_regulation(rule, "X", "fail") is False  # R10 : aucun sujet
+    assert rules.needs_regulation("R7", "NO_CRYPTO_EXPOSURE", "warn") is False
+
+
+def test_messages_par_defaut_sans_vocabulaire_d_approbation(store):
+    from backend.agents.verifier.verifier import forbidden_phrases
+
+    item, result = _engine(store)
+    for verdict in rules.check_rules(store, item, result):
+        message = verdict["messageEn"]
+        assert forbidden_phrases(message) == [], message
+        for word in ("consistent with", "compatible", "reasonable alternative", "respected", "recommended"):
+            assert word not in message.lower(), message

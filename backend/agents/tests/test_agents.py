@@ -158,11 +158,11 @@ def test_le_code_lance_une_recherche_par_sujet_de_la_regle(ctx, scripts):
 
 
 def test_r5_une_recherche_par_sujet_et_cinq_extraits_differents(ctx, scripts):
-    verdicts = [{"rule": "R5", "scenario": 1, "status": "pass", "reasonCode": "NO_SECURITY_RECOMMENDED", "evidence": [],
-                 "citations": [], "messageEn": "No security is recommended."}]
+    verdicts = [{"rule": "R5", "scenario": 1, "status": "fail", "reasonCode": "SECURITY_NAMED", "evidence": [],
+                 "citations": [], "messageEn": "The scenario 2 texts name a specific security."}]
     results = [_kb_result(f"Passage number {i} about order execution only services.") for i in range(3)]
     ctx.clients["kb"] = FakeKb(results + results)  # chaque sujet renvoie les mêmes passages
-    scripts.add("agent-auditor", output("AuditReport", items=[{"key": "R5:pass", "passage_refs": ["P1"], "message_en": "Regulators agree."}]))
+    scripts.add("agent-auditor", output("AuditReport", items=[{"key": "R5:fail", "passage_refs": ["P1"], "message_en": "The rule is inspired by the ban on naming a security."}]))
     enriched = auditor.audit(ctx, verdicts, EvidenceRegistry("en"))
     searches = [c for c in ctx.tool_calls if c["tool"] == "search_regulation"]
     assert sorted(c["params"]["subjects"][0] for c in searches) == ["aide_decision", "oeo", "recommandation"]
@@ -170,8 +170,30 @@ def test_r5_une_recherche_par_sujet_et_cinq_extraits_differents(ctx, scripts):
     group = json.loads(prompt.split("<verdict_groups>\n", 1)[1].split("\n</verdict_groups>", 1)[0])[0]
     excerpts = [p["excerpt"] for p in group["passages"]]
     assert len(excerpts) == len(set(excerpts)) == 3  # 3 sujets × les mêmes 3 passages : jamais deux fois le même extrait
-    # Un pass garde sa phrase : le modèle ne peut pas écrire « Regulators agree » à côté de l'extrait.
-    assert enriched[0]["messageEn"] == "No security is recommended." and len(enriched[0]["citations"]) == 1
+    assert len(enriched[0]["citations"]) == 1 and enriched[0]["messageEn"].startswith("The rule is inspired")
+
+
+def test_un_motif_d_approbation_du_modele_retombe_sur_la_phrase_par_defaut(ctx, scripts):
+    ctx.clients["kb"] = FakeKb([_kb_result()])
+    scripts.add("agent-auditor", output("AuditReport", items=[{"key": "R1:fail", "passage_refs": ["P1"], "message_en": "The idea is not suitable for the investor."}]))
+    enriched = auditor.audit(ctx, [VERDICTS[0]], EvidenceRegistry("en"))
+    assert enriched[0]["messageEn"] == "Default R1." and len(enriched[0]["citations"]) == 1
+
+
+def test_aucune_citation_ni_recherche_pour_pass_et_not_verified(ctx, scripts):
+    """Lot A : un extrait du régulateur à côté d'une règle non déclenchée se lirait comme un accord."""
+    from backend.agents.rules.rules import RULE_SUBJECTS
+
+    ctx.clients["kb"] = FakeKb([_kb_result()])
+    verdicts = [
+        {"rule": r, "scenario": 1, "status": status, "reasonCode": "X", "evidence": [], "citations": [], "messageEn": f"Default {r}."}
+        for r in RULE_SUBJECTS for status in ("pass", "not_verified")
+    ]
+    registry = EvidenceRegistry("en")
+    assert auditor.audit(ctx, verdicts, registry) == verdicts
+    assert not [c for c in ctx.tool_calls if c["tool"] == "search_regulation"]
+    assert "agent-auditor" not in scripts.models and ctx.clients["kb"].calls == []
+    assert not [i for i in registry.items if i["kind"] == "regulation"]
 
 
 def test_un_passage_sans_juridiction_ou_hors_mandat_est_jete(ctx, scripts):

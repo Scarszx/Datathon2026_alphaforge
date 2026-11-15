@@ -1,12 +1,24 @@
 application:
   name: "AlphaForge"
-  version: "0.4.3"
+  version: "0.4.4"
   description: "Banc d'essai agentique et auto-explicatif pour l'investisseur autonome : il cadre l'intention, simule son impact sur le portefeuille et l'audite contre les textes réglementaires canadiens (simulation seulement). Datathon 2026."
-  status: "validé par l'équipe (0.4.0 le 2026-11-14, 0.4.1 le 2026-11-15) ; 0.4.2 et 0.4.3 validées par l'utilisateur le 2026-11-15, à relire par l'équipe"
+  status: "validé par l'équipe (0.4.0 le 2026-11-14, 0.4.1 le 2026-11-15) ; 0.4.2 et 0.4.3 validées par l'utilisateur le 2026-11-15, à relire par l'équipe ; 0.4.4 demandée par l'utilisateur le 2026-11-15 (lot A), à relire par l'équipe"
   solution_ref: "SOLUTION.md (racine du dépôt) : décisions de produit et de conception détaillées"
   # Règle d'équipe : ce fichier est la référence. Toute modification passe par un accord de l'équipe.
   # Voir aussi : la page de présentation du contrat (même contenu, avec schémas).
   changelog:
+    - version: "0.4.4"
+      date: "2026-11-15"
+      status: "demandé par l'utilisateur le 2026-11-15 (lot A, pas encore déployé) ; à relire par l'équipe"
+      summary:
+        - "Vocabulaire : l'outil décrit ce qu'il fait (règle, seuil, calcul) et n'évalue pas la convenance (GN-3200-26-001, 2.1.1). Les messageEn par défaut des verdicts pass disent que la règle n'a pas été déclenchée (« consistent with », « compatible », « reasonable alternative », « recommended » retirés)."
+        - "agent-auditor (renommé « Vérificateur de citations ») : seules les règles déclenchées (warn, fail) sont auditées. Un pass ou un not_verified n'a ni recherche ni citation (citations = []). Une citation nomme le principe dont la règle s'inspire ; pour 31-103, 31-103CP et 31-368, le motif dit que ces textes décrivent des obligations des personnes inscrites que l'outil n'exerce pas. Les recherches passent de 13-14 à environ 5 par run."
+        - "module-verifier : motifs interdits élargis aux affirmations de conformité ou de convenance, en anglais et en français (compliant, complies with, is/are (not) suitable, suits you, compatible with the retained profile, passes, fits the profile, in line with {KB-nn}, conforme, vous convient, correspond au profil, conformément à {KB-nn}, etc.). Une phrase où l'outil dit qu'il ne juge pas (« does not assess », « ne se prononce pas ») est conservée. Un motif de verdict traduit qui contient un de ces motifs est remplacé par sa phrase anglaise."
+        - "schema-explanation-check : champs facultatifs reasonCode et scenario (l'interface affiche un libellé par motif)."
+        - "schema-run : champ facultatif rulesVersion (2 = règles du lot A). Un run sans ce champ date d'avant : l'interface ignore ses citations de règles pass/not_verified et le signale."
+        - "module-rules renommé « Règles R1-R10 » (sans le mot « convenance »)."
+      impacts_to_handle:
+        - "frontend : libellé par motif (reasonCode) au lieu de Conforme/PASS/WARN/FAIL, badge neutre pour une règle non déclenchée, bloc de citation « Principe dont s'inspire cette règle », ignorer les citations d'un run sans rulesVersion (lot frontend, après le rafraîchissement visuel). Le front actuel continue de fonctionner : aucun champ retiré."
     - version: "0.4.3"
       date: "2026-11-15"
       status: "demandé par l'utilisateur le 2026-11-15 (déjà déployé) ; à relire par l'équipe"
@@ -550,6 +562,8 @@ data_schemas:
   - id: "schema-explanation-check"
     fields:
       - { name: "agentId", type: "string", required: true }
+      - { name: "reasonCode", type: "string", description: "motif calculé par module-rules (ex. MAX_LOSS_EXCEEDED) : le front en tire le libellé affiché (0.4.4)" }
+      - { name: "scenario", type: "integer", description: "0, 1 ou 2 si la règle porte sur un scénario ; absent pour R4, R5, R9, R10 (0.4.4)" }
       - { name: "rule", type: "string", required: true, description: "ex. risk_fit, diversification, simulation_only, missing_info, ou R1..R10 (module-rules)" }
       - { name: "status", type: "string", enum: ["pass", "warn", "fail", "not_verified"], required: true }
       - { name: "message", type: "string", required: true }
@@ -730,7 +744,7 @@ data_schemas:
       - { name: "status", type: "string", enum: ["pass", "warn", "fail", "not_verified"], required: true }
       - { name: "reasonCode", type: "string", required: true, description: "ex. MAX_LOSS_EXCEEDED, CONCENTRATION_HIGH" }
       - { name: "evidence", type: "array", items_type: "string", description: "EV-nn" }
-      - { name: "citations", type: "array", items_type: "string", description: "KB-nn, rempli par agent-auditor" }
+      - { name: "citations", type: "array", items_type: "string", description: "KB-nn, rempli par agent-auditor pour les statuts warn et fail seulement (0.4.4) : toujours vide pour pass et not_verified" }
       - { name: "threshold", type: "object", description: "{ value, nature: text | team_assumption }" }
       - { name: "messageEn", type: "string", description: "une phrase, formulée par agent-auditor (anglais)" }
       - { name: "message", type: "string", description: "messageEn traduit dans userLanguage par agent-orchestrator" }
@@ -756,6 +770,7 @@ data_schemas:
       - { name: "sessionId", type: "string", required: true }
       - { name: "mandateVersion", type: "integer", required: true }
       - { name: "status", type: "string", enum: ["partial", "done", "error"], required: true }
+      - { name: "rulesVersion", type: "integer", description: "2 = vocabulaire et citations du lot A (0.4.4) ; absent = run produit par une version précédente (citations possibles sur des règles pass)" }
       - { name: "datasetVersion", type: "string", required: true }
       - { name: "userLanguage", type: "string", required: true }
       - { name: "scenarios", type: "array", items_ref: "schema-scenario", required: true }
@@ -918,11 +933,11 @@ agents:
     owner_agent: "Agent-Backend-Agents"
 
   - id: "agent-auditor"
-    name: "Auditeur de convenance"
+    name: "Vérificateur de citations"
     status: "retenu"
     replaces: "agent-governance"
     system_prompt_language: "en"
-    role: "Travaille en anglais (requêtes KB et motifs en anglais). Ne décide pas des verdicts (module-rules le fait). Ne lance pas lui-même les recherches : le code cherche dans la Knowledge Base, une recherche par sujet de chaque règle (filtre juridiction ∈ {CA, province}), et lui donne les passages. Pour chaque verdict, il désigne ceux qui fondent la règle (ou aucun), le code les inscrit au registre (KB-nn), et il formule le motif en une phrase (un pass garde sa phrase par défaut). Les verdicts sans objet (R7 sans cryptoactif, R8 sans préférence ESG) et R10 (aucun sujet) ne déclenchent aucune recherche : motif par défaut, sans citation."
+    role: "Travaille en anglais (requêtes KB et motifs en anglais). Ne décide pas des verdicts (module-rules le fait). Ne lance pas lui-même les recherches : le code cherche dans la Knowledge Base, une recherche par sujet de chaque règle (filtre juridiction ∈ {CA, province}), et lui donne les passages. Seules les règles déclenchées (warn, fail) sont auditées (0.4.4) : un pass ou un not_verified n'a ni recherche ni citation. Pour chaque verdict déclenché, il désigne les passages qui énoncent le principe dont la règle s'inspire (ou aucun), le code les inscrit au registre (KB-nn), et il formule le motif en une phrase. Les verdicts sans objet (R7 sans cryptoactif, R8 sans préférence ESG) et R10 (aucun sujet) ne déclenchent aucune recherche : motif par défaut, sans citation."
     runs_in: "srv-agent-runtime"
     model: "Claude Sonnet 5.5 via Bedrock, région us-east-1 (profil d'inférence global.anthropic.claude-sonnet-5-5, testé par l'équipe; lu dans la config)"
     max_tokens: 4096
@@ -973,16 +988,16 @@ modules:
     owner_agent: "Agent-Backend-Agents"
 
   - id: "module-rules"
-    name: "Règles de convenance R1-R10"
+    name: "Règles R1-R10"
     runs_in: "srv-agent-runtime"
-    role: "Applique R1 à R10 (voir rules_catalog) au mandat et aux scénarios; produit les verdicts sans citation. Seuils d'hypothèse dans un fichier de configuration."
+    role: "Applique R1 à R10 (voir rules_catalog) au mandat et aux scénarios; produit les verdicts sans citation, avec un motif par défaut qui décrit la règle sans approuver ni juger la convenance (0.4.4). Seuils d'hypothèse dans un fichier de configuration."
     uses_tools: ["tool-check-rules"]
     owner_agent: "Agent-Backend-Agents"
 
   - id: "module-verifier"
     name: "Vérificateur"
     runs_in: "srv-agent-runtime"
-    role: "Contrôle chaque phrase du texte final affiché (text, dans userLanguage) : mêmes emplacements que textEn, emplacements EV/KB existants, aucun chiffre écrit à la main hors constantes du mandat, aucune formule de recommandation ou de promesse. Une phrase fautive est masquée et signalée; pas de nouvelle tentative bloquante."
+    role: "Contrôle chaque phrase du texte final affiché (text, dans userLanguage) : mêmes emplacements que textEn, emplacements EV/KB existants, aucun chiffre écrit à la main hors constantes du mandat, aucune formule de recommandation, de promesse ou de jugement de conformité/convenance (0.4.4). Une phrase fautive est masquée et signalée; pas de nouvelle tentative bloquante."
     owner_agent: "Agent-Backend-Agents"
 
 # ==========================================
