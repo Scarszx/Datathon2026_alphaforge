@@ -14,3 +14,17 @@ Signatures de WS0 inchangées. Points à valider avec l'équipe :
 10. **Nombres** : les `float` sont convertis en `Decimal` à l'écriture et relus en `int` ou `float` (une valeur entière comme `190.0` revient en `190`).
 11. **`delete_messages`** n'est pas atomique avec `delete_conversation` : supprimer les messages d'abord, puis la conversation.
 12. **Horodatage** : `YYYY-MM-DDTHH:MM:SSZ` (seconde près). Deux conversations touchées dans la même seconde ont un ordre arbitraire entre elles.
+
+## WS2b db v0.4 : table Analyses
+
+Signatures de WS0b inchangées. Points à valider avec l'équipe :
+
+13. **Attributs hors liste du contrat.** `schema-run` contient `userLanguage` et `explanation`, absents de la liste `attributes` de db-analyses. Le repository stocke tous les champs reçus (DynamoDB sans schéma) : la liste du contrat est à compléter.
+14. **Version de mandat par session.** La version est calculée sur toute la partition `sessionId` (clé partagée), pas par utilisateur. La propriété de la conversation doit être vérifiée par l'appelant (`conversations.get_conversation`) avant `put_mandate` / `put_run`.
+15. **Concurrence de `put_mandate`.** Écriture conditionnelle `attribute_not_exists(itemKey)`, puis relecture et réessai, au plus `MAX_VERSION_ATTEMPTS = 5` fois. Au-delà : `ApiError("INTERNAL")`. Les champs `sessionId`, `version`, `userId`, `type`, `itemKey` fournis par l'appelant sont ignorés. `confirmedAt` vaut `now_iso()` s'il est absent.
+16. **`put_run` sur un runId existant** lève `ApiError("INTERNAL")` (le runId est un ULID serveur, un doublon est un bug). `createdAt` vaut `now_iso()` s'il est absent.
+17. **`update_run`** refuse (`ValueError`) de modifier `sessionId`, `itemKey`, `userId`, `type`, `runId`. Condition `attribute_exists(itemKey) AND userId = :uid` : run absent ou étranger → `RUN_NOT_FOUND`, aucun item fantôme. `fields` vide : renvoie le run tel quel.
+18. **Objets renvoyés** : `userId`, `type`, `itemKey` ne sont jamais renvoyés. Les nombres suivent la règle 10.
+19. **`delete_analyses`** supprime par `batch_writer` les seuls items de `user_id` ; à appeler avec `delete_messages`, avant `delete_conversation`.
+20. **Limite de 400 Ko** non gérée : si un run l'approche, déplacer `evidence` dans S3 (note du contrat).
+21. **WS1b** : table `Analyses`, `sessionId` (S) HASH, `itemKey` (S) RANGE, sans index, à la demande. Le conftest partagé ne crée pas cette table : `test_repo_analyses.py` la crée dans sa propre fixture.
