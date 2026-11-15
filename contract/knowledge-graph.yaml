@@ -2,14 +2,14 @@ application:
   name: "AlphaForge"
   version: "0.4.1"
   description: "Banc d'essai agentique et auto-explicatif pour l'investisseur autonome : il cadre l'intention, simule son impact sur le portefeuille et l'audite contre les textes réglementaires canadiens (simulation seulement). Datathon 2026."
-  status: "0.4.0 validé par l'équipe (2026-11-14) ; 0.4.1 proposé, à valider par l'équipe"
+  status: "validé par l'équipe (0.4.0 le 2026-11-14, 0.4.1 le 2026-11-15)"
   solution_ref: "SOLUTION.md (racine du dépôt) : décisions de produit et de conception détaillées"
   # Règle d'équipe : ce fichier est la référence. Toute modification passe par un accord de l'équipe.
   # Voir aussi : la page de présentation du contrat (même contenu, avec schémas).
   changelog:
     - version: "0.4.1"
       date: "2026-11-14"
-      status: "proposition, à valider par l'équipe avant fusion dans main"
+      status: "validé par l'équipe (2026-11-15)"
       summary:
         - "schema-mandate.warnings passe de chaînes à { code, message, params? } (schema-mandate-warning) : le front traduit selon le code ; message reste en anglais (language_policy). Codes : HORIZON_EXCEEDS_PROJECT, HORIZON_LONG_FOR_PROJECT, SHORT_HORIZON_GROWTH, PRESERVATION_VS_HIGH_RISK, RETIREMENT_SHORT_HORIZON_HIGH_RISK, LOSS_EXCEEDS_DEFAULT."
         - "observability : la règle « jamais le texte des questions ou des réponses » vise les journaux CloudWatch de l'application. Langfuse est un outil de développement (les utilisateurs ne le consultent pas) : il peut contenir le texte des échanges et ne reçoit que des données fictives."
