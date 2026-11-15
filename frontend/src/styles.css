@@ -585,6 +585,10 @@ fieldset.q.missing legend { color: var(--loss-ink); }
 @media (prefers-reduced-motion: reduce) { .af-mic.listening::after { animation: none; } }
 .af-mic-note { font-size: 12px; margin: 6px 20px 0; }
 .af-mic-note.err { color: #b42318; }
+.af-refusal { display: flex; gap: 10px; align-items: flex-start; margin: 8px 20px 0; padding: 10px 12px; border: 1px solid #E9C98A; background: #FFF6E3; color: #5C4310; border-radius: 12px; font-size: 13px; }
+.af-refusal-icon { font-size: 16px; line-height: 1.3; }
+.af-refusal strong { display: block; font-size: 13px; }
+.af-refusal p { margin: 2px 0 0; }
 /* Texte provisoire de la dictée : dans le champ, en gris italique tant que Transcribe n'a pas validé la phrase. */
 .af-composer-live input { color: var(--faint); font-style: italic; }
 .af-disclaimer { font-size: 11px; color: var(--faint); text-align: center; margin-top: 10px; }

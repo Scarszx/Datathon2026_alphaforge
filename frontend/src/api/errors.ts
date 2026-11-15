@@ -41,7 +41,7 @@ export function errorText(e: unknown): string {
   if (e instanceof ApiError) {
     const labels = inLang("fr", "en") === "en" ? LABELS_EN : LABELS;
     const base = e.message || labels[e.code] || inLang("Une erreur est survenue.", "Something went wrong.");
-    return e.requestId ? `${base} (${inLang("réf.", "ref.")} ${e.requestId})` : base;
+    return e.requestId && e.code !== "GUARDRAIL_BLOCKED" ? `${base} (${inLang("réf.", "ref.")} ${e.requestId})` : base;
   }
   return inLang("Une erreur est survenue.", "Something went wrong.");
 }
