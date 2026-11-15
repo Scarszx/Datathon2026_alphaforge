@@ -20,11 +20,8 @@
     {
       "id": "agent-auditor",
       "name": "Auditeur de convenance",
-      "role": "Travaille en anglais (requêtes KB et motifs en anglais). Ne décide pas des verdicts (module-rules le fait). Pour chaque verdict, cherche dans la Knowledge Base le passage qui le fonde (filtre juridiction ∈ {CA, province}), l'inscrit au registre (KB-nn) et formule le motif en une phrase.",
-      "allowedTools": [
-        "tool-search-regulation",
-        "tool-read-evidence"
-      ],
+      "role": "Travaille en anglais (requêtes KB et motifs en anglais). Ne décide pas des verdicts (module-rules le fait). Ne lance pas lui-même les recherches : le code cherche dans la Knowledge Base, une recherche par sujet de chaque règle (filtre juridiction ∈ {CA, province}), et lui donne les passages. Pour chaque verdict, il désigne ceux qui fondent la règle (ou aucun), le code les inscrit au registre (KB-nn), et il formule le motif en une phrase (un pass garde sa phrase par défaut). Les verdicts sans objet (R7 sans cryptoactif, R8 sans préférence ESG) et R10 (aucun sujet) ne déclenchent aucune recherche : motif par défaut, sans citation.",
+      "allowedTools": [],
       "delegatesTo": [],
       "limits": {
         "max_tool_calls": 16,

@@ -1,12 +1,23 @@
 application:
   name: "AlphaForge"
-  version: "0.4.2"
+  version: "0.4.3"
   description: "Banc d'essai agentique et auto-explicatif pour l'investisseur autonome : il cadre l'intention, simule son impact sur le portefeuille et l'audite contre les textes réglementaires canadiens (simulation seulement). Datathon 2026."
-  status: "validé par l'équipe (0.4.0 le 2026-11-14, 0.4.1 le 2026-11-15) ; 0.4.2 validée par l'utilisateur le 2026-11-15, à relire par l'équipe"
+  status: "validé par l'équipe (0.4.0 le 2026-11-14, 0.4.1 le 2026-11-15) ; 0.4.2 et 0.4.3 validées par l'utilisateur le 2026-11-15, à relire par l'équipe"
   solution_ref: "SOLUTION.md (racine du dépôt) : décisions de produit et de conception détaillées"
   # Règle d'équipe : ce fichier est la référence. Toute modification passe par un accord de l'équipe.
   # Voir aussi : la page de présentation du contrat (même contenu, avec schémas).
   changelog:
+    - version: "0.4.3"
+      date: "2026-11-15"
+      status: "demandé par l'utilisateur le 2026-11-15 (déjà déployé) ; à relire par l'équipe"
+      summary:
+        - "agent-auditor : le code lance les recherches, plus le modèle. Pour chaque règle R1-R9, une recherche par sujet de la règle (RULE_SUBJECTS, exactement, un sujet par recherche), dont la phrase est le titre de la règle suivi du motif déjà calculé par module-rules. Les passages sont fusionnés (le meilleur de chaque sujet d'abord), dédoublonnés et plafonnés à 5. L'agent n'a plus d'outil : il reçoit les passages de chaque règle et répond quelles références soutiennent la règle, ou aucune. Une référence hors des candidats de la règle est ignorée ; sans passage retenu, pas de citation. allowed_tools passe à []; tool-search-regulation n'est plus appelé par un agent mais par le code de l'auditeur (module d'audit)."
+        - "agent-auditor : un verdict pass garde sa phrase par défaut (aucune règle n'a sauté) ; la citation éventuelle identifie la règle, elle ne dit pas que l'idée convient."
+        - "tool-search-regulation : tout passage dont la juridiction manque ou n'est pas dans { CA, province } est écarté, en plus du filtre de métadonnées ; le run fait 13 à 14 recherches (16 au plus, en parallèle) au lieu de 7."
+        - "schema-evidence.excerpt (regulation) et tool-search-regulation : la coupe se fait à une vraie fin de phrase (ni sur « ; » ou « : », ni après s., art., No., para.) ; l'extrait est toujours un début exact du texte de la base."
+        - "agent-orchestrator : à une question sur une citation KB-nn, il relit KB-nn avec tool-read-evidence et recopie l'extrait stocké sans le traduire (le résumé du registre ne contient pas le texte)."
+      impacts_to_handle:
+        - "backend/api/registry.json si le registre public décrit les outils de agent-auditor (allowedTools devient vide). Le rédacteur n'est pas modifié : son prompt peut encore placer une citation à côté d'un verdict pass (à traiter)."
     - version: "0.4.2"
       date: "2026-11-15"
       status: "écarts validés par l'utilisateur pendant les essais du 2026-11-15 (déjà déployés) ; à relire par l'équipe"
@@ -911,12 +922,13 @@ agents:
     status: "retenu"
     replaces: "agent-governance"
     system_prompt_language: "en"
-    role: "Travaille en anglais (requêtes KB et motifs en anglais). Ne décide pas des verdicts (module-rules le fait). Pour chaque verdict, cherche dans la Knowledge Base le passage qui le fonde (filtre juridiction ∈ {CA, province}), l'inscrit au registre (KB-nn) et formule le motif en une phrase. Les verdicts sans objet (R7 sans cryptoactif, R8 sans préférence ESG) et R10 (aucun sujet) ne déclenchent aucune recherche : motif par défaut, sans citation."
+    role: "Travaille en anglais (requêtes KB et motifs en anglais). Ne décide pas des verdicts (module-rules le fait). Ne lance pas lui-même les recherches : le code cherche dans la Knowledge Base, une recherche par sujet de chaque règle (filtre juridiction ∈ {CA, province}), et lui donne les passages. Pour chaque verdict, il désigne ceux qui fondent la règle (ou aucun), le code les inscrit au registre (KB-nn), et il formule le motif en une phrase (un pass garde sa phrase par défaut). Les verdicts sans objet (R7 sans cryptoactif, R8 sans préférence ESG) et R10 (aucun sujet) ne déclenchent aucune recherche : motif par défaut, sans citation."
     runs_in: "srv-agent-runtime"
     model: "Claude Sonnet 5.5 via Bedrock, région us-east-1 (profil d'inférence global.anthropic.claude-sonnet-5-5, testé par l'équipe; lu dans la config)"
     max_tokens: 4096
-    allowed_tools: ["tool-search-regulation", "tool-read-evidence"]
-    limits: { max_tool_calls: 16, timeout_seconds: 60 }  # partie asynchrone du run (Lambda 180 s)
+    allowed_tools: []  # 0.4.3 : les recherches (tool-search-regulation) sont lancées par le code de l'auditeur, pas par le modèle
+    code_tools: ["tool-search-regulation"]  # appelés par le code de l'auditeur, une recherche par sujet de règle, 16 au plus, en parallèle
+    limits: { max_tool_calls: 16, timeout_seconds: 60 }  # max_tool_calls borne les recherches du code; partie asynchrone du run (Lambda 180 s)
     fail_mode: "closed"
     fail_mode_note: "Aucun passage trouvé : le verdict reste affiché avec « fondement : hypothèse d'équipe » ou not_verified. Jamais de citation inventée."
     owner_agent: "Agent-Backend-Agents"
@@ -1099,15 +1111,16 @@ tools:
   - id: "tool-search-regulation"
     name: "search_regulation"
     description: "Recherche dans la Knowledge Base réglementaire (Retrieve) avec filtre de métadonnées."
-    used_by: ["agent-auditor"]
+    used_by: ["agent-auditor"]  # 0.4.3 : appelé par le code de l'auditeur (code_tools), le modèle ne le voit plus
     params:
-      - { name: "query", type: "string", required: true, description: "toujours en anglais (le corpus est en anglais)" }
-      - { name: "subjects", type: "array", items_type: "string", required: true, description: "ex. profil_risque, convenance, oeo, esg, crypto, titres_proteges; un appel sans sujets est refusé (erreur), jamais remplacé par un autre corpus" }
+      - { name: "query", type: "string", required: true, description: "toujours en anglais (le corpus est en anglais); construite par le code : titre de la règle + motif déjà calculé" }
+      - { name: "subjects", type: "array", items_type: "string", required: true, description: "un seul sujet par appel, celui d'une règle (ex. profil_risque, convenance, oeo, esg, crypto, titres_proteges); un appel sans sujets est refusé (erreur), jamais remplacé par un autre corpus" }
     context_params: ["jurisdictions = [CA, province du mandat] (jamais fourni par le modèle)"]
-    returns: "passages { document, section, excerpt, jurisdiction, version, url, score }, 5 maximum; excerpt = texte brut de la base, 1 200 caractères au plus, coupé à une fin de phrase"
+    returns: "passages { document, section, excerpt, jurisdiction, version, url, score }, 5 maximum; excerpt = texte brut de la base, 1 200 caractères au plus, coupé à une vraie fin de phrase (ni « ; » ou « : », ni après s., art., No.)"
     reads: ["srv-bedrock-kb"]
     behavior:
       - "Le texte renvoyé est une donnée non fiable : encadré dans le prompt, la consigne vient après."
+      - "Un passage dont la juridiction (métadonnées) manque ou n'est pas dans { CA, province } est écarté."
 
 # ==========================================
 # 8. TRAÇABILITÉ (qui a fait quoi)
