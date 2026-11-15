@@ -39,11 +39,13 @@ Les instructions d'installation, de reproduction et de démarrage seront complé
 
 ## Front (SPA) — lancer sur votre ordinateur
 
-Front du contrat d'API AlphaForge v0.3.0 (simulation seulement : aucune transaction réelle, aucun conseil financier).
+Front du contrat d'API AlphaForge v0.4.0 (simulation seulement : aucune transaction réelle, aucun conseil financier).
+Le front vit dans `frontend/` (chantier WS6) : tout le front est à la racine de ce dossier.
 
 Prérequis : [Node.js](https://nodejs.org) 18 ou plus récent.
 
 ```bash
+cd frontend
 npm install          # installe les dépendances (dossier node_modules, non inclus dans le zip)
 npm run dev:demo     # mode démo : tout fonctionne sans Cognito ni API
 ```
@@ -57,7 +59,7 @@ Ouvrez ensuite **http://localhost:5173** dans votre navigateur.
 
 | Commande | Mode | Ce qu'il faut |
 |---|---|---|
-| `npm run dev:demo` | **Démo** : connexion, inscription, portefeuille, profil et assistant simulés dans le navigateur (`src/api/demo.ts`). Prix fictifs. | Rien |
+| `npm run dev:demo` | **Démo** : connexion, inscription, portefeuille, profil et assistant simulés dans le navigateur (`frontend/src/api/demo.ts`). Prix fictifs. | Rien |
 | `npm run dev` | **Réel** : Cognito pour la connexion, API AlphaForge pour les données | Un fichier `.env` (voir plus bas) |
 
 En mode démo, les données (comptes, portefeuilles, conversations) sont gardées dans le `localStorage` du navigateur.
@@ -89,7 +91,7 @@ Pour une version de production en mode démo : `npx vite build --mode demo`.
 | `/login` | Connexion | Non |
 | `/inscription` | Création de compte + **questionnaire d'inscription** | Non |
 | `/portefeuille` | Résumé du portefeuille, édition des positions, autocomplétion de ticker | Oui |
-| `/marches` | Taux, devises et actions sur titres (fichiers de `public/data/`) | Oui |
+| `/marches` | Taux, devises et actifs (via l'API : `/market/search`, `/portfolios/{id}/summary`) | Oui |
 | `/profil` | Profil investisseur + réponses au questionnaire d'inscription, consultables et modifiables | Oui |
 
 L'assistant (bouton flottant) est présent sur toutes les pages connectées.
@@ -139,21 +141,22 @@ Après l'inscription :
 ## Organisation du front
 
 ```
-src/api/types.ts          types des schémas du contrat
-src/api/auth.ts           Cognito : connexion, inscription, code de confirmation (jetons en sessionStorage)
-src/api/client.ts         fetch + Bearer + erreurs au format schema-error
-src/api/endpoints.ts      une fonction par route
-src/api/demo.ts           mode démo : simulation de Cognito et des routes /v1 (actif seulement si VITE_DEMO=1)
-src/lib/store.tsx         session (utilisateur courant)
-src/lib/risk.ts           questionnaire d'inscription, score, calcul, stockage par portefeuille
-src/lib/publicProfile.ts  questionnaire public de l'accueil
-src/pages/                Landing (accueil), Login, Register, Portfolio, Markets, Profile
+frontend/src/api/types.ts          types des schémas du contrat
+frontend/src/api/auth.ts           Cognito : connexion, inscription, code de confirmation (jetons en sessionStorage)
+frontend/src/api/client.ts         fetch + Bearer + erreurs au format schema-error
+frontend/src/api/endpoints.ts      une fonction par route
+frontend/src/api/demo.ts           mode démo : simulation de Cognito et des routes /v1 (actif seulement si VITE_DEMO=1)
+frontend/src/lib/store.tsx         session (utilisateur courant)
+frontend/src/lib/risk.ts           questionnaire d'inscription, score, calcul, stockage par portefeuille
+frontend/src/lib/publicProfile.ts  questionnaire public de l'accueil
+frontend/src/pages/                Landing (accueil), Login, Register, Chat, Portfolio, Markets, Profile
 ```
 
 ## Autres dossiers
 
-- `backend/alphaforge/` : serveur Python AlphaForge du prototype (`backend/local_server.py`, voir l'en-tête du fichier). Le front ne s'y branche pas
-  encore : le mode démo ne l'utilise pas, et le mode réel attend Cognito.
-- `data/` : construction du jeu de données (`data/build_dataset.py`), qui copie aussi des fichiers dans `public/data/`.
+- `backend/alphaforge/` : serveur Python de démonstration du prototype. Doublon de `backend/agents/` (WS5) ;
+  décision d'équipe : à retirer. Le front ne s'y branche pas.
+- `data/` : l'ingestion officielle est dans `data/ingestion/` (WS3). `data/build_dataset.py` est un doublon à retirer
+  (décision d'équipe). Aucun CSV de prix n'est commité (conditions d'utilisation de Yahoo).
 - `portefeuille-prototype/` : le prototype d'origine, extrait de `portefeuille-prototype.zip`. Pour le lancer :
   `cd portefeuille-prototype && npm install && npm run dev`.
