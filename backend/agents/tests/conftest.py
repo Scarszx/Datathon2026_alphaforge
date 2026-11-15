@@ -159,7 +159,7 @@ def robert_session(aws, store):
     conversation = conversations.create_conversation(USER, "Condo")
     portfolios.ensure_main_portfolio(USER)
     portfolios.replace_holdings(USER, "main", robert_holdings(store))
-    mandate = robert_mandate()
+    mandate = robert_mandate(compareCategory="short-term-bonds")  # comparaison demandée : scénarios 0, 1 et 2
     analyses.put_mandate(conversation["sessionId"], USER, {
         "mandate": mandate, **evaluate_mandate(mandate), "changedFields": [], "confirmedAt": "2026-11-15T14:02:00Z",
     })

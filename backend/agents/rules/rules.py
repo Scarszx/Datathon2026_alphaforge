@@ -206,26 +206,39 @@ def r8(store, mandate_item: dict[str, Any], scenario: ScenarioAnalysis) -> dict[
                     "Some holdings have no published ESG methodology: for equities only the sector is known and controversies are not verified.")
 
 
+def visible_texts(result: EngineResult) -> list[str]:
+    """Texte lisible sans clic : libellés, descriptions et notes des scénarios, libellés de preuve (R5, lot B)."""
+    texts: list[str] = []
+    for scenario in result.scenarios:
+        texts += [scenario.label, scenario.description or "", scenario.proxy_note or ""] + list(scenario.notes)
+    texts += [str(item.get("label", "")) for item in result.registry.items]
+    return texts
+
+
 def run_level_rules(result: EngineResult, scenario_verdicts: list[dict[str, Any]], mandate_item: dict[str, Any],
                     universe_tickers: set[str]) -> list[dict[str, Any]]:
     verdicts = []
-    # R4 : une alternative dès qu'un scénario de l'idée est en WARN ou FAIL.
-    idea_status = max((ORDER[v["status"]] for v in scenario_verdicts if v.get("scenario") == 1), default=0)
-    has_alternative = any(s.index == 2 for s in result.scenarios)
-    if idea_status == 0:
-        verdicts.append(_verdict("R4", None, "pass", "ALTERNATIVE_NOT_REQUIRED", "The idea raises no warning: no alternative is required."))
-    elif has_alternative:
-        verdicts.append(_verdict("R4", None, "pass", "ALTERNATIVE_PRESENTED", "A comparison by asset category is shown as an additional scenario."))
+    mandate = mandate_item["mandate"]
+    # R4 : la comparaison par catégorie n'existe que sur demande de l'utilisateur ; la règle ne peut plus échouer.
+    has_comparison = any(s.index == 2 for s in result.scenarios)
+    if not mandate.get("compareCategory"):
+        verdicts.append(_verdict("R4", None, "pass", "COMPARISON_NOT_REQUESTED", "No comparison by asset category was requested."))
+    elif has_comparison:
+        verdicts.append(_verdict("R4", None, "pass", "COMPARISON_SHOWN", "A comparison by asset category is shown as an additional scenario."))
     else:
-        verdicts.append(_verdict("R4", None, "fail", "ALTERNATIVE_MISSING", "The idea raises a warning but no compatible alternative category was found in the dataset."))
+        verdicts.append(_verdict("R4", None, "not_verified", "COMPARISON_UNAVAILABLE",
+                                 "The requested comparison could not be built from the dataset."))
 
-    # R5 : l'alternative ne nomme aucun titre (description et libellé).
-    texts = " ".join(filter(None, [s.description for s in result.scenarios if s.index == 2] + [s.label for s in result.scenarios]))
-    named = sorted(t for t in universe_tickers if t and _contains_ticker(texts, t))
+    # R5 : aucun symbole de titre dans le texte visible sans clic, sauf ceux que l'utilisateur a écrits ou détient.
+    own = set(result.scenarios[0].positions_cad) | {op["ticker"] for op in mandate.get("operations") or []}
+    own |= {mandate["subjectTicker"]} if mandate.get("subjectTicker") else set()
+    texts = " ".join(visible_texts(result))
+    named = sorted(t for t in universe_tickers if t and t not in own and _contains_ticker(texts, t))
     if named:
-        verdicts.append(_verdict("R5", None, "fail", "SECURITY_NAMED", "The alternative names a specific security."))
+        verdicts.append(_verdict("R5", None, "fail", "SECURITY_NAMED", "A security symbol appears in the visible scenario texts."))
     else:
-        verdicts.append(_verdict("R5", None, "pass", "NO_SECURITY_RECOMMENDED", "The comparison texts name no security: the rule was not triggered."))
+        verdicts.append(_verdict("R5", None, "pass", "NO_SECURITY_RECOMMENDED",
+                                 "No security symbol appears in the visible scenario texts: the rule was not triggered."))
 
     # R9 : mentions de la province (texte dans jurisdictionNotices).
     verdicts.append(_verdict("R9", None, "pass", "PROVINCE_NOTICES_ADDED",

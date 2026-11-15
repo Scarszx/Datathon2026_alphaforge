@@ -25,7 +25,7 @@ pytestmark = pytest.mark.skipif(not STARTER, reason="ALPHAFORGE_STARTER_DIR non 
 def test_robert_nvda_sur_le_jeu_de_depart(tmp_path, capsys):
     convert(Path(STARTER), tmp_path)
     store = DataStore(str(tmp_path), "starter")
-    mandate = robert_mandate()
+    mandate = robert_mandate(compareCategory="short-term-bonds")
     item = {"mandate": mandate, **evaluate_mandate(mandate)}
     result = run_engine(store, item, {"holdings": robert_holdings(store), "baseCurrency": "CAD"}, EvidenceRegistry("en"))
     verdicts = rules.check_rules(store, item, result)
