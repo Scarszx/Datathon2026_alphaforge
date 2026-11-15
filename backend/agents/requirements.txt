@@ -1,0 +1,6 @@
+# Lambda agents (srv-agent-runtime). pandas, pyarrow et numpy viennent de la
+# couche AWS SDK for pandas (retirés du zip par infra/scripts/build_lambdas.sh) :
+# installe-les en local pour les tests (pip install pandas pyarrow).
+strands-agents==1.65.0
+boto3>=1.40
+python-ulid>=4
