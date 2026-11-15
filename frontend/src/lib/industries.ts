@@ -1,8 +1,9 @@
 /*
  * Industries d'intérêt (choix multiple) à l'inscription et dans le profil.
  * Regroupe les industries Yahoo Finance du jeu de données en catégories plus larges.
+ * Deux listes : ce que le client aime et ce qu'il préfère éviter (une industrie ne peut pas être dans les deux).
  * Stockage : dans `preferences` du profil investisseur (liste de textes du contrat), sous la forme
- * « Industrie : <libellé> », sans nouveau champ de contrat.
+ * « Industrie : <libellé> » ou « Industrie à éviter : <libellé> », sans nouveau champ de contrat.
  */
 export const INDUSTRIES: { label: string; covers: string }[] = [
   { label: "Semi-conducteurs et équipements", covers: "Semiconductors, Semiconductor Equipment & Materials" },
@@ -27,16 +28,24 @@ export const INDUSTRIES: { label: string; covers: string }[] = [
   { label: "Voyages et services de voyage", covers: "Travel Services" },
   { label: "Conglomérats", covers: "Conglomerates" },
 ];
-const PREFIX = "Industrie : ";
-/** Industries cochées → entrées de `preferences`. */
-export const industryPrefs = (labels: string[]) => labels.map((l) => PREFIX + l);
-/** Sépare `preferences` en industries (libellés connus) et autres préférences. */
-export function splitPreferences(prefs: string[] = []): { industries: string[]; others: string[] } {
+const LIKED = "Industrie : ";
+const AVOIDED = "Industrie à éviter : ";
+export type IndustryChoice = { liked: string[]; avoided: string[] };
+export const EMPTY_INDUSTRIES: IndustryChoice = { liked: [], avoided: [] };
+/** Industries choisies → entrées de `preferences` (« Industrie : X », « Industrie à éviter : X »). */
+export const industryPrefs = ({ liked, avoided }: IndustryChoice) => [
+  ...liked.map((l) => LIKED + l),
+  ...avoided.map((l) => AVOIDED + l),
+];
+/** Sépare `preferences` en industries aimées, industries à éviter (libellés connus) et autres préférences. */
+export function splitPreferences(prefs: string[] = []): IndustryChoice & { others: string[] } {
   const known = new Set(INDUSTRIES.map((i) => i.label));
-  const industries: string[] = [], others: string[] = [];
+  const liked: string[] = [], avoided: string[] = [], others: string[] = [];
   for (const p of prefs) {
-    const l = p.startsWith(PREFIX) ? p.slice(PREFIX.length) : null;
-    if (l !== null && known.has(l)) industries.push(l); else others.push(p);
+    // AVOIDED d'abord : « Industrie à éviter : » commence aussi par « Industrie ».
+    if (p.startsWith(AVOIDED) && known.has(p.slice(AVOIDED.length))) avoided.push(p.slice(AVOIDED.length));
+    else if (p.startsWith(LIKED) && known.has(p.slice(LIKED.length))) liked.push(p.slice(LIKED.length));
+    else others.push(p);
   }
-  return { industries, others };
+  return { liked, avoided, others };
 }

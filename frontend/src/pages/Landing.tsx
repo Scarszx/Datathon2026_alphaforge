@@ -1,8 +1,12 @@
-/* Page d'accueil (présentation de l'outil). v0.4.6 : le questionnaire public et la carte
- * « Votre profil préliminaire » sont retirés (une seule échelle de risque, une seule entrée :
- * le questionnaire de l'inscription). Aucun symbole de titre dans les textes. */
+/* Page d'accueil (présentation de l'outil). Deux boutons « Créer un compte » (en-tête et haut de page) et un
+ * questionnaire personnel sans compte (modèle du portefeuille-prototype). Ce questionnaire reprend les cinq
+ * questions de l'inscription : une seule échelle de risque (contrat 0.4.6). Aucun symbole de titre dans les textes. */
+import { useState } from "react";
 import { Link, Navigate } from "react-router-dom";
+import PersonalQuestionnaire from "../components/PersonalQuestionnaire";
 import PublicHeader from "../components/PublicHeader";
+import { RiskResult } from "../components/RiskForm";
+import { loadPersonalAnswers, savePersonalAnswers } from "../lib/personalDraft";
 import { useApp } from "../lib/store";
 
 const FEATURES: [string, string][] = [
@@ -20,6 +24,8 @@ const STEPS: [string, string][] = [
 
 export default function Landing() {
   const { status } = useApp();
+  const [answers, setAnswers] = useState<Record<string, number> | null>(loadPersonalAnswers);
+  const [editing, setEditing] = useState(false);
   if (status === "authed") return <Navigate to="/portefeuille" replace />;
 
   return (
@@ -56,8 +62,29 @@ export default function Landing() {
             ))}
           </div>
           <div className="actions-row" style={{ marginTop: 28 }}>
-            <Link to="/inscription" className="btn">Créer un compte</Link>
+            <a href="#questionnaire" className="btn">Faire mon questionnaire personnel</a>
           </div>
+        </section>
+        <section id="questionnaire" className="landing-q">
+          <h2 className="section-title">Quel investisseur êtes-vous ?</h2>
+          <p className="muted" style={{ marginBottom: 24 }}>
+            Cinq questions, sans compte. Vos réponses restent dans cet onglet et sont reprises si vous créez un compte.
+          </p>
+          {answers && !editing ? (
+            <>
+              <RiskResult answers={answers} />
+              <div className="actions-row" style={{ marginTop: 24 }}>
+                <Link to="/inscription" className="btn">Créer un compte avec ce profil</Link>
+                <button type="button" className="link" onClick={() => setEditing(true)}>Modifier mes réponses</button>
+              </div>
+            </>
+          ) : (
+            <PersonalQuestionnaire
+              initial={answers ?? {}}
+              submitLabel="Voir mon profil"
+              onSubmit={(a) => { setAnswers(a); setEditing(false); savePersonalAnswers(a); }}
+            />
+          )}
         </section>
       </main>
       <footer className="footer"><div className="wrap">Outil éducatif. Aucune transaction réelle. Ne constitue pas un conseil financier.</div></footer>
