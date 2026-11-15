@@ -24,12 +24,16 @@ _NOT_FOUND_MESSAGE = "Conversation inconnue."
 
 def _to_conversation(item: dict[str, Any]) -> dict[str, Any]:
     """Item DynamoDB -> schema-conversation (userId n'est pas exposé)."""
-    return {
+    conversation = {
         "sessionId": item["sessionId"],
         "title": item.get("title"),
         "createdAt": item["createdAt"],
         "updatedAt": item["updatedAt"],
     }
+    # schema-conversation : userLanguage (défaut en, appliqué par le lecteur).
+    if item.get("userLanguage"):
+        conversation["userLanguage"] = item["userLanguage"]
+    return conversation
 
 
 def _raise_not_found(exc: ClientError) -> None:
@@ -126,6 +130,23 @@ def touch_conversation(user_id: str, session_id: str) -> None:
             UpdateExpression="SET updatedAt = :now",
             ConditionExpression="attribute_exists(sessionId)",
             ExpressionAttributeValues={":now": _dynamo.now_iso()},
+        )
+    except ClientError as exc:
+        _raise_not_found(exc)
+
+
+def set_user_language(user_id: str, session_id: str, user_language: str) -> None:
+    """Enregistre userLanguage (ISO 639-1, détecté par agent-orchestrator).
+
+    updatedAt n'est pas modifié (touch_conversation s'en charge).
+    Lève ApiError('CONVERSATION_NOT_FOUND') si absente ou non possédée.
+    """
+    try:
+        _dynamo.table(config.conversations_table()).update_item(
+            Key={"userId": user_id, "sessionId": session_id},
+            UpdateExpression="SET userLanguage = :lang",
+            ConditionExpression="attribute_exists(sessionId)",
+            ExpressionAttributeValues={":lang": user_language},
         )
     except ClientError as exc:
         _raise_not_found(exc)

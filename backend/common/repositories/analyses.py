@@ -235,6 +235,17 @@ def get_run(session_id: str, user_id: str, run_id: str) -> dict[str, Any] | None
     return _public(item) if item else None
 
 
+def get_latest_run(session_id: str, user_id: str) -> dict[str, Any] | None:
+    """Dernier run de la session appartenant à user_id (runId ULID : ordre chronologique), sinon None.
+
+    Sert à read_evidence (« registre du dernier run de la session », WS5).
+    """
+    for item in _query_all(session_id, RUN_PREFIX, newest_first=True):
+        if _owned(item, user_id):
+            return _public(item)
+    return None
+
+
 def delete_analyses(session_id: str, user_id: str) -> None:
     """Supprime tous les mandats et runs de la session (appelé à la suppression d'une conversation).
 

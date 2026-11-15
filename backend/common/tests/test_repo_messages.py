@@ -103,3 +103,25 @@ def test_delete_messages(dynamo):
 
 def test_delete_messages_session_vide(dynamo):
     messages.delete_messages("vide")
+
+
+def test_put_message_assistant_avec_champs_de_cadrage(dynamo):
+    draft = {"portfolioId": "main", "mode": "add_asset", "horizonYears": 3.5}
+    msg = messages.put_message(
+        "s1", "u1", "assistant", "Voici le mandat", "done",
+        quick_replies=["3 ans", "10 ans"], mandate_draft=draft, run_id="01RUN",
+    )
+    stored = messages.list_messages("s1")["items"][0]
+    for value in (msg, stored):
+        assert value["quickReplies"] == ["3 ans", "10 ans"]
+        assert value["mandateDraft"] == draft
+        assert value["runId"] == "01RUN"
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [{"quick_replies": ["a"]}, {"mandate_draft": {"mode": "diagnose"}}, {"run_id": "01RUN"}],
+)
+def test_champs_de_cadrage_refuses_pour_un_message_utilisateur(dynamo, kwargs):
+    with pytest.raises(ValueError):
+        messages.put_message("s1", "u1", "user", "x", "done", **kwargs)

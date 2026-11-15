@@ -129,3 +129,19 @@ def test_isolation_entre_utilisateurs(dynamo):
         assert err.value.code == "CONVERSATION_NOT_FOUND"
     assert conversations.get_conversation("u1", sid) == conv
     assert conversations.get_conversation("u2", sid) is None
+
+
+def test_set_user_language(dynamo):
+    conv = conversations.create_conversation("u1", "t")
+    assert "userLanguage" not in conv
+    conversations.set_user_language("u1", conv["sessionId"], "fr")
+    stored = conversations.get_conversation("u1", conv["sessionId"])
+    assert stored["userLanguage"] == "fr"
+    assert stored["updatedAt"] == conv["updatedAt"]
+
+
+def test_set_user_language_conversation_d_un_autre_utilisateur(dynamo):
+    conv = conversations.create_conversation("u1", "t")
+    with pytest.raises(ApiError) as exc:
+        conversations.set_user_language("u2", conv["sessionId"], "fr")
+    assert exc.value.code == "CONVERSATION_NOT_FOUND"

@@ -1,0 +1,350 @@
+"""Les 13 outils du contrat (section tools), en fonctions pures du contexte.
+
+Chaque outil valide ses paramètres et construit lui-même sa lecture
+(rule-tool-validation). Une erreur attendue est renvoyée comme
+{ "error": "<quoi corriger>" }, jamais levée vers le modèle. Aucune réponse ne
+dépasse les plafonds du contrat (20 actifs, 260 points, 5 passages KB) ni ne
+contient de lignes brutes (rule-no-raw-rows).
+"""
+
+from __future__ import annotations
+
+import difflib
+import json
+import re
+from datetime import date
+from typing import Any
+
+import pandas as pd
+
+from backend.agents.engine import analytics as an
+from backend.agents.engine.concentration import concentration as concentration_of
+from backend.agents.engine.scenarios import holding_values_cad, run_engine
+from backend.agents.engine.stress import PERIOD_IDS, derive_period
+from backend.agents.rules.rules import check_rules as run_rules
+from backend.agents.tools import kb
+from backend.agents.tools.context import RequestContext
+from backend.common.http import ApiError
+from backend.common.mandates import evaluate_mandate
+from backend.common.repositories import analyses as analyses_repo
+from backend.common.repositories import portfolios as portfolios_repo
+from backend.common.repositories import users as users_repo
+from backend.common.validation import validate_mandate_create
+
+MAX_ASSETS = 20
+MAX_POINTS = 260
+MAX_METRIC_TICKERS = 20
+DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+METRIC_NAMES = ("total_return", "volatility", "max_drawdown", "correlation")
+
+
+def _error(message: str) -> dict[str, Any]:
+    return {"error": message}
+
+
+def _parse_date(value: Any, name: str) -> pd.Timestamp | str:
+    if not isinstance(value, str) or not DATE_RE.match(value):
+        return f"{name} must be a date in YYYY-MM-DD format."
+    try:
+        return pd.Timestamp(date.fromisoformat(value))
+    except ValueError:
+        return f"{name} is not a valid calendar date."
+
+
+def _unknown_ticker(ctx: RequestContext, ticker: str) -> dict[str, Any]:
+    universe = list(ctx.store.universe().index)
+    close = difflib.get_close_matches(str(ticker).upper(), universe, n=3, cutoff=0.5)
+    hint = f" Closest symbols: {', '.join(close)}." if close else " Use search_assets to find the exact symbol."
+    return _error(f"Unknown ticker '{ticker}': it must be an exact symbol of the dataset universe.{hint}")
+
+
+# --- orchestrateur --------------------------------------------------------
+
+
+def search_assets(ctx: RequestContext, query: str, asset_class: str | None = None) -> dict[str, Any]:
+    if not isinstance(query, str) or not query.strip():
+        return _error("query must be a non-empty string (name or symbol).")
+    needle = query.strip().lower()[:100]
+    universe = ctx.store.universe()
+    items = []
+    for ticker, row in universe.iterrows():
+        if asset_class and str(row["asset_class"]).lower() != asset_class.lower():
+            continue
+        name = str(row["name"] or "")
+        if needle in ticker.lower() or needle in name.lower():
+            score = 0 if ticker.lower() == needle else 1 if ticker.lower().startswith(needle) else 2
+            items.append((score, ticker, {
+                "ticker": ticker, "name": name, "assetClass": row["asset_class"],
+                "sector": row["sector"], "currency": row["currency"],
+            }))
+    items.sort(key=lambda x: (x[0], x[1]))
+    return {"items": [item for _, _, item in items[:MAX_ASSETS]]}
+
+
+def get_portfolio(ctx: RequestContext) -> dict[str, Any]:
+    portfolio = portfolios_repo.get_portfolio(ctx.user_id, ctx.portfolio_id)
+    if portfolio is None:
+        return _error(f"No portfolio '{ctx.portfolio_id}' for the current user.")
+    return {
+        "portfolioId": portfolio["portfolioId"],
+        "baseCurrency": portfolio["baseCurrency"],
+        "holdings": [
+            {"ticker": h["ticker"], "quantity": h["quantity"], "avgCost": h["avgCost"]}
+            for h in portfolio.get("holdings", [])
+        ],
+    }
+
+
+def get_profile(ctx: RequestContext) -> dict[str, Any]:
+    user = users_repo.get_user(ctx.user_id)
+    return {"investorProfile": (user or {}).get("investorProfile")}
+
+
+def propose_mandate(ctx: RequestContext, draft: dict[str, Any]) -> dict[str, Any]:
+    """Valide un brouillon (schema-mandate-create-request) ; ne confirme rien."""
+    if isinstance(draft, str):
+        try:
+            draft = json.loads(draft)
+        except ValueError:
+            return {"valid": False, "errors": ["draft must be a JSON object."]}
+    if not isinstance(draft, dict):
+        return {"valid": False, "errors": ["draft must be a JSON object."]}
+    # Valeurs de contexte, jamais celles du modèle.
+    draft = {**draft, "portfolioId": ctx.portfolio_id, "userLanguage": ctx.user_language}
+    if ctx.province and "province" not in draft:
+        draft["province"] = ctx.province
+    try:
+        mandate = validate_mandate_create(draft)
+    except ApiError as error:
+        return {"valid": False, "errors": [error.message]}
+    unknown = [op["ticker"] for op in mandate.get("operations", []) if not ctx.store.has_ticker(op["ticker"])]
+    if mandate.get("subjectTicker") and not ctx.store.has_ticker(mandate["subjectTicker"]):
+        unknown.append(mandate["subjectTicker"])
+    if unknown:
+        return {"valid": False, "errors": [f"Unknown ticker(s): {', '.join(unknown)}. Use search_assets."]}
+    if mandate["mode"] in ("add_asset", "rebalance") and not mandate.get("operations"):
+        return {"valid": False, "errors": ["operations must describe the tested idea for add_asset and rebalance."]}
+    if mandate["mode"] == "diagnose" and not mandate.get("subjectTicker"):
+        return {"valid": False, "errors": ["subjectTicker is required for diagnose."]}
+    derived = evaluate_mandate(mandate)
+    ctx.captured["mandateDraft"] = mandate
+    return {"valid": True, "errors": [], **derived}
+
+
+def read_evidence(ctx: RequestContext, evidence_id: str | None = None) -> dict[str, Any]:
+    """Registre du run (complet résumé, ou un élément)."""
+    if not ctx.evidence:
+        return _error("No analysis run in this session yet: the registry is empty.")
+    if evidence_id:
+        if not re.fullmatch(r"(EV|KB)-\d{2,}", str(evidence_id)):
+            return _error("evidence_id must look like EV-07 or KB-03.")
+        item = next((e for e in ctx.evidence if e["id"] == evidence_id), None)
+        return item if item else _error(f"{evidence_id} is not in the registry of the latest run.")
+    summary = []
+    for item in ctx.evidence:
+        entry = {k: item[k] for k in ("id", "kind", "label", "scenario", "formatted", "document") if k in item}
+        summary.append(entry)
+    return {"items": summary}
+
+
+# --- module-engine --------------------------------------------------------
+
+
+def _resample(series: pd.Series, frequency: str) -> tuple[pd.Series, str]:
+    if frequency == "weekly":
+        series = series.resample("W-FRI").last().dropna()
+    elif frequency == "monthly":
+        series = series.resample("ME").last().dropna()
+    if len(series) > MAX_POINTS and frequency == "daily":
+        return _resample(series, "weekly")
+    if len(series) > MAX_POINTS and frequency == "weekly":
+        return _resample(series, "monthly")
+    return series.tail(MAX_POINTS), frequency
+
+
+def get_prices(ctx: RequestContext, ticker: str, start: str, end: str, frequency: str = "daily") -> dict[str, Any]:
+    if not ctx.store.has_ticker(ticker):
+        return _unknown_ticker(ctx, ticker)
+    start_ts, end_ts = _parse_date(start, "start"), _parse_date(end, "end")
+    for value in (start_ts, end_ts):
+        if isinstance(value, str):
+            return _error(value)
+    if end_ts < start_ts:
+        return _error("end must be on or after start.")
+    if end_ts > start_ts + pd.DateOffset(years=5):
+        return _error("end must be at most 5 years after start.")
+    if frequency not in ("daily", "weekly", "monthly"):
+        return _error("frequency must be daily, weekly or monthly.")
+    series = an.native_series(ctx.store, ticker)
+    series = series[(series.index >= start_ts) & (series.index <= end_ts)]
+    notes = ["Days without a quote (holidays, weekends) are not filled; each point is a real quote."]
+    if series.empty:
+        return {"ticker": ticker, "points": [], "notes": ["No quote in this period."]}
+    sampled, used = _resample(series, frequency)
+    if used != frequency:
+        notes.append(f"Switched to {used} frequency to stay under {MAX_POINTS} points.")
+    return {
+        "ticker": ticker, "currency": an.listing_currency(ctx.store, ticker), "frequency": used, "adjusted": True,
+        "points": [[d.date().isoformat(), round(float(v), 4)] for d, v in sampled.items()],
+        "source": ctx.store.source_label(f"prices/{ticker}.parquet"), "notes": notes,
+    }
+
+
+def get_macro(ctx: RequestContext, series_id: str, start: str, end: str) -> dict[str, Any]:
+    start_ts, end_ts = _parse_date(start, "start"), _parse_date(end, "end")
+    for value in (start_ts, end_ts):
+        if isinstance(value, str):
+            return _error(value)
+    if series_id == "USDCAD":
+        series = ctx.store.fx_usdcad()
+        unit, frequency, source = "CAD per USD", "business daily", ctx.store.source_label("fx/usdcad.parquet")
+        notes = []
+    else:
+        macro = ctx.store.macro()
+        rows = macro[macro["series_id"] == series_id]
+        if rows.empty:
+            known = sorted(macro["series_id"].unique())
+            return _error(f"Unknown series_id '{series_id}'. Known: {', '.join(known)}, USDCAD.")
+        series = rows.set_index("date")["value"].astype(float)
+        unit, frequency = str(rows["unit"].iloc[0]), str(rows["frequency"].iloc[0])
+        source = ctx.store.source_label("macro/macro.parquet")
+        notes = []
+        if "month" in frequency:
+            notes.append("Monthly values are dated by reference month, not by publication date.")
+    series = series[(series.index >= start_ts) & (series.index <= end_ts)]
+    sampled, _ = _resample(series, "daily")
+    return {
+        "series_id": series_id, "unit": unit, "frequency": frequency,
+        "points": [[d.date().isoformat(), round(float(v), 4)] for d, v in sampled.items()],
+        "source": source, "notes": notes,
+    }
+
+
+def compute_metrics(ctx: RequestContext, tickers: list[str], start: str, end: str, metrics: list[str]) -> dict[str, Any]:
+    if not isinstance(tickers, list) or not tickers or len(tickers) > MAX_METRIC_TICKERS:
+        return _error(f"tickers must be a list of 1 to {MAX_METRIC_TICKERS} symbols.")
+    for ticker in tickers:
+        if not ctx.store.has_ticker(ticker):
+            return _unknown_ticker(ctx, ticker)
+    if not isinstance(metrics, list) or not metrics or any(m not in METRIC_NAMES for m in metrics):
+        return _error(f"metrics must be a non-empty list among: {', '.join(METRIC_NAMES)}.")
+    start_ts, end_ts = _parse_date(start, "start"), _parse_date(end, "end")
+    for value in (start_ts, end_ts):
+        if isinstance(value, str):
+            return _error(value)
+    out: dict[str, Any] = {}
+    for ticker in tickers:
+        values = an.asset_metrics(ctx.store, ticker, start_ts, end_ts)
+        out[ticker] = {
+            "total_return": round(values["totalReturn"], 2) if values and "total_return" in metrics else None,
+            "volatility": round(values["volatility"], 2) if values and "volatility" in metrics else None,
+            "max_drawdown": round(values["maxDrawdown"], 2) if values and "max_drawdown" in metrics else None,
+        }
+    result: dict[str, Any] = {
+        "metrics": out, "period": f"{start}/{end}",
+        "assumptions": [
+            "adj_close; percentages in the listing currency; volatility annualized with sqrt(252) or sqrt(365) for crypto.",
+        ],
+        "source": ctx.store.source_label("prices"),
+    }
+    if "correlation" in metrics and len(tickers) > 1:
+        aligned = an.aligned_cad_prices(ctx.store, tickers, start_ts, end_ts)
+        result["correlation"] = an.correlation_matrix(aligned.frame)
+        result["assumptions"].append("Correlation of daily CAD returns on common trading days.")
+    return result
+
+
+def _current_weights(ctx: RequestContext) -> dict[str, float] | dict[str, Any]:
+    portfolio = portfolios_repo.get_portfolio(ctx.user_id, ctx.portfolio_id)
+    if portfolio is None:
+        return {}
+    values, _ = holding_values_cad(ctx.store, portfolio.get("holdings", []), ctx.store.last_date())
+    return values
+
+
+def portfolio_impact(ctx: RequestContext, mandate_version: int) -> dict[str, Any]:
+    mandate_item = analyses_repo.get_mandate(ctx.session_id, ctx.user_id, int(mandate_version))
+    if mandate_item is None:
+        return _error(f"No confirmed mandate version {mandate_version} in this session.")
+    ctx.portfolio_id = mandate_item["mandate"]["portfolioId"]
+    portfolio = portfolios_repo.get_portfolio(ctx.user_id, ctx.portfolio_id)
+    from backend.agents.engine.registry import EvidenceRegistry  # registre propre au run
+
+    registry = EvidenceRegistry(ctx.user_language)
+    result = run_engine(ctx.store, mandate_item, portfolio, registry)
+    ctx.engine_result, ctx.mandate_item = result, mandate_item
+    return {
+        "scenarios": [{"index": s.index, "label": s.label, "metrics": dict(s.evidence)} for s in result.scenarios],
+        "evidenceIds": [item["id"] for item in registry.items],
+    }
+
+
+def stress_test(ctx: RequestContext, period_id: str) -> dict[str, Any]:
+    if period_id not in PERIOD_IDS:
+        return _error(f"period_id must be one of: {', '.join(PERIOD_IDS)}.")
+    period = derive_period(ctx.store, period_id)
+    if not period.available:
+        return {"period": period_id, "available": False, "notes": [period.note]}
+    weights = _current_weights(ctx)
+    aligned = an.aligned_cad_prices(ctx.store, list(weights), period.start, period.end, require_full_window=True)
+    if not weights or aligned.missing:
+        return {"period": period_id, "start": period.start.date().isoformat(), "end": period.end.date().isoformat(),
+                "drawdown": None, "notes": ["Insufficient history for: " + ", ".join(aligned.missing or ["empty portfolio"])]}
+    drawdown, _, _ = an.max_drawdown(an.portfolio_index(aligned.frame, weights))
+    return {"period": period_id, "start": period.start.date().isoformat(), "end": period.end.date().isoformat(),
+            "drawdown": round(drawdown, 2), "method": period.method, "evidenceIds": []}
+
+
+def concentration(ctx: RequestContext) -> dict[str, Any]:
+    weights = _current_weights(ctx)
+    if not weights:
+        return _error("The portfolio is empty.")
+    result = concentration_of(ctx.store, weights)
+    return {k: result[k] for k in ("topSingle", "bySector", "byCountry", "byCurrency", "techLookThrough", "caveats")} | {"evidenceIds": []}
+
+
+# --- module-rules ---------------------------------------------------------
+
+
+def check_rules(ctx: RequestContext) -> dict[str, Any]:
+    if ctx.engine_result is None or ctx.mandate_item is None:
+        return _error("Run portfolio_impact first: no scenarios in this run.")
+    return {"verdicts": run_rules(ctx.store, ctx.mandate_item, ctx.engine_result)}
+
+
+# --- agent-auditor --------------------------------------------------------
+
+
+def search_regulation(ctx: RequestContext, query: str, subjects: list[str] | None = None) -> dict[str, Any]:
+    if not isinstance(query, str) or not query.strip():
+        return _error("query must be a non-empty English sentence.")
+    if subjects is not None and (not isinstance(subjects, list) or any(s not in kb.KNOWN_SUBJECTS for s in subjects)):
+        return _error(f"subjects must be a list among: {', '.join(kb.KNOWN_SUBJECTS)}.")
+    passages = kb.retrieve(query.strip()[:500], ctx.jurisdictions, subjects, client=ctx.clients.get("kb"))
+    shown = []
+    for passage in passages:
+        ref = f"P{len(ctx.passages) + 1}"
+        ctx.passages[ref] = passage
+        shown.append({
+            "ref": ref, "document": passage["document"], "section": passage["section"],
+            "jurisdiction": passage["jurisdiction"], "version": passage["version"], "score": passage["score"],
+            "excerpt": kb.neutralize(passage["excerpt"]),
+        })
+    return {"passages": shown}
+
+
+TOOL_FUNCTIONS = {
+    "search_assets": search_assets,
+    "get_prices": get_prices,
+    "get_macro": get_macro,
+    "compute_metrics": compute_metrics,
+    "get_portfolio": get_portfolio,
+    "get_profile": get_profile,
+    "propose_mandate": propose_mandate,
+    "read_evidence": read_evidence,
+    "portfolio_impact": portfolio_impact,
+    "stress_test": stress_test,
+    "concentration": concentration,
+    "check_rules": check_rules,
+    "search_regulation": search_regulation,
+}

@@ -15,4 +15,8 @@ dev = [
 [tool.pytest.ini_options]
 # Les tests importent backend.common.* : racine du projet dans le chemin.
 pythonpath = ["."]
-testpaths = ["backend/common/tests"]
+# backend/api/tests se lance à part : test_universe vérifie que pyarrow n'est pas importé
+# dans le processus, ce que les tests de backend/agents (pandas) rendent faux.
+testpaths = ["backend/common/tests", "backend/agents/tests"]
+# pandas (resample) émet un avertissement interne de NumPy : sans effet sur nos calculs.
+filterwarnings = ["ignore:The 'generic' unit for NumPy timedelta:DeprecationWarning"]

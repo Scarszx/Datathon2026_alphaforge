@@ -1,0 +1,227 @@
+"""Chaîne d'un run (contrat api-runs-create) : module-engine → module-rules → [partial]
+→ agent-auditor (KB) → agent-writer → traduction (agent-orchestrator) → module-verifier → [done].
+
+La partie déterministe est écrite tout de suite (status = partial) ; la suite est
+exécutée par une invocation asynchrone de la Lambda elle-même (événement
+interne, pas une route), décision WS5. Le schéma du run ne change pas.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+from datetime import datetime, timezone
+from typing import Any, Callable
+
+from backend.agents import guardrails
+from backend.agents.data.store import DataStore
+from backend.agents.engine.registry import EvidenceRegistry
+from backend.agents.engine.scenarios import attach_allocations, public_scenarios
+from backend.agents.llm import base
+from backend.agents.llm.auditor import agent as auditor
+from backend.agents.llm.orchestrator import agent as orchestrator
+from backend.agents.llm.writer import agent as writer
+from backend.agents.observability import log_event
+from backend.agents.rules.rules import jurisdiction_notices, scenario_verdicts
+from backend.agents.rules.settings import settings
+from backend.agents.toolbox import TOOLBOX
+from backend.agents.tools.context import RequestContext
+from backend.agents.verifier.verifier import verify_narrative
+from backend.common.http import ApiError
+from backend.common.ids import new_run_id
+from backend.common.repositories import analyses as analyses_repo
+
+INTERNAL_EVENT = "complete_run"
+
+GENERAL_LIMITATIONS = [
+    "Past performance describes the past; it does not predict future returns.",
+    "Survivorship bias: the asset universe was selected in 2026.",
+    "Educational simulation only: no order is placed and nothing here is personalized financial advice.",
+]
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def team_assumptions(mandate_item: dict[str, Any]) -> list[str]:
+    conf = settings()
+    items = [
+        f"Analysis window: trailing {conf['windowYears']} years (team assumption).",
+        "Risk level implied by annualized volatility bands (team assumption, R1).",
+        f"Single-security concentration: warning above {conf['singleSecurity']['warnPct']}%, failure above {conf['singleSecurity']['failPct']}% (team assumption, R6).",
+        "Crypto-asset caps by risk profile (team assumption, R7).",
+    ]
+    if "maxAcceptableLossPct" not in mandate_item["mandate"]:
+        items.append(f"Maximum acceptable loss defaulted to {mandate_item['effectiveMaxLossPct']}% for the horizon (team assumption, R2).")
+    return items
+
+
+def build_explanation(ctx: RequestContext, sources: list[dict[str, Any]], verdicts: list[dict[str, Any]] | None,
+                      assumptions: list[str], limitations: list[str]) -> dict[str, Any]:
+    """schema-explanation à partir du journal réel de l'exécution (rule-explanation-from-trace)."""
+    steps = [
+        {k: call[k] for k in ("agentId", "tool", "params", "status", "durationMs") if k in call}
+        for call in ctx.tool_calls
+    ]
+    checks = [
+        {"agentId": "agent-auditor" if v.get("citations") else "module-rules", "rule": v["rule"], "status": v["status"],
+         "message": v.get("messageEn", ""), "citations": v.get("citations", [])}
+        for v in verdicts or []
+    ]
+    return {"sources": sources, "assumptions": assumptions, "limitations": limitations, "steps": steps, "checks": checks}
+
+
+# --- partie déterministe ---------------------------------------------------
+
+
+def start_run(ctx: RequestContext, mandate_version: int) -> dict[str, Any]:
+    """Calcule scénarios, preuves et verdicts ; écrit le run en status = partial et le renvoie."""
+    mandate_item = analyses_repo.get_mandate(ctx.session_id, ctx.user_id, mandate_version)
+    if mandate_item is None:
+        raise ApiError("MANDATE_NOT_FOUND", "Mandat inconnu pour cette conversation.")
+    if not mandate_item.get("confirmedAt"):
+        raise ApiError("MANDATE_NOT_CONFIRMED", "Le mandat doit être confirmé avant l'analyse.")
+    mandate = mandate_item["mandate"]
+    ctx.run_id = ctx.run_id or new_run_id()
+    ctx.portfolio_id = mandate["portfolioId"]
+    ctx.province = mandate["province"]
+    ctx.user_language = mandate["userLanguage"]
+
+    TOOLBOX.call("module-engine", "get_portfolio", ctx)
+    impact = TOOLBOX.call("module-engine", "portfolio_impact", ctx, mandate_version=mandate_version)
+    if "error" in impact:
+        raise ApiError("MANDATE_NOT_FOUND", "Mandat inconnu pour cette conversation.")
+    result = ctx.engine_result
+    verdicts = TOOLBOX.call("module-rules", "check_rules", ctx)["verdicts"]
+    if mandate["userLanguage"] == "en":
+        verdicts = [{**v, "message": v["messageEn"]} for v in verdicts]
+    scenarios = public_scenarios(result, scenario_verdicts(verdicts))
+    attach_allocations(ctx.store, result, scenarios)
+
+    limitations = list(GENERAL_LIMITATIONS) + result.warnings + [n for s in result.scenarios for n in s.notes]
+    run = {
+        "runId": ctx.run_id,
+        "sessionId": ctx.session_id,
+        "mandateVersion": mandate_version,
+        "status": "partial",
+        "datasetVersion": ctx.store.version,
+        "userLanguage": mandate["userLanguage"],
+        "scenarios": scenarios,
+        "verdicts": verdicts,
+        "evidence": result.registry.public_items(),
+        "jurisdictionNotices": jurisdiction_notices(mandate["province"]),
+        "explanation": build_explanation(ctx, result.sources, verdicts, team_assumptions(mandate_item), limitations),
+        "createdAt": _now(),
+    }
+    return analyses_repo.put_run(ctx.session_id, ctx.user_id, run)
+
+
+# --- complétion (auditeur, rédacteur, traduction, vérificateur) -------------
+
+
+def _translate_run_texts(ctx: RequestContext, sections: list[dict[str, Any]], verdicts: list[dict[str, Any]],
+                         notices: list[str], language: str) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[str], bool]:
+    """Traduit sections, motifs et mentions ; renvoie aussi si la traduction a gardé les emplacements."""
+    if language == "en":
+        return ([{**s, "text": s["textEn"]} for s in sections],
+                [{**v, "message": v["messageEn"]} for v in verdicts], list(notices), True)
+    section_texts = orchestrator.translate(ctx, [s["textEn"] for s in sections], language)
+    match = all(orchestrator.placeholders_preserved(s["textEn"], t) for s, t in zip(sections, section_texts))
+    translated_sections = []
+    for section, text in zip(sections, section_texts):
+        # Une traduction qui perd ou ajoute un emplacement n'est pas affichée : la version anglaise la remplace.
+        shown = text if orchestrator.placeholders_preserved(section["textEn"], text) else section["textEn"]
+        translated_sections.append({**section, "text": shown})
+    unique_messages = sorted({v["messageEn"] for v in verdicts})
+    message_texts = orchestrator.translate(ctx, unique_messages + list(notices), language)
+    by_message = dict(zip(unique_messages, message_texts[: len(unique_messages)]))
+    translated_verdicts = [{**v, "message": by_message.get(v["messageEn"], v["messageEn"])} for v in verdicts]
+    return translated_sections, translated_verdicts, message_texts[len(unique_messages):], match
+
+
+def complete_run(store: DataStore, user_id: str, session_id: str, run_id: str, *, kb_client=None) -> dict[str, Any]:
+    run = analyses_repo.get_run(session_id, user_id, run_id)
+    if run is None:
+        raise ApiError("RUN_NOT_FOUND", "Run inconnu.")
+    mandate_item = analyses_repo.get_mandate(session_id, user_id, run["mandateVersion"])
+    mandate = mandate_item["mandate"]
+    language = run["userLanguage"]
+    registry = EvidenceRegistry(language, run["evidence"])
+    ctx = RequestContext(user_id=user_id, session_id=session_id, store=store, run_id=run_id,
+                         portfolio_id=mandate["portfolioId"], province=mandate["province"], user_language=language,
+                         evidence=registry.items, clients={"kb": kb_client} if kb_client else {})
+    steps_before = run.get("explanation", {}).get("steps", [])
+    try:
+        verdicts = auditor.audit(ctx, run["verdicts"], registry)
+        narrative: dict[str, Any] | None = None
+        verifier_report = None
+        try:
+            record = writer.analysis_record(mandate, run["scenarios"], verdicts, registry.items)
+            sections = writer.write(ctx, record)
+        except base.AgentFailure as failure:
+            log_event("agent.failure", agentId=writer.AGENT_ID, reason=failure.reason, sessionId=session_id)
+            sections = None
+        sections_t, verdicts_t, notices_t, match = _translate_run_texts(
+            ctx, sections or [], verdicts, run.get("jurisdictionNotices", []), language)
+        status = "done"
+        if sections is not None:
+            cleaned, hidden, verifier_report = verify_narrative(sections_t, registry.ids(), mandate)
+            verifier_report["placeholdersMatch"] = verifier_report["placeholdersMatch"] and match
+            shown = " ".join(s["text"] for s in cleaned)
+            check = guardrails.apply(shown, "OUTPUT")
+            if check.blocked:
+                hidden = hidden + [{"section": s["key"], "reason": "guardrail"} for s in cleaned if s["text"]]
+                cleaned = [{**s, "text": ""} for s in cleaned]
+            narrative = {
+                "sections": [{"key": s["key"], "textEn": s["textEn"], "text": s["text"]} for s in cleaned],
+                # Une section dont la traduction a perdu un emplacement est affichée en anglais
+                # (placeholdersMatch = false le signale) ; la langue cible reste userLanguage.
+                "language": language,
+                "hiddenSentences": hidden,
+            }
+        else:
+            status = "error"  # fail-open : scénarios, verdicts et citations restent utilisables
+        explanation = run.get("explanation", {})
+        explanation = {
+            **explanation,
+            "steps": steps_before + [
+                {k: c[k] for k in ("agentId", "tool", "params", "status", "durationMs") if k in c} for c in ctx.tool_calls
+            ],
+            "checks": build_explanation(ctx, [], verdicts_t, [], [])["checks"],
+        }
+        fields: dict[str, Any] = {
+            "status": status, "verdicts": verdicts_t, "evidence": registry.public_items(),
+            "jurisdictionNotices": notices_t, "explanation": explanation, "completedAt": _now(),
+        }
+        if narrative is not None:
+            fields["narrative"] = narrative
+            fields["verifier"] = verifier_report
+        return analyses_repo.update_run(session_id, user_id, run_id, fields)
+    except Exception as exc:
+        log_event("run.error", sessionId=session_id, runId=run_id, error=type(exc).__name__)
+        return analyses_repo.update_run(session_id, user_id, run_id, {"status": "error", "completedAt": _now()})
+
+
+# --- déclenchement asynchrone ---------------------------------------------
+
+
+def _lambda_invoke(payload: dict[str, Any]) -> None:
+    import boto3
+
+    boto3.client("lambda").invoke(
+        FunctionName=os.environ["AWS_LAMBDA_FUNCTION_NAME"], InvocationType="Event",
+        Payload=json.dumps(payload).encode("utf-8"),
+    )
+
+
+def default_dispatcher() -> Callable[[dict[str, Any]], None]:
+    """Dans Lambda : auto-invocation asynchrone. En local (banc) : None = complétion dans la requête."""
+    if os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
+        return _lambda_invoke
+    return None  # type: ignore[return-value]
+
+
+def completion_payload(user_id: str, session_id: str, run_id: str) -> dict[str, Any]:
+    return {"internal": INTERNAL_EVENT, "userId": user_id, "sessionId": session_id, "runId": run_id}
+

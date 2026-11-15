@@ -1,0 +1,130 @@
+{
+  "fixture": true,
+  "note": "Synthetic test values, not issuer data.",
+  "etfs": {
+    "XIU.TO": {
+      "sourceUrl": "https://example.test/fixture/xiu",
+      "asOfDate": "2026-10-31",
+      "merPct": 0.18,
+      "sectorWeights": {
+        "Financials": 33.0,
+        "Energy": 17.0,
+        "Industrials": 12.0,
+        "Materials": 11.0,
+        "Information Technology": 9.0,
+        "Other": 18.0
+      },
+      "countryWeights": {
+        "CA": 100.0
+      },
+      "topHoldings": [
+        {
+          "ticker": "RY.TO",
+          "name": "Royal Bank",
+          "weight": 7.0
+        },
+        {
+          "ticker": "TD.TO",
+          "name": "TD Bank",
+          "weight": 5.5
+        },
+        {
+          "ticker": "ENB.TO",
+          "name": "Enbridge",
+          "weight": 4.0
+        }
+      ]
+    },
+    "SPY": {
+      "sourceUrl": "https://example.test/fixture/spy",
+      "asOfDate": "2026-10-31",
+      "merPct": 0.09,
+      "sectorWeights": {
+        "Information Technology": 32.0,
+        "Financials": 13.0,
+        "Health Care": 11.0,
+        "Consumer Discretionary": 10.0,
+        "Other": 34.0
+      },
+      "countryWeights": {
+        "US": 100.0
+      },
+      "topHoldings": [
+        {
+          "ticker": "NVDA",
+          "name": "NVIDIA",
+          "weight": 7.0
+        },
+        {
+          "ticker": "AAPL",
+          "name": "Apple",
+          "weight": 6.5
+        }
+      ]
+    },
+    "QQQ": {
+      "sourceUrl": "https://example.test/fixture/qqq",
+      "asOfDate": "2026-10-31",
+      "merPct": 0.2,
+      "sectorWeights": {
+        "Information Technology": 50.0,
+        "Communication Services": 16.0,
+        "Other": 34.0
+      },
+      "countryWeights": {
+        "US": 97.0,
+        "Other": 3.0
+      },
+      "topHoldings": [
+        {
+          "ticker": "NVDA",
+          "name": "NVIDIA",
+          "weight": 9.0
+        },
+        {
+          "ticker": "AAPL",
+          "name": "Apple",
+          "weight": 8.0
+        }
+      ]
+    },
+    "ESGV": {
+      "sourceUrl": "https://example.test/fixture/esgv",
+      "asOfDate": "2026-10-31",
+      "merPct": 0.09,
+      "sectorWeights": {
+        "Information Technology": 35.0,
+        "Other": 65.0
+      },
+      "countryWeights": {
+        "US": 100.0
+      },
+      "topHoldings": [
+        {
+          "ticker": "NVDA",
+          "name": "NVIDIA",
+          "weight": 7.5
+        }
+      ],
+      "exclusions": [
+        "fossil fuels",
+        "weapons",
+        "tobacco"
+      ],
+      "esgMethodologyUrl": "https://example.test/fixture/esgv-methodology"
+    },
+    "XBB.TO": {
+      "sourceUrl": "https://example.test/fixture/xbb",
+      "asOfDate": "2026-10-31",
+      "merPct": 0.1,
+      "sectorWeights": {
+        "Government bonds": 70.0,
+        "Corporate bonds": 30.0
+      },
+      "countryWeights": {
+        "CA": 100.0
+      },
+      "topHoldings": []
+    }
+  }
+}

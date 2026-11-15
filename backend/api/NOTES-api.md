@@ -63,7 +63,7 @@ Signatures de WS0/WS0b/WS2/WS2b inchangées. Points relevés pendant l'implémen
       spécification WS4b), `"CA"` (juridiction fédérale/nationale de la KB) est
       exclu du champ `province` de l'utilisateur et du mandat.
     - **Seuils par défaut (`effectiveMaxLossPct`) :** lus depuis
-      `backend/api/mandate_defaults.json` (`< 3` ans : `10`, `3–8` ans : `20`,
+      `backend/common/mandate_defaults.json` (`< 3` ans : `10`, `3–8` ans : `20`,
       `> 8` ans : `35`), surchargeables via `RULES_CONFIG_PATH`.
     - **Contrôle de cohérence (`warnings`) :** rédigés en anglais conformément
       à `conventions.language_policy` (tout le système interne est en anglais).

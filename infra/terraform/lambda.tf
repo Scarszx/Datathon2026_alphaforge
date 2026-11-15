@@ -69,7 +69,10 @@ resource "aws_lambda_function" "agents" {
   architectures = ["arm64"]
   handler       = "backend/agents/app.handler"
   memory_size   = 2048
-  timeout       = 30
+  # 180 s : la complétion asynchrone d'un run (auditeur, rédacteur, traduction,
+  # vérificateur) dépasse les 30 s de l'API Gateway. Les routes HTTP restent
+  # bornées par l'API Gateway (30 s) et par les limites des agents.
+  timeout = 180
 
   filename         = local.agents_zip
   source_code_hash = can(filebase64sha256(local.agents_zip)) ? filebase64sha256(local.agents_zip) : null

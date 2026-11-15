@@ -55,7 +55,7 @@ build_lambda() {
     cp -r "$repo_root/backend/$name" "$stage/backend/$name"
     cp -r "$repo_root/backend/common" "$stage/backend/common"
     # Les tests (WS0/WS2) et caches n'appartiennent pas au zip de production.
-    rm -rf "$stage/backend/common/tests"
+    rm -rf "$stage/backend/common/tests" "$stage/backend/$name/tests"
     find "$stage" -type d -name "__pycache__" -prune -exec rm -rf {} +
     find "$stage" -name "*.pyc" -delete
 
@@ -67,6 +67,15 @@ build_lambda() {
         # Paquets fournis par la couche AWS SDK for pandas : retirés du zip.
         rm -rf "$stage/pandas" "$stage/pyarrow" "$stage/numpy"
         find "$stage" -maxdepth 1 \( -name "pandas*" -o -name "pyarrow*" -o -name "numpy*" \) -exec rm -rf {} +
+        if [ "$name" = "agents" ]; then
+            # Dépendances de strands-agents jamais importées par la Lambda (serveur MCP,
+            # serveur HTTP, JWT) : environ 20 Mo de moins à côté de la couche pandas,
+            # sous la limite de 250 Mo décompressés. Vérifié par un import bloquant (WS5).
+            for pkg in mcp mcp_types starlette sse_starlette uvicorn cryptography jwt multipart python_multipart; do
+                rm -rf "${stage:?}/$pkg"
+                find "$stage" -maxdepth 1 -iname "${pkg}-*.dist-info" -exec rm -rf {} +
+            done
+        fi
     else
         echo "  (pas de requirements.txt dans backend/$name : zip factice)"
     fi

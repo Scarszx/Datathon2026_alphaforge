@@ -289,3 +289,12 @@ def test_isolation_entre_utilisateurs(table):
     analyses.delete_analyses(SESSION, BOB)
     assert analyses.get_mandate(SESSION, ALICE, 1) is not None
     assert analyses.get_run(SESSION, ALICE, run_id)["status"] == "partial"
+
+
+def test_get_latest_run_plus_recent_et_possede(table):
+    analyses.put_run(SESSION, ALICE, _run("01JRUN0000000000000000000A"))
+    analyses.put_run(SESSION, ALICE, _run("01JRUN0000000000000000000B"))
+    analyses.put_mandate(SESSION, ALICE, _mandate())
+    assert analyses.get_latest_run(SESSION, ALICE)["runId"] == "01JRUN0000000000000000000B"
+    assert analyses.get_latest_run(SESSION, BOB) is None
+    assert analyses.get_latest_run("autre-session", ALICE) is None

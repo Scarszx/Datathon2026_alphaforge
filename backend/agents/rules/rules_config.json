@@ -1,0 +1,52 @@
+{
+  "_comment": "Team assumptions (rule-team-assumptions-labeled): thresholds chosen by the team, displayed as assumptions, never as official rules. The horizon loss defaults (R2) live in backend/common/mandate_defaults.json. RULES_CONFIG_PATH may point to a file overriding any top-level key.",
+  "windowYears": 5,
+  "riskBandsByVolatility": [
+    {"maxVolatilityPct": 10, "band": 1},
+    {"maxVolatilityPct": 14, "band": 2},
+    {"maxVolatilityPct": 18, "band": 3},
+    {"maxVolatilityPct": 25, "band": 4},
+    {"band": 5}
+  ],
+  "maxLossWarnRatio": 0.8,
+  "singleSecurity": {"warnPct": 10, "failPct": 20},
+  "cryptoCapPct": {"excluded": 0, "profileUpTo3": 5, "profileAbove3": 10},
+  "alternativeCategories": {
+    "1": [
+      {"category": "Canadian short-term bonds", "proxies": ["ZST.TO", "XSB.TO"]},
+      {"category": "Canadian aggregate bonds", "proxies": ["XBB.TO", "ZAG.TO"]}
+    ],
+    "2": [
+      {"category": "Canadian aggregate bonds", "proxies": ["XBB.TO", "ZAG.TO"]},
+      {"category": "Canadian short-term bonds", "proxies": ["XSB.TO", "ZST.TO"]}
+    ],
+    "3": [
+      {"category": "Balanced asset allocation", "proxies": ["XBAL.TO", "VBAL.TO"]},
+      {"category": "Broad Canadian equity", "proxies": ["XIC.TO", "XIU.TO"]},
+      {"category": "Canadian aggregate bonds", "proxies": ["XBB.TO", "ZAG.TO"]}
+    ],
+    "4": [
+      {"category": "Broad global equity", "proxies": ["XEQT.TO", "VEQT.TO"]},
+      {"category": "Broad U.S. equity", "proxies": ["SPY", "VFV.TO", "XSP.TO"]},
+      {"category": "Broad Canadian equity", "proxies": ["XIC.TO", "XIU.TO"]}
+    ],
+    "5": [
+      {"category": "Broad global equity", "proxies": ["XEQT.TO", "VEQT.TO"]},
+      {"category": "Broad U.S. equity", "proxies": ["SPY", "VFV.TO", "XSP.TO"]}
+    ]
+  },
+  "baseNotice": "Educational simulation only, not financial advice. No order is placed.",
+  "provinceNotices": {
+    "QC": "In Québec, securities activities are overseen by the Autorité des marchés financiers (AMF). The title \"financial planner\" is reserved by law; this tool is not a financial planner or a registered adviser. For personalized advice, consult a registered professional.",
+    "ON": "In Ontario, the titles \"financial planner\" and \"financial advisor\" are protected under the FSRA title protection framework; this tool uses neither title and is not a registered adviser. For personalized advice, consult a credentialed professional.",
+    "SK": "In Saskatchewan, the FCAA has proposed title protection rules for financial planners and advisors; this tool is not a financial planner or a registered adviser. For personalized advice, consult a registered professional.",
+    "default": "Securities activities are overseen by your provincial or territorial securities regulator; this tool is not a registered adviser. For personalized advice, consult a registered professional."
+  },
+  "provinceRegulators": {
+    "QC": "Autorité des marchés financiers (AMF)",
+    "ON": "Ontario Securities Commission (OSC) and FSRA",
+    "SK": "Financial and Consumer Affairs Authority (FCAA)",
+    "BC": "British Columbia Securities Commission (BCSC)",
+    "AB": "Alberta Securities Commission (ASC)"
+  }
+}
