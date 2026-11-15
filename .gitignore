@@ -28,3 +28,6 @@ data/output/
 *.parquet
 !data/fixtures/**/*.parquet
 !backend/agents/tests/fixtures/**/*.parquet
+
+# Sortie locale de backend/agents/scripts/build_kb_corpus.py (texte des documents réglementaires : conditions de réutilisation à vérifier avant tout partage)
+/kb/
