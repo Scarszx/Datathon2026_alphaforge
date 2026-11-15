@@ -180,6 +180,21 @@ class DataStore:
 
         return self._cached("etf_enriched", load)
 
+    def profiles(self) -> dict[str, dict[str, Any]]:
+        """Descriptions d'entreprise par ticker ({ ticker: { description, website } }), {} si absent.
+
+        Fichier facultatif `profiles.json` du jeu : sans lui, la fiche d'un actif n'a pas de description.
+        """
+
+        def load() -> dict[str, dict[str, Any]]:
+            try:
+                payload = json.loads(self._read_bytes("profiles.json"))
+            except (DatasetError, ValueError):
+                return {}
+            return {k: v for k, v in payload.items() if isinstance(v, dict)} if isinstance(payload, dict) else {}
+
+        return self._cached("profiles", load)
+
     def last_date(self) -> pd.Timestamp:
         """Dernière date de cours du jeu (asOf), d'après le manifeste ou SPY / XIU.TO."""
         manifest = self.manifest()

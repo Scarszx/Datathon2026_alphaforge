@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { errorText } from "../api/errors";
 import type { InvestorProfile, Jurisdiction, Portfolio, PortfolioSummary } from "../api/types";
 import AppHeader from "../components/AppHeader";
+import Avatar from "../components/Avatar";
 import { getSummary, listPortfolios } from "../api/endpoints";
 import RiskForm, { RiskResult } from "../components/RiskForm";
 import { PROVINCES, PROVINCE_LABELS, loadLatestRisk, loadRisk, QUESTIONS, saveRisk, syncRisk, type PortfolioRisk } from "../lib/risk";
@@ -17,7 +18,7 @@ function RiskQuestionnaire({ userId }: { userId: string }) {
   const [latest, setLatest] = useState<PortfolioRisk | null>(() => loadLatestRisk(userId));
   const [stored, setStored] = useState<Record<string, PortfolioRisk>>(() => loadRisk(userId));
   const [portfolios, setPortfolios] = useState<Portfolio[] | null>(null);
-  const [editing, setEditing] = useState(latest === null);
+  const [editing, setEditing] = useState(false);
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
@@ -57,7 +58,7 @@ function RiskQuestionnaire({ userId }: { userId: string }) {
           </RiskForm>
           {latest && <button type="button" className="link" style={{ marginTop: 12 }} onClick={() => setEditing(false)}>Annuler</button>}
         </>
-      ) : latest && (
+      ) : latest ? (
         <div className="stack">
           <RiskResult answers={latest.answers} province={latest.province} />
           <table className="risk-answers">
@@ -88,6 +89,8 @@ function RiskQuestionnaire({ userId }: { userId: string }) {
           </div>
           <div><button type="button" className="btn" onClick={() => { setMsg(""); setEditing(true); }}>Modifier mes réponses</button></div>
         </div>
+      ) : (
+        <p className="muted small">Le questionnaire investisseur sera présenté lors de la création de votre portefeuille.</p>
       )}
     </section>
   );
@@ -164,7 +167,7 @@ export default function Profile() {
   const { user, saveProfile } = useApp();
   const warning = (useLocation().state as { warning?: string } | null)?.warning;
   const p = user?.investorProfile;
-  const [editing, setEditing] = useState(!p);
+  const [editing, setEditing] = useState(false);
   const [tolerance, setTolerance] = useState(p?.riskTolerance != null ? String(p.riskTolerance) : "");
   const [capacity, setCapacity] = useState(p?.riskCapacity != null ? String(p.riskCapacity) : "");
   const [province, setProvince] = useState<Jurisdiction | "">(p?.province ?? "");
@@ -208,19 +211,26 @@ export default function Profile() {
       <AppHeader />
       <main className="wrap dash">
         <div className="dash-hero">
-          <div>
-            <h1 className="dash-title">Bon retour, <span className="muted-name">{name}</span></h1>
-            <p className="muted">Votre profil d'investisseur, tel que l'outil l'utilise pour cadrer vos simulations. Profil fictif : aucune donnée personnelle réelle.</p>
+          <div className="dash-hero-id">
+            <Avatar seed={user?.userId ?? ""} size={64} label={name} />
+            <div>
+              <h1 className="dash-title">Bon retour, <span className="muted-name">{name}</span></h1>
+              <p className="muted">Votre profil d'investisseur, tel que l'outil l'utilise pour cadrer vos simulations. Profil fictif : aucune donnée personnelle réelle.</p>
+            </div>
           </div>
           <div className="dash-actions">
             <span className="date-chip">📅 {today}</span>
-            <button type="button" className="btn" onClick={() => { setSaved(false); setEditing((v) => !v); }}>
-              {editing ? "Fermer la modification" : "Modifier mon profil"}
-            </button>
+            {p ? (
+              <button type="button" className="btn" onClick={() => { setSaved(false); setEditing((v) => !v); }}>
+                {editing ? "Fermer la modification" : "Modifier mon profil"}
+              </button>
+            ) : (
+              <Link to="/portefeuille" className="btn">Créer mon portefeuille</Link>
+            )}
           </div>
         </div>
         {warning && !p && <div className="banner warn" style={{ marginBottom: 16 }}>{warning}</div>}
-        {!p && <div className="banner" style={{ background: "var(--ghost)", marginBottom: 16 }}>Profil non rempli : remplissez la tolérance, la capacité, l'horizon et l'objectif pour lancer une analyse.</div>}
+        {!p && <div className="banner" style={{ background: "var(--ghost)", marginBottom: 16 }}>Profil non rempli : <Link to="/portefeuille" className="link">créez votre portefeuille</Link> pour répondre au questionnaire investisseur.</div>}
         {p && retained === null && (
           <div className="banner warn" style={{ marginBottom: 16 }}>Profil ancien incomplet : la capacité à encaisser une perte manque. Complétez-la dans « Modifier mon profil ».</div>
         )}

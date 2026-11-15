@@ -1,7 +1,7 @@
 /* Une fonction par route du contrat (section apis). Le front ne calcule rien : il affiche ce que ces routes renvoient. */
 import { request } from "./client";
 import type {
-  AgentsRegistry, Asset, Conversation, Holding, InvestorProfile, Mandate, MandateCreateRequest,
+  AgentsRegistry, Asset, AssetDetail, Conversation, Holding, InvestorProfile, Mandate, MandateCreateRequest,
   Message, MessageCreateResponse, Page, Portfolio, PortfolioSummary, Run, RunCreateRequest,
   SpeechSession, SummaryRange, User,
 } from "./types";
@@ -34,6 +34,8 @@ export const getSummary = (portfolioId: string, range: SummaryRange) =>
 export const searchAssets = (q: string, assetClass?: string, signal?: AbortSignal) =>
   request<{ items: Asset[] }>("/market/search", { query: { q, assetClass }, signal });
 
+export const getAssetDetail = (ticker: string, range: SummaryRange, signal?: AbortSignal) =>
+  request<AssetDetail>(`/market/assets/${enc(ticker)}`, { query: { range }, signal });
 export const getAgentsRegistry = () => request<AgentsRegistry>("/agents");
 
 /* v0.4.0 : mandats (Lambda API, sans LLM) et runs (Lambda agents) */

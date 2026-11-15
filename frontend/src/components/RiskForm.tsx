@@ -37,7 +37,7 @@ export default function RiskForm({
         <span className="muted small">{done} / {QUESTIONS.length}</span>
       </div>
       {QUESTIONS.map((q, i) => (
-        <fieldset key={q.id} className={`q${tried && answers[q.id] === undefined ? " missing" : ""}`}>
+        <fieldset key={q.id} className={`q risk-question${tried && answers[q.id] === undefined ? " missing" : ""}`}>
           <legend>{i + 1}. {q.label}</legend>
           <div className="opts">
             {q.options.map((o, j) => (
@@ -49,9 +49,9 @@ export default function RiskForm({
           </div>
         </fieldset>
       ))}
-      <fieldset className={`q${tried && missingProvince ? " missing" : ""}`}>
+      <fieldset className={`q province-question${tried && missingProvince ? " missing" : ""}`}>
         <legend>{QUESTIONS.length + 1}. Province ou territoire de résidence</legend>
-        <div className="field" style={{ maxWidth: 320 }}>
+        <div className="field province-field">
           <select className="input" value={province} onChange={(e) => setProvince(e.target.value)} aria-label="Province ou territoire">
             <option value="">Sélectionner…</option>
             {PROVINCES.map((p) => <option key={p.code} value={p.code}>{p.label} ({p.code})</option>)}
@@ -60,14 +60,14 @@ export default function RiskForm({
         <p className="muted small" style={{ margin: "6px 0 0" }}>Sert à afficher les mentions propres à votre province. Aucune autre donnée personnelle n'est requise.</p>
       </fieldset>
       {showIndustries && (
-        <fieldset className="q">
+        <fieldset className="q preference-question">
           <legend>{QUESTIONS.length + 2}. Industries : ce que vous aimez et ce que vous préférez éviter (facultatif, plusieurs choix possibles)</legend>
           <IndustryPicker value={industries} onChange={setIndustries} />
         </fieldset>
       )}
       {tried && (!isComplete(answers) || missingProvince) && <p className="error" role="alert">Répondez à toutes les questions, y compris la province.</p>}
       {children}
-      <div><button className="btn" disabled={busy}>{submitLabel}</button></div>
+      <div className="questionnaire-actions"><button className="btn" disabled={busy}>{submitLabel}</button></div>
     </form>
   );
 }

@@ -1,12 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ApiError, errorText } from "../api/errors";
 import { getSummary, listPortfolios, putHoldings, searchAssets } from "../api/endpoints";
-import type { Asset, Holding, Portfolio, PortfolioSummary, Slice, SummaryRange } from "../api/types";
+import type { Asset, Holding, Jurisdiction, Portfolio, PortfolioSummary, Slice, SummaryRange } from "../api/types";
 import AppHeader from "../components/AppHeader";
 import Chart from "../components/Chart";
 import Explanation from "../components/Explanation";
 import { t as tr } from "../lib/i18n";
+import RiskForm from "../components/RiskForm";
 import { amount, money, pct, plainPct, shortDate, signedAmount, toSeconds } from "../lib/format";
+import { profileFromAnswers, saveRisk } from "../lib/risk";
+import type { IndustryChoice } from "../lib/industries";
+import { useApp } from "../lib/store";
 import { TickerLabel } from "../components/TickerLogo";
 
 const RANGES: { key: SummaryRange; label: string }[] = [
@@ -51,11 +55,15 @@ function Alloc({ title, items }: { title: string; items: Slice[] }) {
 }
 
 export default function PortfolioPage() {
+  const { user, saveProfile } = useApp();
+  const [profileReady, setProfileReady] = useState(() => Boolean(user?.investorProfile));
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
   const [rows, setRows] = useState<Row[]>([]);
   const [range, setRange] = useState<SummaryRange>("1y");
   const [summary, setSummary] = useState<PortfolioSummary | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => Boolean(user?.investorProfile));
+  const [onboardingBusy, setOnboardingBusy] = useState(false);
+  const [onboardingError, setOnboardingError] = useState("");
   const [sumLoading, setSumLoading] = useState(false);
   const [error, setError] = useState("");
   const [sumError, setSumError] = useState("");
@@ -68,6 +76,8 @@ export default function PortfolioPage() {
   const sumSeq = useRef(0);
 
   useEffect(() => {
+    if (!profileReady) return;
+    setLoading(true);
     listPortfolios()
       .then(({ items }) => {
         const p = items.find((x) => x.portfolioId === "main") ?? items[0];
@@ -76,7 +86,26 @@ export default function PortfolioPage() {
       })
       .catch((e) => setError(errorText(e)))
       .finally(() => setLoading(false));
-  }, []);
+  }, [profileReady]);
+
+  async function createPortfolio(
+    answers: Record<string, number>,
+    province: Jurisdiction,
+    industries: IndustryChoice,
+  ) {
+    if (!user) return;
+    setOnboardingBusy(true); setOnboardingError("");
+    try {
+      await saveProfile(profileFromAnswers(answers, province, industries));
+      // Le contrat crée le portefeuille principal au prochain GET /portfolios.
+      saveRisk(user.userId, ["main"], answers, province);
+      setProfileReady(true);
+    } catch (e) {
+      setOnboardingError(errorText(e));
+    } finally {
+      setOnboardingBusy(false);
+    }
+  }
 
   const loadSummary = useCallback(async (p: Portfolio, r: SummaryRange) => {
     const seq = ++sumSeq.current;
@@ -143,7 +172,36 @@ export default function PortfolioPage() {
     return pts.length > 1 ? { values: pts.map((p) => p.value), timestamps: pts.map((p) => toSeconds(p.date)) } : null;
   }, [summary]);
 
-  if (loading) return <><AppHeader /><main className="wrap"><p className="muted" style={{ padding: "48px 0" }}>Chargement…</p></main></>;
+  if (!profileReady) {
+    return (
+      <>
+        <AppHeader />
+        <main className="wrap onboarding-page">
+          <section className="onboarding-card" aria-labelledby="onboarding-title">
+            <header className="onboarding-head">
+              <div className="eyebrow onboarding-kicker">
+                <span>Création du portefeuille</span>
+                <span className="tag">Étape 1</span>
+              </div>
+              <h1 id="onboarding-title" className="auth-h">Quel investisseur êtes-vous&nbsp;?</h1>
+              <p className="muted onboarding-intro">
+                Répondez à ces questions pour établir le profil utilisé par vos simulations. Votre portefeuille principal sera créé ensuite.
+              </p>
+            </header>
+            <RiskForm
+              showIndustries
+              busy={onboardingBusy}
+              submitLabel={onboardingBusy ? "Création…" : "Créer mon portefeuille"}
+              onSubmit={createPortfolio}
+            >
+              {onboardingError && <p className="error" role="alert">{onboardingError}</p>}
+            </RiskForm>
+          </section>
+        </main>
+      </>
+    );
+  }
+  if (loading) return <><AppHeader /><main className="wrap"><p className="muted" style={{ padding: "48px 0" }}>Création du portefeuille…</p></main></>;
   if (!portfolio) return <><AppHeader /><main className="wrap"><p className="error" role="alert" style={{ padding: "48px 0" }}>{error}</p></main></>;
 
   const cur = summary?.baseCurrency ?? portfolio.baseCurrency;
