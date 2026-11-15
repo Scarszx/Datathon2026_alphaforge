@@ -1,4 +1,4 @@
-"""agent-auditor : fonde chaque verdict sur un passage de la KB (citations KB-nn) et formule messageEn.
+"""agent-auditor : rattache chaque règle déclenchée à un passage de la KB (citations KB-nn) et formule messageEn.
 
 Le CODE lance les recherches, pas le modèle. Pour chaque règle (R1…R9) il y a une
 recherche par sujet de la règle (RULE_SUBJECTS, exactement, un sujet par
@@ -8,16 +8,16 @@ proches de la RÈGLE, pas de la phrase d'un modèle. Les passages de tous les
 sujets sont fusionnés (un par sujet d'abord), dédoublonnés, plafonnés à 5, et
 seuls ceux dont la juridiction est dans {CA, province} sont gardés.
 
+Seules les règles déclenchées (warn, fail) sont auditées (lot A) : un pass ou un
+not_verified n'a ni recherche ni citation, car un extrait du régulateur à côté
+d'une règle « non déclenchée » se lirait comme un accord sur l'idée
+(GN-3200-26-001, 2.1.1). Une citation nomme le principe dont la règle s'inspire.
+
 Le modèle ne reçoit aucun outil : il lit les passages de chaque groupe de
-verdicts (règle, statut) et répond « P2 soutient le verdict » ou « aucun ». Le
+verdicts (règle, statut) et répond « P2 soutient la règle » ou « aucun ». Le
 code reconstruit la citation à partir de ce que la KB a réellement renvoyé ; une
 référence qui n'est pas dans les candidats du groupe est ignorée. Aucun passage
-retenu : pas de citation, motif par défaut (« fondement : hypothèse d'équipe »
-ou not_verified côté affichage).
-
-Un « pass » dit seulement « cette règle n'a pas sauté » : son motif reste la
-phrase par défaut de module-rules, jamais une phrase du modèle à côté d'un
-extrait de l'OCRCVM/ACVM qui ressemblerait à une approbation.
+retenu : pas de citation, motif par défaut.
 """
 
 from __future__ import annotations
@@ -138,7 +138,7 @@ def _prompt_groups(groups: dict[str, dict[str, Any]], candidates: dict[str, list
 
 def audit(ctx: RequestContext, verdicts: list[dict[str, Any]], registry: EvidenceRegistry) -> list[dict[str, Any]]:
     """Renvoie les verdicts enrichis (citations, messageEn) ; inscrit les KB-nn au registre."""
-    groups = {k: g for k, g in verdict_groups(verdicts).items() if needs_regulation(g["rule"], g["reasonCode"])}
+    groups = {k: g for k, g in verdict_groups(verdicts).items() if needs_regulation(g["rule"], g["reasonCode"], g["status"])}
     if not groups:
         return verdicts  # rien à fonder : motifs par défaut, aucun appel de modèle
     candidates = _candidates_for(ctx, groups)
@@ -172,9 +172,7 @@ def audit(ctx: RequestContext, verdicts: list[dict[str, Any]], registry: Evidenc
                 )
             if kb_by_ref[ref] not in citations:
                 citations.append(kb_by_ref[ref])
-        # Un pass garde sa phrase par défaut : « aucune règle n'a sauté », jamais « le régulateur est d'accord ».
-        message = group["defaultMessage"] if group["status"] == "pass" else _safe_message(item.message_en, group["defaultMessage"])
-        by_key[item.key] = (citations, message)
+        by_key[item.key] = (citations, _safe_message(item.message_en, group["defaultMessage"]))
     enriched = []
     for verdict in verdicts:
         citations, message = by_key.get(f"{verdict['rule']}:{verdict['status']}", ([], verdict["messageEn"]))
