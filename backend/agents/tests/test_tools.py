@@ -361,6 +361,11 @@ def test_propose_mandate_build_sans_preferences(ctx, relaxed_optimizer):
     assert "operations" not in ctx.captured["mandateDraft"]
 
 
+def test_propose_mandate_build_conserve_le_montant(ctx, relaxed_optimizer):
+    result = catalog.propose_mandate(ctx, {**_build_draft(), "buildAmount": 50000, "fieldSources": {"buildAmount": "user_answer"}})
+    assert result["valid"] is True and ctx.captured["mandateDraft"]["buildAmount"] == 50000
+
+
 @pytest.mark.parametrize("draft,expected", [
     ({**_build_draft(), "operations": [{"action": "add", "ticker": "NVDA", "amount": 1000}]}, "no operations"),
     ({**_build_draft(), "subjectTicker": "NVDA"}, "no operations"),

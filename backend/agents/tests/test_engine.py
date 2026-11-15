@@ -290,6 +290,35 @@ def test_mode_build_portefeuille_vide_utilise_un_montant_notionnel(store, build_
     assert [s.index for s in result.scenarios] == [0, 1] and result.scenarios[1].weights
 
 
+def test_mode_build_montant_demande_et_quantites(store, build_config):
+    from backend.agents.engine import analytics as an
+    from backend.agents.engine.scenarios import holding_values_cad
+
+    item = _build_item()
+    item["mandate"]["buildAmount"] = 50_000
+    registry = EvidenceRegistry("en")
+    result = run_engine(store, item, {"holdings": [], "baseCurrency": "CAD"}, registry)
+    built = result.scenarios[1]
+    assert sum(built.positions_cad.values()) == pytest.approx(50_000)
+    amount = next(p for p in built.parameters if p["key"] == "amount")
+    assert amount["value"] == 50_000 and amount["origin"] == "user" and "evidence" not in amount
+    # quantité x dernier cours (x USD/CAD) retombe sur le montant demandé
+    end = an.pd.Timestamp(max(store.prices(h["symbol"]).index.max() for h in built.holdings))
+    holdings = [{"ticker": h["symbol"], "quantity": h["quantity"]} for h in built.holdings]
+    values, _ = holding_values_cad(store, holdings, end)
+    assert sum(values.values()) == pytest.approx(50_000, rel=1e-3)
+    for h in built.holdings:
+        assert h["quantity"] > 0 and h["price"] > 0 and h["currency"] == "USD"
+
+
+def test_mode_build_portefeuille_vide_montant_par_defaut_est_une_hypothese(store, build_config):
+    registry = EvidenceRegistry("en")
+    result = run_engine(store, _build_item(), {"holdings": [], "baseCurrency": "CAD"}, registry)
+    amount = next(p for p in result.scenarios[1].parameters if p["key"] == "amount")
+    assert amount["value"] == 100_000 and amount["origin"] == "default"
+    assert registry.get(amount["evidence"])["kind"] == "assumption"
+
+
 def test_mode_build_impossible_ne_casse_pas_le_run(store, build_config):
     result = run_engine(store, _build_item(excludedIndustries=["Information Technology (synthetic)"]),
                         {"holdings": robert_holdings(store), "baseCurrency": "CAD"}, EvidenceRegistry("en"))

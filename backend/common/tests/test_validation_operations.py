@@ -59,3 +59,26 @@ def test_categories_sans_symbole_dans_les_libelles_et_triees_par_niveau():
     assert len({c["id"] for c in items}) == len(items)
     for category in items:
         assert not any(proxy in category["label"] for proxy in category["proxies"])
+
+
+# --- buildAmount (onboarding, 0.4.16) --------------------------------------------------------------------------------
+
+
+def _build_body(**extra):
+    body = _mandate_body(mode="build", **extra)
+    body.pop("operations")
+    return body
+
+
+def test_build_amount_facultatif_positif_et_reserve_au_mode_build():
+    from backend.common.validation import validate_mandate_create
+
+    assert "buildAmount" not in validate_mandate_create(_build_body())
+    assert validate_mandate_create(_build_body(buildAmount=50000))["buildAmount"] == 50000
+    for bad in (0, -1, "50000", True, 10**9, float("nan")):
+        with pytest.raises(ApiError) as error:
+            validate_mandate_create(_build_body(buildAmount=bad))
+        assert error.value.code == "VALIDATION_ERROR"
+    with pytest.raises(ApiError) as error:  # hors mode build
+        validate_mandate_create(_mandate_body(buildAmount=50000))
+    assert error.value.code == "VALIDATION_ERROR"

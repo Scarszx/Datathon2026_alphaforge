@@ -40,6 +40,7 @@ PROVINCES = (
 )
 
 MANDATE_MODES = ("add_asset", "rebalance", "diagnose", "build")
+MAX_BUILD_AMOUNT = 100_000_000  # montant fictif du mode build (CAD), borne de bon sens
 MANDATE_OBJECTIVES = ("growth", "income", "preservation", "project", "retirement")
 OPERATION_ACTIONS = ("add", "remove", "set_weight")
 CURRENCIES = ("CAD", "USD")
@@ -61,6 +62,7 @@ MANDATE_FIELDS = (
     "operations",
     "subjectTicker",
     "compareCategory",
+    "buildAmount",
     "fieldSources",
 )
 
@@ -429,6 +431,14 @@ def validate_mandate_create(body: dict[str, Any]) -> dict[str, Any]:
             values = ", ".join(category_ids())
             raise _validation_error(f"compareCategory doit être l'un de : {values}.")
         mandate["compareCategory"] = compare_category
+
+    build_amount = _number(body, "buildAmount", required=False)
+    if build_amount is not None:
+        if mode != "build":
+            raise _validation_error("buildAmount n'est permis qu'en mode build.")
+        if build_amount <= 0 or build_amount > MAX_BUILD_AMOUNT:
+            raise _validation_error(f"buildAmount doit être supérieur à 0 et au plus {MAX_BUILD_AMOUNT:,.0f}.")
+        mandate["buildAmount"] = build_amount
 
     if "fieldSources" in body:
         mandate["fieldSources"] = _validate_field_sources(body["fieldSources"])

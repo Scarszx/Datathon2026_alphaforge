@@ -25,6 +25,7 @@ from backend.common.ids import new_message_id
 from backend.common.repositories import analyses as analyses_repo
 from backend.common.repositories import conversations as conversations_repo
 from backend.common.repositories import messages as messages_repo
+from backend.common.repositories import portfolios as portfolios_repo
 from backend.common.repositories import users as users_repo
 from backend.common.validation import parse_json_body, session_id
 
@@ -51,6 +52,7 @@ def _session_context(user_id: str, session: str, conversation: dict[str, Any]) -
     context: dict[str, Any] = {
         "knownUserLanguage": conversation.get("userLanguage"),
         "profileFilled": profile is not None,
+        "portfolioEmpty": not ((portfolios_repo.get_portfolio(user_id, "main") or {}).get("holdings")),
         "province": (mandate or {}).get("mandate", {}).get("province") or (profile or {}).get("province"),
     }
     if mandate:
