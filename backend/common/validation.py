@@ -21,7 +21,6 @@ from backend.common.http import ApiError
 # Même borne que la couche d'accès DynamoDB (backend/common/repositories).
 MAX_LIMIT = 100
 
-RISK_LEVELS = ("low", "low_moderate", "moderate", "high")
 
 # Juridictions provinciales/territoriales du contrat (conventions.jurisdictions hors CA).
 PROVINCES = (
@@ -208,16 +207,15 @@ def validate_investor_profile(body: dict[str, Any]) -> dict[str, Any]:
             "excludedAssetClasses",
         ),
     )
-    risk_level = _string(body, "riskLevel")
-    if risk_level not in RISK_LEVELS:
-        values = ", ".join(RISK_LEVELS)
-        raise _validation_error(f"riskLevel doit être l'un de : {values}.")
-    risk_tolerance = _integer(body, "riskTolerance", required=False)
-    if risk_tolerance is not None:
-        _validate_risk_score(risk_tolerance, "riskTolerance")
-    risk_capacity = _integer(body, "riskCapacity", required=False)
-    if risk_capacity is not None:
-        _validate_risk_score(risk_capacity, "riskCapacity")
+    # riskLevel (ancienne échelle à quatre libellés) est accepté pour ne pas casser les anciens clients, puis ignoré :
+    # une seule échelle existe (tolérance et capacité de 1 à 5, niveau retenu = le plus bas des deux ; lot C).
+    _string(body, "riskLevel", required=False)
+    risk_tolerance = _integer(body, "riskTolerance")
+    assert risk_tolerance is not None
+    _validate_risk_score(risk_tolerance, "riskTolerance")
+    risk_capacity = _integer(body, "riskCapacity")
+    assert risk_capacity is not None
+    _validate_risk_score(risk_capacity, "riskCapacity")
     province = _string(body, "province", required=False)
     if province is not None:
         _validate_province(province)
@@ -225,14 +223,11 @@ def validate_investor_profile(body: dict[str, Any]) -> dict[str, Any]:
     horizon_max = _integer(body, "horizonMaxYears", required=False)
     objective = _string(body, "objective")
     profile: dict[str, Any] = {
-        "riskLevel": risk_level,
+        "riskTolerance": risk_tolerance,
+        "riskCapacity": risk_capacity,
         "horizonMinYears": horizon_min,
         "objective": objective,
     }
-    if risk_tolerance is not None:
-        profile["riskTolerance"] = risk_tolerance
-    if risk_capacity is not None:
-        profile["riskCapacity"] = risk_capacity
     if province is not None:
         profile["province"] = province
     if horizon_max is not None:

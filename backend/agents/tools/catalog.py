@@ -174,7 +174,9 @@ def get_portfolio(ctx: RequestContext) -> dict[str, Any]:
 
 def get_profile(ctx: RequestContext) -> dict[str, Any]:
     user = users_repo.get_user(ctx.user_id)
-    return {"investorProfile": (user or {}).get("investorProfile")}
+    profile = (user or {}).get("investorProfile")
+    # riskLevel (ancienne échelle à quatre libellés) n'est plus transmis : une seule échelle, tolérance et capacité 1-5.
+    return {"investorProfile": {k: v for k, v in profile.items() if k != "riskLevel"} if profile else profile}
 
 
 def propose_mandate(ctx: RequestContext, draft: dict[str, Any]) -> dict[str, Any]:
@@ -205,6 +207,10 @@ def propose_mandate(ctx: RequestContext, draft: dict[str, Any]) -> dict[str, Any
         return {"valid": False, "errors": ["operations must describe the tested idea for add_asset and rebalance."]}
     if mandate["mode"] == "diagnose" and not mandate.get("subjectTicker"):
         return {"valid": False, "errors": ["subjectTicker is required for diagnose."]}
+    if (mandate.get("fieldSources") or {}).get("riskCapacity") == "team_assumption":
+        # Observé dans Langfuse le 2026-11-15 : capacité 2 inventée et marquée hypothèse d'équipe, sans question à l'utilisateur.
+        return {"valid": False, "errors": [
+            "riskCapacity cannot be a team assumption: use the profile value, or ask the user for it with quick replies."]}
     derived = evaluate_mandate(mandate)
     ctx.captured["mandateDraft"] = mandate
     return {"valid": True, "errors": [], **derived}

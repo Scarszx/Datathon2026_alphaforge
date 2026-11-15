@@ -67,3 +67,7 @@ Signatures de WS0/WS0b/WS2/WS2b inchangées. Points relevés pendant l'implémen
       `> 8` ans : `35`), surchargeables via `RULES_CONFIG_PATH`.
     - **Contrôle de cohérence (`warnings`) :** rédigés en anglais conformément
       à `conventions.language_policy` (tout le système interne est en anglais).
+
+## Lot C : profil investisseur (2026-11-15)
+
+15. **`riskTolerance` et `riskCapacity` sont obligatoires** (1 à 5) dans `PUT /me/profile` ; `riskLevel` reste accepté s'il est une chaîne, mais il est ignoré et jamais stocké (anciens clients). Un profil sans tolérance est refusé en `VALIDATION_ERROR`. Les profils déjà stockés ne sont pas migrés : le prochain `PUT` doit fournir les deux champs.
