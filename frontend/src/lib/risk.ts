@@ -1,5 +1,6 @@
 /* Questionnaire de profil de risque : chaque réponse vaut de 1 à 5 points (score total : 5 à 25).
  * v0.4.0 : tolérance et capacité de perte séparées (règle R1, avis 31-368), et province pour la Knowledge Base et les mentions R9. */
+import { industryPrefs } from "./industries";
 import type { InvestorProfile, Jurisdiction, RiskLevel } from "../api/types";
 
 export type Question = { id: string; label: string; options: string[] }; // options[i] vaut i + 1 point
@@ -116,7 +117,7 @@ export function isComplete(answers: Record<string, number>) {
  * v0.4.0 : tolérance et capacité de perte séparées — la question « Perte maximale acceptable » donne la
  * tolérance (ce que la personne accepte de subir), la question « Capacité financière » la capacité (R1).
  */
-export function profileFromAnswers(answers: Record<string, number>, province?: Jurisdiction): InvestorProfile {
+export function profileFromAnswers(answers: Record<string, number>, province?: Jurisdiction, industries: string[] = []): InvestorProfile {
   const [min, max] = HORIZONS[answers.horizon];
   const goal = QUESTIONS.find((q) => q.id === "goal")!.options[answers.goal];
   return {
@@ -127,6 +128,6 @@ export function profileFromAnswers(answers: Record<string, number>, province?: J
     horizonMinYears: min,
     ...(max !== null ? { horizonMaxYears: max } : {}),
     objective: goal,
-    constraints: [], preferences: [], excludedAssetClasses: [],
+    constraints: [], preferences: industryPrefs(industries), excludedAssetClasses: [],
   };
 }

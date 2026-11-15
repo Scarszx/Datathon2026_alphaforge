@@ -1,6 +1,7 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import { isComplete, PROVINCES, QUESTIONS, riskCalc, riskLevelOf, RISK_LABELS, SCORE_MAX, SCORE_MIN, totalScore } from "../lib/risk";
 import type { Jurisdiction } from "../api/types";
+import IndustryPicker from "./IndustryPicker";
 
 type Answers = Record<string, number>;
 
@@ -9,13 +10,14 @@ type Answers = Record<string, number>;
  * N'enregistre rien : `onSubmit` reçoit les réponses complètes et la province choisie.
  */
 export default function RiskForm({
-  initial = {}, initialProvince = "", submitLabel, busy = false, onSubmit, children,
+  initial = {}, initialProvince = "", showIndustries = false, submitLabel, busy = false, onSubmit, children,
 }: {
-  initial?: Answers; initialProvince?: string; submitLabel: string; busy?: boolean;
-  onSubmit: (a: Answers, province: Jurisdiction) => void; children?: ReactNode;
+  initial?: Answers; initialProvince?: string; showIndustries?: boolean; submitLabel: string; busy?: boolean;
+  onSubmit: (a: Answers, province: Jurisdiction, industries: string[]) => void; children?: ReactNode;
 }) {
   const [answers, setAnswers] = useState<Answers>(initial);
   const [province, setProvince] = useState(initialProvince);
+  const [industries, setIndustries] = useState<string[]>([]);
   const [tried, setTried] = useState(false);
   const done = QUESTIONS.filter((q) => answers[q.id] !== undefined).length;
   const missingProvince = !PROVINCES.some((p) => p.code === province);
@@ -23,7 +25,7 @@ export default function RiskForm({
   function submit(e: FormEvent) {
     e.preventDefault();
     setTried(true);
-    if (isComplete(answers) && !missingProvince) onSubmit(answers, province as Jurisdiction);
+    if (isComplete(answers) && !missingProvince) onSubmit(answers, province as Jurisdiction, industries);
   }
 
   return (
@@ -55,6 +57,12 @@ export default function RiskForm({
         </div>
         <p className="muted small" style={{ margin: "6px 0 0" }}>Sert à afficher les mentions propres à votre province. Aucune autre donnée personnelle n'est requise.</p>
       </fieldset>
+      {showIndustries && (
+        <fieldset className="q">
+          <legend>{QUESTIONS.length + 2}. Industries qui vous intéressent (facultatif, plusieurs choix possibles)</legend>
+          <IndustryPicker value={industries} onChange={setIndustries} />
+        </fieldset>
+      )}
       {tried && (!isComplete(answers) || missingProvince) && <p className="error" role="alert">Répondez à toutes les questions, y compris la province.</p>}
       {children}
       <div><button className="btn" disabled={busy}>{submitLabel}</button></div>

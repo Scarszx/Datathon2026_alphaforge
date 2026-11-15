@@ -26,6 +26,7 @@ export default function Register() {
   const [errs, setErrs] = useState<Record<string, string>>({});
   const answers = useRef<Answers | null>(null);
   const provinceRef = useRef<Jurisdiction | null>(null);
+  const industriesRef = useRef<string[]>([]);
   const [code, setCode] = useState("");
   const [err, setErr] = useState("");
   const [info, setInfo] = useState("");
@@ -53,8 +54,9 @@ export default function Register() {
     if (Object.keys(x).length === 0) { setErr(""); setStep("risk"); }
   }
 
-  async function create(a: Answers, province: Jurisdiction) {
+  async function create(a: Answers, province: Jurisdiction, industries: string[]) {
     answers.current = a;
+    industriesRef.current = industries;
     provinceRef.current = province;
     setBusy(true); setErr("");
     let confirmed: boolean;
@@ -108,7 +110,7 @@ export default function Register() {
     const province = provinceRef.current!;
     let warning = "";
     try {
-      await saveProfile(profileFromAnswers(a, province));
+      await saveProfile(profileFromAnswers(a, province, industriesRef.current));
     } catch (x) {
       warning = `Compte créé, mais le profil n'a pas pu être enregistré : ${errorText(x)} Vous pouvez le remplir sur cette page.`;
     }
@@ -135,9 +137,9 @@ export default function Register() {
         <main className="wrap" style={{ maxWidth: 720, padding: "40px 24px 80px" }}>
           <h1 className="auth-h">Votre profil financier</h1>
           <p className="muted" style={{ margin: "6px 0 24px" }}>
-            Cinq questions pour situer votre tolérance au risque, plus votre province. Aucune information sensible n'est requise.
+            Cinq questions pour situer votre tolérance au risque, plus votre province et vos industries d'intérêt. Aucune information sensible n'est requise.
           </p>
-          <RiskForm busy={busy} submitLabel={busy ? "Création…" : "Créer mon compte"} onSubmit={create}>
+          <RiskForm showIndustries busy={busy} submitLabel={busy ? "Création…" : "Créer mon compte"} onSubmit={create}>
             {err && <p className="error" role="alert">{err}</p>}
           </RiskForm>
           <button type="button" className="link" style={{ marginTop: 16 }} onClick={() => setStep("account")}>← Retour</button>
