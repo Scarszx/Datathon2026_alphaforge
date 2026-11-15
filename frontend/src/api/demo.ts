@@ -179,13 +179,12 @@ function demoExplanation(tool: string, params: Record<string, unknown>): Explana
     assumptions: [`Taux USD/CAD fixe : ${USDCAD}`],
     limitations: ["Simulation locale : aucune donnée de marché réelle, aucun agent réel."],
     steps: [{ agentId: "demo", tool, params, status: "ok", durationMs: 1 }],
-    checks: [{ agentId: "demo", rule: "simulation_only", status: "pass", message: "Aucune transaction réelle." }],
+    checks: [{ agentId: "demo", rule: "simulation_only", status: "pass", reasonCode: "SIMULATION_ONLY", message: "Aucune transaction réelle." }],
   };
 }
 
 /* ---------- Orchestrateur simulé (v0.4.0 : cadrage → mandat confirmé → analyse) ---------- */
 
-const RISK_FR: Record<string, string> = { low: "faible", low_moderate: "faible à modéré", moderate: "modéré", high: "élevé" };
 const QUICK_REPLIES = ["Et si j'ajoutais un titre ?", "Rééquilibrer mon portefeuille", "Diagnostiquer mon portefeuille"];
 
 function detectMode(text: string): MandateMode | null {
@@ -256,6 +255,8 @@ function validateMandate(req: MandateCreateRequest, portfolios: Portfolio[]): vo
     fail("La perte maximale acceptable doit être un pourcentage entre 0 (exclu) et 100.");
   if (!JURISDICTIONS.includes(req.province)) fail(`Province inconnue : ${req.province}.`);
   if (req.province === "CA") fail("La province « CA » désigne les textes nationaux, pas une province de résidence : choisissez votre province.");
+  if (req.compareCategory !== undefined && !["short-term-bonds", "aggregate-bonds", "balanced-allocation", "canadian-equity", "us-equity", "global-equity"].includes(req.compareCategory))
+    fail(`Catégorie de comparaison inconnue : ${req.compareCategory}.`);
   for (const op of req.operations ?? []) {
     if (!["add", "remove", "set_weight"].includes(op.action)) fail(`Opération inconnue : ${op.action}.`);
     if (!op.ticker?.trim()) fail("Chaque opération doit nommer un ticker.");
@@ -280,13 +281,13 @@ function orchestratorReply(db: DB, u: DemoUser, sessionId: string, text: string)
   const prior = (db.messages[sessionId] ?? []).filter((x) => x.role === "assistant");
   const prof = u.investorProfile;
   const profLine = prof
-    ? `Votre profil indique un risque ${RISK_FR[prof.riskLevel] ?? prof.riskLevel}${prof.riskTolerance ? `, une tolérance de ${prof.riskTolerance}/5 et une capacité de ${prof.riskCapacity ?? "?"}/5` : ""}${prof.province ? ` (province : ${prof.province})` : ""}.`
+    ? `${prof.riskTolerance ? `Votre profil indique une tolérance de ${prof.riskTolerance}/5 et une capacité de ${prof.riskCapacity ?? "?"}/5 (niveau retenu : ${Math.min(prof.riskTolerance, prof.riskCapacity ?? 5)}/5).` : "Votre profil n'indique pas encore la tolérance et la capacité de perte."}${prof.province ? ` Province : ${prof.province}.` : ""}`
     : "Votre profil investisseur n'est pas rempli (page Profil) : le mandat utilisera des valeurs par défaut prudentes.";
 
   // 1. Cadrage : au plus une étape de questions, aucun calcul tant que le mandat n'est pas confirmé.
   if (!prior.length) {
     const welcome = p && p.holdings.length
-      ? `Je comprends que vous voulez tester une idée. Je ne calcule rien et je ne recommande rien : je cadre votre intention en un mandat, puis j'audite l'analyse contre les textes réglementaires canadiens. ${profLine}`
+      ? `Je comprends que vous voulez tester une idée. Je ne calcule rien et je ne suggère rien : je cadre votre intention en un mandat, puis j'audite l'analyse contre les textes réglementaires canadiens. ${profLine}`
       : `Votre portefeuille est vide : ajoutez des positions sur la page Portefeuille, puis revenez cadrer votre idée. ${profLine}`;
     return { ...base, messageId: id("m"), role: "assistant", content: welcome, quickReplies: QUICK_REPLIES, explanation: demoExplanation("assistant.frame", { sessionId }) };
   }
@@ -321,17 +322,37 @@ const worstWindow = (v: number[], days: number) => {
   return w * 100;
 };
 
+/** Scénarios du run : 0 actuel, 1 idée telle quelle, 2 comparaison par catégorie SEULEMENT si le mandat
+ *  porte compareCategory (0.4.5). Aucun symbole dans les textes du scénario 2 (R5) : libellé générique
+ *  de la catégorie, description sans titre, proxyNote sans symbole. */
 function scenarioPortfolios(p: Portfolio, mandate: MandateCreateRequest): { holdings: { ticker: string; quantity: number }[]; label: string; description?: string; proxyNote?: string }[] {
   const cur = p.holdings.map(({ ticker, quantity }) => ({ ticker, quantity }));
-  const s0 = { holdings: cur, label: "Portefeuille actuel" };
-  const s1 = { holdings: applyOps(cur, mandate, p), label: "Idée telle quelle" };
-  const broad = mandate.mode === "diagnose" ? (mandate.subjectTicker ? "XIC" : undefined) : mandate.subjectTicker ? "XIC" : undefined;
-  const altHoldings = mandate.subjectTicker
-    ? cur.map((h) => (h.ticker === mandate.subjectTicker && broad ? { ticker: broad, quantity: Math.round((h.quantity * (asset(mandate.subjectTicker!)?.price ?? 1)) / (asset(broad)?.price ?? 1)) } : h))
-    : cur;
-  const s2 = { holdings: altHoldings, label: "Alternative (par catégorie d'actifs)", description: "Exposition large équivalente, formulée par catégorie d'actifs : jamais la recommandation d'un titre précis.", proxyNote: mandate.subjectTicker ? `Exposition approchée par XIC pour le calcul (mode démo).` : undefined };
-  return [s0, s1, s2];
+  const out: { holdings: { ticker: string; quantity: number }[]; label: string; description?: string; proxyNote?: string }[] = [
+    { holdings: cur, label: "Portefeuille actuel" },
+    { holdings: applyOps(cur, mandate, p), label: "Idée telle quelle" },
+  ];
+  if (mandate.compareCategory) {
+    const amount = mandate.operations?.[0]?.amount;
+    const proxy = PROXY_BY_CATEGORY[mandate.compareCategory] ?? "ZAG";
+    const replaced = cur.map((h) => (mandate.operations?.some((op) => op.action === "add" || op.action === "set_weight") && h.ticker === mandate.operations?.[0]?.ticker
+      ? { ticker: proxy, quantity: amount ? Math.round(amount / (asset(proxy)?.price ?? 1)) : h.quantity }
+      : h));
+    const holdings = replaced.some((h) => h.ticker === proxy) ? replaced : [...replaced, { ticker: proxy, quantity: amount ? Math.round(amount / (asset(proxy)?.price ?? 1)) : 0 }];
+    out.push({
+      holdings,
+      label: "Comparaison par catégorie d'actifs",
+      description: `Same amount allocated to the selected category, a category this tool places at its level. La comparaison ne juge pas votre idée : elle montre le même montant alloué à une catégorie d'actifs.`,
+      proxyNote: "Un fonds du jeu de données sert d'approximation pour le calcul seulement ; la catégorie est affichée, jamais un titre.",
+    });
+  }
+  return out;
 }
+
+/* Approximation de calcul du scénario 2 : n'apparaît jamais dans un libellé visible (R5, 0.4.5). */
+const PROXY_BY_CATEGORY: Record<NonNullable<MandateCreateRequest["compareCategory"]>, string> = {
+  "short-term-bonds": "ZAG", "aggregate-bonds": "ZAG", "balanced-allocation": "ZAG",
+  "canadian-equity": "XIC", "us-equity": "VFV", "global-equity": "XEF",
+};
 
 function applyOps(holdings: { ticker: string; quantity: number }[], mandate: MandateCreateRequest, p: Portfolio): { ticker: string; quantity: number }[] {
   let out = holdings.map((h) => ({ ...h }));
@@ -421,47 +442,64 @@ function buildRun(db: DB, u: DemoUser, sessionId: string, mandate: Mandate, runI
         return Object.entries(byClass).map(([label, v]) => ({ label, weight: total ? round((v / total) * 100) : 0 })).sort((a, b) => b.weight - a.weight);
       })(),
       metrics: { volatility: ids.volatility, maxDrawdown: ids.maxDrawdown, stress2022: ids.stress2022, stressRates: ids.stressRates, topSingleWeight: ids.topSingleWeight, techWeightLookThrough: ids.techWeightLookThrough },
-      verdict: (r1Status === "fail" || r2Status === "fail" || r6Status === "fail") ? "fail" : (r1Status === "warn" || r2Status === "warn" || r6Status === "warn") ? "warn" : "pass",
     });
     const cryptoWeight = scenarios[i].allocation?.find((a) => /crypto/i.test(a.label))?.weight ?? 0;
-    const mk = (rule: string, status: "pass" | "warn" | "fail" | "not_verified", reasonCode: string, messageEn: string, evs: string[] = [], citations: string[] = [], threshold?: { value: number; nature: "text" | "team_assumption" }) =>
-      verdicts.push({ rule, scenario: i, status, reasonCode, evidence: evs, citations, ...(threshold ? { threshold } : {}), messageEn, message: messageEn } as Run["verdicts"][number]);
-    mk("R1", r1Status, diff >= 1 ? "RISK_PROFILE_MISMATCH" : "RISK_PROFILE_OK", `Implied risk profile ${implied} versus mandate profile ${mandate.riskProfile}.`, [ids.volatility], r1Status === "fail" ? ["KB-01"] : [], { value: mandate.riskProfile, nature: "text" });
-    mk("R2", r2Status, r2Status === "fail" ? "MAX_LOSS_EXCEEDED" : "MAX_LOSS_OK", `Worst drop ${st.mdd.toFixed(1)}% versus accepted loss ${mandate.effectiveMaxLossPct}%.`, [ids.maxDrawdown, ids.stress2022], r2Status === "fail" ? ["KB-01"] : [], { value: mandate.effectiveMaxLossPct, nature: "team_assumption" });
-    mk("R3", "pass", "DIVERSIFICATION_OK", `${sc.holdings.length} holdings in the scenario.`, [], []);
-    mk("R4", cryptoWeight > 5 ? "warn" : "pass", cryptoWeight > 5 ? "CRYPTO_CAP_HIGH" : "CRYPTO_CAP_OK", `Crypto weight ${cryptoWeight.toFixed(1)}% (team assumption: 5%).`, [], [], { value: 5, nature: "team_assumption" });
-    mk("R5", "pass", "NO_SINGLE_NAME_ADVICE", "No specific security is recommended; alternatives are expressed by asset class.", [], []);
-    mk("R6", r6Status, r6Status === "pass" ? "CONCENTRATION_OK" : "CONCENTRATION_HIGH", `Top holding weight ${top.toFixed(1)}% (team assumption: 10%).`, [ids.topSingleWeight], [], { value: 10, nature: "team_assumption" });
-    mk("R7", "not_verified", "ESG_NOT_VERIFIED", "No invented ESG indicator for individual equities: left unverified unless a cited source exists.", [], cryptoWeight > 0 ? ["KB-02"] : []);
-    mk("R8", "pass", "NO_INVENTED_ESG", "No ESG indicator is invented for individual equities.", [], []);
-    mk("R9", "pass", "JURISDICTION_OK", `Notices for ${m.province} are displayed.`, [], []);
-    mk("R10", "pass", "NO_LOOKAHEAD", "Monthly macro series are not used before their publication date (demo: fictitious data).", [], []);
+    /* Verdicts du lot A : motifs sans vocabulaire d'approbation, citations réservées aux règles déclenchées. */
+    const mk = (rule: string, status: "pass" | "warn" | "fail" | "not_verified", reasonCode: string, messageEn: string, evs: string[] = [], threshold?: { value: number; nature: "text" | "team_assumption" }) =>
+      verdicts.push({ rule, scenario: i, status, reasonCode, evidence: evs, citations: [], ...(threshold ? { threshold } : {}), messageEn, message: messageEn } as Run["verdicts"][number]);
+    mk("R1", r1Status, r1Status === "pass" ? "RISK_PROFILE_RESPECTED" : diff === 1 && i > 0 ? "IDEA_EXCEEDS_RISK_PROFILE" : "PORTFOLIO_EXCEEDS_RISK_PROFILE", `The scenario's volatility implies risk level ${implied} versus the retained level ${mandate.riskProfile}.`, [ids.volatility], { value: mandate.riskProfile, nature: "text" });
+    mk("R2", r2Status, st.mdd > mandate.effectiveMaxLossPct ? "MAX_LOSS_EXCEEDED" : st.mdd > mandate.effectiveMaxLossPct * 0.8 ? "MAX_LOSS_NEAR_LIMIT" : "MAX_LOSS_WITHIN_LIMIT", "The worst simulated historical decline is compared with the maximum acceptable loss of the mandate.", [ids.maxDrawdown, ids.stress2022], { value: mandate.effectiveMaxLossPct, nature: "team_assumption" });
+    mk("R3", "pass", sc.holdings.length ? "PORTFOLIO_LEVEL_IMPACT" : "EMPTY_PORTFOLIO", sc.holdings.length ? "The impact is measured on the whole portfolio." : "The portfolio is empty: the impact cannot be measured.", []);
+    mk("R6", r6Status, top > 20 ? "CONCENTRATION_HIGH" : top > 10 ? "CONCENTRATION_ELEVATED" : "CONCENTRATION_OK", "A single security, including through fund holdings, is compared with the concentration thresholds.", [ids.topSingleWeight], { value: top > 20 ? 20 : 10, nature: "team_assumption" });
+    mk("R7", cryptoWeight > 0 ? "warn" : "pass", cryptoWeight > 0 ? "CRYPTO_WITHIN_CAP" : "NO_CRYPTO_EXPOSURE", cryptoWeight > 0 ? "Crypto-asset exposure stays within the cap for this mandate, but crypto assets carry specific platform and custody risks." : "The scenario holds no crypto assets.", [], { value: 5, nature: "team_assumption" });
+    mk("R8", "pass", "ESG_NOT_REQUESTED", "The mandate has no ESG preference.", []);
   });
+  /* Règles au niveau du run (lot B) : R4 ne peut plus échouer, la comparaison existe seulement sur demande. */
+  const runVerdict = (rule: string, status: "pass" | "warn" | "fail" | "not_verified", reasonCode: string, messageEn: string) =>
+    verdicts.push({ rule, status, reasonCode, evidence: [], citations: [], messageEn } as Run["verdicts"][number]);
+  runVerdict("R4", "pass", m.compareCategory ? "COMPARISON_SHOWN" : "COMPARISON_NOT_REQUESTED", m.compareCategory ? "A comparison by asset category is shown as an additional scenario." : "No comparison by asset category was requested.");
+  runVerdict("R5", "pass", "NO_SECURITY_RECOMMENDED", "No security symbol appears in the visible scenario texts.");
+  runVerdict("R9", "pass", "PROVINCE_NOTICES_ADDED", "Province notices name the regulator and the protected titles this tool does not use.");
+  runVerdict("R10", "pass", "MACRO_PUBLICATION_RESPECTED", "Only daily macroeconomic series, known on their observation date, were used.");
 
   return {
-    runId, sessionId, mandateVersion: mandate.version, status: "partial", datasetVersion: "demo", userLanguage: "fr",
+    runId, sessionId, mandateVersion: mandate.version, status: "partial", rulesVersion: 2, datasetVersion: "demo", userLanguage: "fr",
     scenarios, verdicts, evidence, jurisdictionNotices: noticesFor(m.province), createdAt: now(),
   };
 }
 
-/* agent-auditor simulé : citations KB (titres réels du corpus, extrait simulé), puis rédacteur + vérificateur. */
+/* agent-auditor simulé : citations KB (titres réels du corpus, extrait simulé), puis rédacteur + vérificateur.
+ * Les champs documentType / regulator / status (lot E2) sont présents comme dans le nouveau corpus. */
 const KB_DEMO: Evidence[] = [
   {
-    id: "KB-01", kind: "regulation", label: "Avis 31-368 des ACVM : obligation de convenance", document: "Avis conjoint 31-368 (mode démo)",
+    id: "KB-01", kind: "regulation", label: "Avis conjoint 31-368 des ACVM et de l'OCRI", document: "Avis conjoint 31-368 (mode démo)", documentType: "staff_notice", regulator: "CSA", status: "en_vigueur",
     section: "Résumé (extrait simulé)", excerpt: "[Extrait simulé en mode démo : le texte réglementaire n'est pas reproduit ici.]",
     jurisdiction: "CA", source: "docs/for_KB (démo)", url: "https://www.osc.ca", caveats: ["Extrait et référence simulés pour la démonstration."],
   },
   {
-    id: "KB-02", kind: "regulation", label: "Avis 21-332 : plateformes de crypto-actifs", document: "Avis conjoint 21-332 (mode démo)",
+    id: "KB-02", kind: "regulation", label: "Avis conjoint 21-332 des ACVM", document: "Avis conjoint 21-332 (mode démo)", documentType: "staff_notice", regulator: "CSA", status: "en_vigueur",
     section: "Exigences (extrait simulé)", excerpt: "[Extrait simulé en mode démo : le texte réglementaire n'est pas reproduit ici.]",
     jurisdiction: "CA", source: "docs/for_KB (démo)", caveats: ["Extrait et référence simulés pour la démonstration."],
   },
+  {
+    id: "KB-03", kind: "regulation", label: "OCRI, note d'orientation GN-3200-26-001", document: "OCRI GN-3200-26-001 (mode démo)", documentType: "guidance_note", regulator: "CIRO", status: "en_vigueur",
+    section: "s. 2.1.1 Decision-making supports (extrait simulé)", excerpt: "[Extrait simulé en mode démo : le texte réglementaire n'est pas reproduit ici.]",
+    jurisdiction: "CA", source: "docs/for_KB (démo)", caveats: ["Extrait et référence simulés pour la démonstration."],
+  },
 ];
+
+/* Citations fixées (lot E2) : R5 à côté des mentions fixes, R9 à côté des mentions de la province.
+ * Simulées : la variable KB_CORPUS_VERSION du backend décide en réel. */
+function demoNoticeCitations(province: string): { R5: string[]; R9: string[] } {
+  const fixed = { R5: ["KB-03"], R9: ["KB-03"] };
+  return fixed;
+}
 
 function completeRun(run: Run): Run {
   const narrative = narrativeFor(run);
   return {
     ...run, status: "done", evidence: [...run.evidence, ...KB_DEMO],
+    noticeCitations: run.noticeCitations ?? demoNoticeCitations("QC"),
     narrative, verifier: verifierFor({ ...run, narrative }), completedAt: now(),
   };
 }
@@ -475,16 +513,17 @@ function noticesFor(province: string): string[] {
 function narrativeFor(run: Run): Narrative {
   const s1 = run.scenarios[1], s2 = run.scenarios[2];
   const evOf = (id: string) => run.evidence.find((e) => e.id === id);
-  const vol1 = evOf(s1.metrics?.volatility ?? ""), dd1 = evOf(s1.metrics?.maxDrawdown ?? "");
-  const vol2 = evOf(s2.metrics?.volatility ?? "");
-  const fails = run.verdicts.filter((v) => v.scenario === 1 && v.status === "fail").map((v) => v.rule);
+  const vol1 = evOf(s1?.metrics?.volatility ?? ""), dd1 = evOf(s1?.metrics?.maxDrawdown ?? "");
+  const vol2 = evOf(s2?.metrics?.volatility ?? "");
+  /* Vocabulaire descriptif (lot A) : ce que les règles ont fait, jamais une appréciation de l'idée. */
+  const triggered = run.verdicts.filter((v) => v.scenario === 1 && (v.status === "warn" || v.status === "fail")).map((v) => v.rule);
   return {
     language: "fr",
     sections: [
       { key: "data_used", textEn: `Built from the demo price history (fictitious) and the confirmed mandate. Scenario 1 volatility: {${vol1?.id}}, worst drop: {${dd1?.id}}.`, text: `Construit à partir de l'historique de prix fictif du mode démo et du mandat confirmé. Volatilité du scénario 1 : {${vol1?.id}} ; pire baisse : {${dd1?.id}}.` },
-      { key: "why", textEn: fails.length ? `Scenario 1 fails rule(s) ${fails.join(", ")}: see the verdicts above and the citations.` : `Scenario 1 passes the checks; the alternative keeps the exposure while reducing risk ({${vol2?.id}}).`, text: fails.length ? `Le scénario 1 échoue sur la ou les règles ${fails.join(", ")} : voir les verdicts et les citations.` : `Le scénario 1 passe les contrôles ; l'alternative garde l'exposition tout en réduisant le risque ({${vol2?.id}}).` },
+      { key: "why", textEn: triggered.length ? `Rules ${triggered.join(", ")} were triggered in scenario 1; see their labels above and the texts they are inspired by.` : `No rule was triggered in scenario 1; the comparison by category shows the same amount in the chosen category ({${vol2?.id}}).`, text: triggered.length ? `Les règles ${triggered.join(", ")} ont été déclenchées dans le scénario 1 : voir leurs libellés ci-dessus et les textes dont elles s'inspirent.` : `Aucune règle n'a été déclenchée dans le scénario 1 ; la comparaison par catégorie montre le même montant dans la catégorie choisie ({${vol2?.id}}).` },
       { key: "limits", textEn: "All figures come from fictitious demo prices; they are not market data. Past results never predict the future.", text: "Tous les chiffres viennent de prix fictifs du mode démo ; ce ne sont pas des données de marché. Le passé ne prédit jamais le futur." },
-      { key: "what_would_change", textEn: "Lowering the position size, extending the horizon, or diversifying across sectors would change the verdicts.", text: "Réduire la taille de la position, allonger l'horizon ou diversifier les secteurs changerait les verdicts." },
+      { key: "what_would_change", textEn: "Lowering the position size, extending the horizon, or diversifying across sectors would change what the rules measure.", text: "Réduire la taille de la position, allonger l'horizon ou diversifier les secteurs changerait ce que les règles mesurent." },
     ],
     hiddenSentences: [],
   };

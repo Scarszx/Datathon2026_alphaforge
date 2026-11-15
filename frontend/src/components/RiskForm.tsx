@@ -1,5 +1,6 @@
 import { useState, type FormEvent, type ReactNode } from "react";
-import { isComplete, PROVINCES, QUESTIONS, riskCalc, riskLevelOf, RISK_LABELS, SCORE_MAX, SCORE_MIN, totalScore } from "../lib/risk";
+import { isComplete, PROVINCES, QUESTIONS, totalScore, SCORE_MAX } from "../lib/risk";
+import { levelLabel, retainedLevel, VOLATILITY_ASSUMPTION } from "../lib/riskScale";
 import type { Jurisdiction } from "../api/types";
 import IndustryPicker from "./IndustryPicker";
 
@@ -70,22 +71,23 @@ export default function RiskForm({
   );
 }
 
-/** Résultat affiché : score, niveau de risque du contrat, tolérance/capacité séparées et province (R1). */
+/** Résultat affiché : tolérance (1 à 5), capacité (1 à 5) et niveau retenu = le plus bas des deux (R1). */
 export function RiskResult({ answers, province }: { answers: Answers; province?: string }) {
   const score = totalScore(answers);
-  const fill = ((score - SCORE_MIN) / (SCORE_MAX - SCORE_MIN)) * 100;
+  const tolerance = answers.maxLoss + 1, capacity = answers.capacity + 1;
+  const retained = retainedLevel(tolerance, capacity);
   return (
     <div className="profile-card">
-      <div className="eyebrow">Votre tolérance au risque</div>
+      <div className="eyebrow">Tolérance et capacité de perte</div>
       <div className="profile-top">
-        <div className="big filled" style={{ fontSize: 40 }}>{RISK_LABELS[riskLevelOf(score)]}</div>
+        <div className="big filled" style={{ fontSize: 40 }}>{levelLabel(retained, "fr")}</div>
         <div className="score"><strong>{score}</strong><span>/ {SCORE_MAX}</span></div>
       </div>
-      <div className="alloc-bar" style={{ margin: "16px 0" }}><span style={{ width: `${fill}%`, background: "var(--red)" }} /></div>
       <p className="desc" style={{ WebkitLineClamp: "unset" }}>
-        Tolérance à la perte : <strong>{answers.maxLoss + 1} / 5</strong> · Capacité à encaisser : <strong>{answers.capacity + 1} / 5</strong>
+        Tolérance à la perte : <strong>{tolerance} / 5</strong> · Capacité à encaisser : <strong>{capacity} / 5</strong>
         {province ? <> · Province : <strong>{province}</strong></> : null}
-        <br />Résultat du calcul : <strong>{riskCalc(score).toFixed(2)}</strong> (10 = très prudent, 1 = très tolérant au risque).
+        <br />Niveau retenu (R1) : <strong>{retained} / 5</strong> — le plus bas des deux.
+        <br /><span className="muted small">{VOLATILITY_ASSUMPTION.fr}</span>
       </p>
     </div>
   );
