@@ -586,7 +586,7 @@ fieldset.q.missing legend { color: var(--loss-ink); }
 @media (prefers-reduced-motion: reduce) { .af-mic.listening::after { animation: none; } }
 .af-mic-note { font-size: 12px; margin: 6px 20px 0; }
 .af-mic-note.err { color: #b42318; }
-.af-refusal { display: flex; gap: 10px; align-items: flex-start; margin: 8px 20px 0; padding: 10px 12px; border: 1px solid #E9C98A; background: #FFF6E3; color: #5C4310; border-radius: 12px; font-size: 13px; }
+.af-refusal { display: flex; gap: 10px; align-items: flex-start; margin: 8px 20px 0; padding: 10px 12px; border: 1px solid var(--warn); background: var(--warn-soft); color: var(--warn-ink); border-radius: 12px; font-size: 13px; }
 .af-refusal-icon { font-size: 16px; line-height: 1.3; }
 .af-refusal strong { display: block; font-size: 13px; }
 .af-refusal p { margin: 2px 0 0; }
