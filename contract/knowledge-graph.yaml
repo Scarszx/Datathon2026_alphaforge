@@ -1,12 +1,22 @@
 application:
   name: "AlphaForge"
-  version: "0.4.7"
+  version: "0.4.8"
   description: "Banc d'essai agentique et auto-explicatif pour l'investisseur autonome : il cadre l'intention, simule son impact sur le portefeuille et l'audite contre les textes réglementaires canadiens (simulation seulement). Datathon 2026."
-  status: "validé par l'équipe (0.4.0 le 2026-11-14, 0.4.1 le 2026-11-15) ; 0.4.2 et 0.4.3 validées par l'utilisateur le 2026-11-15, à relire par l'équipe ; 0.4.4 à 0.4.7 demandées par l'utilisateur le 2026-11-15 (lots A, B, C et E), à relire par l'équipe"
+  status: "validé par l'équipe (0.4.0 le 2026-11-14, 0.4.1 le 2026-11-15) ; 0.4.2 et 0.4.3 validées par l'utilisateur le 2026-11-15, à relire par l'équipe ; 0.4.4 à 0.4.7 demandées par l'utilisateur le 2026-11-15 (lots A, B, C et E), à relire par l'équipe ; 0.4.8 demandée par l'utilisateur le 2026-11-15 (saisie vocale), à relire par l'équipe"
   solution_ref: "SOLUTION.md (racine du dépôt) : décisions de produit et de conception détaillées"
   # Règle d'équipe : ce fichier est la référence. Toute modification passe par un accord de l'équipe.
   # Voir aussi : la page de présentation du contrat (même contenu, avec schémas).
   changelog:
+    - version: "0.4.8"
+      date: "2026-11-15"
+      status: "demandé par l'utilisateur le 2026-11-15 (saisie vocale, pas encore déployé) ; à relire par l'équipe"
+      summary:
+        - "Saisie vocale dans le chat : nouvelle route api-speech-session (POST /v1/speech/session, srv-api-light). Elle renvoie une URL WebSocket signée (SigV4, 300 s) vers Amazon Transcribe Streaming (srv-transcribe), dans la langue de l'interface (fr → fr-CA, en → en-US), PCM 16 kHz. Le navigateur envoie l'audio directement à Transcribe ; le texte reconnu remplit le champ de saisie et l'utilisateur l'envoie lui-même par api-messages-create, inchangée (Guardrails et limite de 2000 caractères identiques)."
+        - "Schémas schema-speech-session-request (lang facultatif, fr par défaut) et schema-speech-session-response."
+        - "L'audio et le texte transcrit ne passent pas par nos Lambdas et ne sont jamais journalisés."
+      impacts_to_handle:
+        - "infra/terraform : route POST /v1/speech/session vers la Lambda API ; droit transcribe:StartStreamTranscriptionWebSocket (ressource *) sur le rôle de la Lambda API."
+        - "frontend : bouton micro dans le composer (visible seulement si le navigateur gère getUserMedia et AudioWorklet), aperçu du texte partiel, arrêt automatique après 60 s, refus du micro géré."
     - version: "0.4.7"
       date: "2026-11-15"
       status: "demandé par l'utilisateur le 2026-11-15 (lot E, pas encore déployé ni ingéré) ; à relire par l'équipe"
@@ -184,6 +194,7 @@ services:
       - "api-mandates-list"
       - "api-runs-create"
       - "api-runs-get"
+      - "api-speech-session"
     rules:
       - "Le front ne calcule rien : prix, poids, gains et répartitions viennent du back."
       - "Il affiche toujours le champ explanation d'une réponse de l'assistant."
@@ -204,7 +215,7 @@ services:
     type: "managed_service"
     description: "Porte d'entrée unique pour le front. Authorizer JWT natif relié à Cognito."
     routes_to:
-      srv-api-light: ["/me", "/me/profile", "/conversations*", "/portfolios (GET, PUT holdings)", "/agents", "GET et POST /conversations/{sessionId}/mandates"]
+      srv-api-light: ["/me", "/me/profile", "/conversations*", "/portfolios (GET, PUT holdings)", "/agents", "GET et POST /conversations/{sessionId}/mandates", "POST /speech/session"]
       srv-agent-runtime: ["POST /conversations/{sessionId}/messages", "POST /conversations/{sessionId}/runs", "GET /conversations/{sessionId}/runs/{runId}", "GET /portfolios/{portfolioId}/summary", "GET /market/search"]
     depends_on:
       - "srv-cognito"
@@ -228,6 +239,9 @@ services:
       - "api-agents-registry"
       - "api-mandates-create"
       - "api-mandates-list"
+      - "api-speech-session"
+    uses_services:
+      - "srv-transcribe"   # signe seulement l'URL ; ne reçoit ni audio ni texte
     access_to_dbs:
       - id: "db-users"
         mode: "read_write"
@@ -309,6 +323,13 @@ services:
     name: "Amazon Bedrock Guardrails"
     type: "managed_service"
     description: "Filtre d'entrée (traduction anglaise du message utilisateur, et texte original) et de sortie (texte final affiché) : ordres de transaction, promesses de rendement, conseil personnalisé, données personnelles. Un blocage renvoie GUARDRAIL_BLOCKED ou un refus expliqué; le message refusé n'entre pas dans l'historique."
+
+  - id: "srv-transcribe"
+    name: "Amazon Transcribe Streaming"
+    type: "managed_service"
+    description: "Reconnaissance vocale en direct pour la saisie du chat (0.4.8). Le navigateur s'y connecte par WebSocket avec l'URL signée par api-speech-session ; le texte reconnu ne fait que remplir le champ de saisie."
+    notes:
+      - "Droit transcribe:StartStreamTranscriptionWebSocket, ressource * (seule valeur acceptée par le service). Langues : fr-CA et en-US. Coût à la seconde, minimum 15 s par session."
 
   - id: "srv-cloudwatch"
     name: "Amazon CloudWatch Logs"
@@ -519,6 +540,18 @@ apis:
     response_payload:
       schema_ref: "schema-agents-registry"
 
+  - id: "api-speech-session"
+    provider: "srv-api-light"
+    method: "POST"
+    path: "/v1/speech/session"
+    description: "Saisie vocale (0.4.8) : renvoie une URL WebSocket signée (300 s) vers Amazon Transcribe Streaming, dans la langue demandée. Aucun audio ni texte ne passe par cette route."
+    auth: "jwt"
+    optional: true
+    request_payload:
+      schema_ref: "schema-speech-session-request"
+    response_payload:
+      schema_ref: "schema-speech-session-response"
+
 # ==========================================
 # 3. LES SCHÉMAS DE DONNÉES (payloads et modèles)
 # ==========================================
@@ -686,6 +719,18 @@ data_schemas:
       - { name: "agents", type: "array", description: "par agent : id, name, role, allowedTools, delegatesTo, limits" }
       - { name: "modules", type: "array", description: "par module de code : id, name, role" }
       - { name: "tools", type: "array", description: "par outil : id, description, reads" }
+
+  - id: "schema-speech-session-request"
+    description: "Corps facultatif ; tout autre champ est refusé (VALIDATION_ERROR)."
+    fields:
+      - { name: "lang", type: "string", required: false, enum: ["fr", "en"], description: "langue de l'interface ; fr par défaut" }
+
+  - id: "schema-speech-session-response"
+    fields:
+      - { name: "url", type: "string", required: true, description: "wss://transcribestreaming.<région>.amazonaws.com:8443/stream-transcription-websocket?… signée SigV4" }
+      - { name: "languageCode", type: "string", required: true, enum: ["fr-CA", "en-US"] }
+      - { name: "sampleRate", type: "integer", required: true, description: "16000 ; audio PCM 16 bits little-endian, mono" }
+      - { name: "expiresIn", type: "integer", required: true, description: "secondes de validité de l'URL pour ouvrir la connexion (300)" }
 
   - id: "schema-operation"
     description: "Une opération simulée de l'idée testée."
