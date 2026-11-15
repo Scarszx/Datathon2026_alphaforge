@@ -507,11 +507,10 @@ Ce qu'il faut changer pour respecter le contrat v0.4.0 :
 6. **Langue :** l'interface s'affiche dans `userLanguage` (au moins fr et en), et les libellés fixes passent par des clés stables. Les textes générés arrivent déjà traduits, et les extraits KB s'affichent en anglais avec la mention « extrait original (anglais) ».
 7. **Données de `public/data/`** (CSV du prototype pour la page Marchés) : en mode réel, la page doit passer par l'API. Les CSV issus de Yahoo ne doivent pas rester commités (licence, voir `contract` storage-dataset) : à retirer avec David.
 
-Hors du périmètre de WS6, à trancher avec David en même temps :
-- **`backend/alphaforge/`, `backend/local_server.py`, `backend/lambda_handler.py`** : un second backend (Bedrock Converse, Haiku 4.5, prompt en français) qui fait doublon avec WS5 (`backend/agents/`, Strands, Sonnet 5.5, prompts en anglais). Le front ne s'y branche pas. À retirer, ou en reprendre les idées dans WS5.
-- **`data/build_dataset.py`, `data/universe.py`, `data/dataset/*.csv`** : doublon de WS3 (`data/ingestion/`), avec des prix Yahoo commités. À retirer de git.
-- **`data/esg_screen.csv`** : une classification ESG des actions, contraire à la décision R8 (pas d'indicateur ESG inventé pour les actions). À retirer, ou à transformer en liste de documents à vérifier, sans verdict.
-- **`fundamentals_sec.csv`, `news_attention.csv`** : à garder s'ils servent, en documentant leurs sources dans `data/README.md`.
+Hors du périmètre de WS6 (✅ **retirés le 2026-11-14**, branche `ws/cleanup`, après vérification qu'aucun module ne les importait) :
+- `backend/alphaforge/`, `backend/local_server.py`, `backend/lambda_handler.py` : second backend (Bedrock Converse, Haiku 4.5) qui faisait doublon avec WS5 ;
+- `data/build_dataset.py`, `data/universe.py`, `data/dataset/` (dont `fundamentals_sec.csv` et `news_attention.csv`, que seul ce second backend lisait) : doublon de WS3, avec des prix Yahoo commités ;
+- `data/esg_screen.csv` : classification ESG des actions, contraire à la décision R8.
 
 Prompt du chantier (à donner à l'agent ou à David, en partant du front existant) :
 

@@ -156,9 +156,8 @@ frontend/src/pages/                Landing (accueil), Login, Register, Chat, Por
 
 ## Autres dossiers
 
-- `backend/alphaforge/` : serveur Python de démonstration du prototype. Doublon de `backend/agents/` (WS5) ;
-  décision d'équipe : à retirer. Le front ne s'y branche pas.
-- `data/` : l'ingestion officielle est dans `data/ingestion/` (WS3). `data/build_dataset.py` est un doublon à retirer
-  (décision d'équipe). Aucun CSV de prix n'est commité (conditions d'utilisation de Yahoo).
+- `data/` : l'ingestion officielle est dans `data/ingestion/` (WS3). Aucun CSV de prix n'est commité (conditions
+  d'utilisation de Yahoo). Les doublons du prototype (second backend `backend/alphaforge/`, `data/build_dataset.py`,
+  `data/dataset/`, `data/esg_screen.csv`) ont été retirés le 2026-11-14.
 - `portefeuille-prototype/` : le prototype d'origine, extrait de `portefeuille-prototype.zip`. Pour le lancer :
   `cd portefeuille-prototype && npm install && npm run dev`.
