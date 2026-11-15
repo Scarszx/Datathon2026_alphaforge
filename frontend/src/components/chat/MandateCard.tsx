@@ -2,6 +2,7 @@
  * ou mandat confirmé), avec la source de chaque ligne quand elle est connue (fieldSources du contrat). */
 import type { Mandate, MandateCreateRequest } from "../../api/types";
 import { t, warningText, type Lang } from "../../lib/i18n";
+import { categoryOf } from "../../lib/comparisonCategories";
 import { PROVINCE_LABELS } from "../../lib/risk";
 
 export function FieldSourceTag({ field, mandate, lang }: { field: string; mandate: MandateCreateRequest; lang: Lang }) {
@@ -29,6 +30,9 @@ export default function MandateCard({ mandate, confirmed, lang }: { mandate: Man
             {" "}<FieldSourceTag field="maxAcceptableLossPct" mandate={mandate} lang={lang} />
             {confirmed && <span className="muted small"> · {t("mandate.riskProfile", lang)} : {confirmed.riskProfile}</span>}
           </td></tr>
+          {mandate.compareCategory && (
+            <tr><td>{t("sim.scenario.alternative", lang)}</td><td>{categoryOf(mandate.compareCategory)?.label[lang] ?? mandate.compareCategory} <FieldSourceTag field="compareCategory" mandate={mandate} lang={lang} /></td></tr>
+          )}
           {mandate.subjectTicker && <tr><td>{t("mandate.subject", lang)}</td><td><strong>{mandate.subjectTicker}</strong> <FieldSourceTag field="subjectTicker" mandate={mandate} lang={lang} /></td></tr>}
           {mandate.operations?.length ? (
             <tr><td>{t("mandate.operations", lang)}</td><td>
