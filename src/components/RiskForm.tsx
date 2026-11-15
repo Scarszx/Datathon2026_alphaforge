@@ -1,0 +1,63 @@
+import { useState, type FormEvent, type ReactNode } from "react";
+import { isComplete, QUESTIONS, riskCalc, riskLevelOf, RISK_LABELS, SCORE_MAX, SCORE_MIN, totalScore } from "../lib/risk";
+
+type Answers = Record<string, number>;
+
+/** Questionnaire de risque (lib/risk.ts). N'enregistre rien : `onSubmit` reçoit les réponses complètes. */
+export default function RiskForm({
+  initial = {}, submitLabel, busy = false, onSubmit, children,
+}: { initial?: Answers; submitLabel: string; busy?: boolean; onSubmit: (a: Answers) => void; children?: ReactNode }) {
+  const [answers, setAnswers] = useState<Answers>(initial);
+  const [tried, setTried] = useState(false);
+  const done = QUESTIONS.filter((q) => answers[q.id] !== undefined).length;
+
+  function submit(e: FormEvent) {
+    e.preventDefault();
+    setTried(true);
+    if (isComplete(answers)) onSubmit(answers);
+  }
+
+  return (
+    <form className="questionnaire" onSubmit={submit} noValidate>
+      <div className="q-progress" aria-live="polite">
+        <div className="alloc-bar" style={{ margin: 0, flex: 1, height: 6 }}><span style={{ width: `${(done / QUESTIONS.length) * 100}%`, background: "var(--red)" }} /></div>
+        <span className="muted small">{done} / {QUESTIONS.length}</span>
+      </div>
+      {QUESTIONS.map((q, i) => (
+        <fieldset key={q.id} className={`q${tried && answers[q.id] === undefined ? " missing" : ""}`}>
+          <legend>{i + 1}. {q.label}</legend>
+          <div className="opts">
+            {q.options.map((o, j) => (
+              <label key={o} className={`opt${answers[q.id] === j ? " on" : ""}`}>
+                <input type="radio" name={q.id} checked={answers[q.id] === j} onChange={() => setAnswers({ ...answers, [q.id]: j })} />
+                {o}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      ))}
+      {tried && !isComplete(answers) && <p className="error" role="alert">Répondez à toutes les questions.</p>}
+      {children}
+      <div><button className="btn" disabled={busy}>{submitLabel}</button></div>
+    </form>
+  );
+}
+
+/** Résultat affiché : score, niveau de risque du contrat et résultat du premier calcul (10 → 1). */
+export function RiskResult({ answers }: { answers: Answers }) {
+  const score = totalScore(answers);
+  const fill = ((score - SCORE_MIN) / (SCORE_MAX - SCORE_MIN)) * 100;
+  return (
+    <div className="profile-card">
+      <div className="eyebrow">Votre tolérance au risque</div>
+      <div className="profile-top">
+        <div className="big filled" style={{ fontSize: 40 }}>{RISK_LABELS[riskLevelOf(score)]}</div>
+        <div className="score"><strong>{score}</strong><span>/ {SCORE_MAX}</span></div>
+      </div>
+      <div className="alloc-bar" style={{ margin: "16px 0" }}><span style={{ width: `${fill}%`, background: "var(--red)" }} /></div>
+      <p className="desc" style={{ WebkitLineClamp: "unset" }}>
+        Résultat du calcul : <strong>{riskCalc(score).toFixed(2)}</strong> (10 = très prudent, 1 = très tolérant au risque).
+      </p>
+    </div>
+  );
+}
