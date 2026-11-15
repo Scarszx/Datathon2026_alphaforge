@@ -6,3 +6,5 @@
 -r backend/api/requirements.txt
 -r data/requirements.txt
 moto[dynamodb]>=5
+scipy>=1.11            # comparaisons de test avec le script de l'équipe (SLSQP); absents des Lambdas
+scikit-learn>=1.4      # idem (LedoitWolf)
