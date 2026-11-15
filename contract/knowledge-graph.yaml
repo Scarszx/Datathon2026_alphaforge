@@ -1,12 +1,21 @@
 application:
   name: "AlphaForge"
-  version: "0.4.9"
+  version: "0.4.10"
   description: "Banc d'essai agentique et auto-explicatif pour l'investisseur autonome : il cadre l'intention, simule son impact sur le portefeuille et l'audite contre les textes réglementaires canadiens (simulation seulement). Datathon 2026."
-  status: "validé par l'équipe (0.4.0 le 2026-11-14, 0.4.1 le 2026-11-15) ; 0.4.2 et 0.4.3 validées par l'utilisateur le 2026-11-15, à relire par l'équipe ; 0.4.4 à 0.4.7 demandées par l'utilisateur le 2026-11-15 (lots A, B, C et E), à relire par l'équipe ; 0.4.8 demandée par l'utilisateur le 2026-11-15 (saisie vocale), à relire par l'équipe ; 0.4.9 demandée par l'utilisateur le 2026-11-15 (jeu de données aligné sur le script du collègue), à relire par l'équipe"
+  status: "validé par l'équipe (0.4.0 le 2026-11-14, 0.4.1 le 2026-11-15) ; 0.4.2 et 0.4.3 validées par l'utilisateur le 2026-11-15, à relire par l'équipe ; 0.4.4 à 0.4.7 demandées par l'utilisateur le 2026-11-15 (lots A, B, C et E), à relire par l'équipe ; 0.4.8 demandée par l'utilisateur le 2026-11-15 (saisie vocale), à relire par l'équipe ; 0.4.9 demandée par l'utilisateur le 2026-11-15 (jeu de données aligné sur le script du collègue), à relire par l'équipe ; 0.4.10 demandée par l'utilisateur le 2026-11-15 (saisie vocale, détection de la langue), à relire par l'équipe"
   solution_ref: "SOLUTION.md (racine du dépôt) : décisions de produit et de conception détaillées"
   # Règle d'équipe : ce fichier est la référence. Toute modification passe par un accord de l'équipe.
   # Voir aussi : la page de présentation du contrat (même contenu, avec schémas).
   changelog:
+    - version: "0.4.10"
+      date: "2026-11-15"
+      status: "demandé par l'utilisateur le 2026-11-15 (saisie vocale, essai réel) ; à relire par l'équipe"
+      summary:
+        - "api-speech-session : la langue parlée est détectée par Transcribe (identify-language entre fr-CA et en-US), la langue de l'interface n'étant plus qu'une langue préférée (preferred-language). Constat de l'essai réel avec de la parole synthétique : avec une langue fixée, du français écouté en en-US donne un texte faux ; avec la détection, le français et l'anglais sont transcrits correctement quelle que soit la langue de l'interface. Transcribe n'accepte qu'une variante par langue dans language-options (fr-CA avec fr-FR est refusé)."
+        - "schema-speech-session-response : languageCode devient la langue préférée (fr-CA | en-US) ; nouveau champ languageOptions (['fr-CA', 'en-US']). Requête inchangée."
+      impacts_to_handle:
+        - "frontend : à l'arrêt, le flux est terminé proprement (fin de flux envoyée, derniers résultats attendus) et le texte partiel restant est conservé ; rééchantillonnage à 16 kHz fait par le navigateur quand il le permet, sinon avec filtrage."
+        - "infra : reconstruire et redéployer la Lambda API (aucun changement Terraform)."
     - version: "0.4.9"
       date: "2026-11-15"
       status: "demandé par l'utilisateur le 2026-11-15 (jeu de données, code sur la branche ws/dataset-yf, pas encore déployé) ; à relire par l'équipe"
@@ -555,7 +564,7 @@ apis:
     provider: "srv-api-light"
     method: "POST"
     path: "/v1/speech/session"
-    description: "Saisie vocale (0.4.8) : renvoie une URL WebSocket signée (300 s) vers Amazon Transcribe Streaming, dans la langue demandée. Aucun audio ni texte ne passe par cette route."
+    description: "Saisie vocale (0.4.8) : renvoie une URL WebSocket signée (300 s) vers Amazon Transcribe Streaming, avec détection de la langue parlée (fr-CA ou en-US ; la langue demandée n'est que la préférée, 0.4.10). Aucun audio ni texte ne passe par cette route."
     auth: "jwt"
     optional: true
     request_payload:
@@ -739,7 +748,8 @@ data_schemas:
   - id: "schema-speech-session-response"
     fields:
       - { name: "url", type: "string", required: true, description: "wss://transcribestreaming.<région>.amazonaws.com:8443/stream-transcription-websocket?… signée SigV4" }
-      - { name: "languageCode", type: "string", required: true, enum: ["fr-CA", "en-US"] }
+      - { name: "languageCode", type: "string", required: true, enum: ["fr-CA", "en-US"], description: "langue préférée (celle de l'interface) ; la langue réellement parlée est détectée par Transcribe parmi languageOptions (0.4.10)" }
+      - { name: "languageOptions", type: "array", items_type: "string", required: true, description: "['fr-CA', 'en-US'] : langues entre lesquelles Transcribe choisit (une seule variante par langue)" }
       - { name: "sampleRate", type: "integer", required: true, description: "16000 ; audio PCM 16 bits little-endian, mono" }
       - { name: "expiresIn", type: "integer", required: true, description: "secondes de validité de l'URL pour ouvrir la connexion (300)" }
 
