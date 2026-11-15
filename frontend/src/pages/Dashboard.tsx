@@ -11,7 +11,7 @@ import { useApp } from "../lib/legacyStore";
 import { ACCOUNTS } from "../lib/types";
 
 const ACCOUNT_OPTIONS = [ALL, ...ACCOUNTS];
-const PALETTE = ["var(--red)", "#f3a3a6", "#111318", "#6b7280", "#d6d9de", "#a1a6b0", "#c3141a"];
+const PALETTE = ["#143D30", "#1B5E45", "#3E8F68", "#C4A15A", "#D08A62", "#8E9892", "#D5DDD8"];
 const colorFor = (name: string, i: number) => (name === "Liquidités" ? "#d6d9de" : PALETTE[i % PALETTE.length]);
 const fmtDate = (ts: number) => new Date(ts).toLocaleDateString("fr-CA", { day: "numeric", month: "short", year: "numeric" });
 
