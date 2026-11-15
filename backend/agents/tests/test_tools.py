@@ -125,6 +125,12 @@ def test_outils_du_portefeuille_lisent_l_utilisateur_du_contexte(robert_session,
     other = RequestContext(user_id="intrus", session_id=robert_session, store=store)
     assert "error" in catalog.get_portfolio(other)
     assert catalog.get_profile(other) == {"investorProfile": None}
+    from backend.common.repositories import users
+
+    users.update_investor_profile(USER, {"riskLevel": "moderate", "riskTolerance": 3, "riskCapacity": 2,
+                                         "horizonMinYears": 3, "objective": "x"})
+    profile = catalog.get_profile(ctx)["investorProfile"]
+    assert profile["riskTolerance"] == 3 and profile["riskCapacity"] == 2 and "riskLevel" not in profile
     assert catalog.stress_test(ctx, "y2022")["drawdown"] < 0
     assert "error" in catalog.stress_test(ctx, "y1929")
     assert catalog.concentration(ctx)["topSingle"]["ticker"] == "TD.TO"
@@ -228,3 +234,15 @@ def test_propose_mandate_ne_met_jamais_compare_category(ctx):
              "operations": [{"action": "add", "ticker": "NVDA", "amount": 15000, "currency": "CAD"}]}
     assert catalog.propose_mandate(ctx, draft)["valid"] is True
     assert "compareCategory" not in ctx.captured["mandateDraft"]
+
+
+def test_propose_mandate_refuse_une_capacite_inventee(ctx):
+    draft = {"mode": "add_asset", "objective": "project", "horizonYears": 3, "riskTolerance": 3, "riskCapacity": 2,
+             "operations": [{"action": "add", "ticker": "NVDA", "amount": 15000, "currency": "CAD"}],
+             "fieldSources": {"riskCapacity": "team_assumption"}}
+    result = catalog.propose_mandate(ctx, draft)
+    assert result["valid"] is False and "riskCapacity cannot be a team assumption" in result["errors"][0]
+    assert "mandateDraft" not in ctx.captured
+    for source in ("user_answer", "persona"):
+        draft["fieldSources"] = {"riskCapacity": source}
+        assert catalog.propose_mandate(ctx, draft)["valid"] is True

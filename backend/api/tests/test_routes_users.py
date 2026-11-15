@@ -85,7 +85,6 @@ def test_get_me_sans_claim_username_replie_sur_sub(fake_users, monkeypatch):
 
 def test_put_profile_valide_et_remplace_le_profil(fake_users):
     profile = {
-        "riskLevel": "high",
         "riskTolerance": 5,
         "riskCapacity": 4,
         "province": "QC",
@@ -104,50 +103,30 @@ def test_put_profile_valide_et_remplace_le_profil(fake_users):
     ]
 
 
+def _profile(**fields):
+    base = {"riskTolerance": 4, "riskCapacity": 3, "horizonMinYears": 15, "objective": "x"}
+    base.update(fields)
+    return {k: v for k, v in base.items() if v is not None}
+
+
 @pytest.mark.parametrize(
     "profile",
     [
         {},
-        {"riskLevel": "extreme", "horizonMinYears": 15, "objective": "x"},
-        {"riskLevel": "high", "horizonMinYears": "15", "objective": "x"},
-        {"riskLevel": "high", "horizonMinYears": 15, "objective": 12},
-        {"riskLevel": "high", "horizonMinYears": 15, "objective": "x", "typo": True},
-        {
-            "riskLevel": "high",
-            "horizonMinYears": 15,
-            "horizonMaxYears": True,
-            "objective": "x",
-        },
-        {
-            "riskLevel": "high",
-            "horizonMinYears": 15,
-            "objective": "x",
-            "constraints": ["ok", 12],
-        },
-        {
-            "riskLevel": "high",
-            "riskTolerance": 0,
-            "horizonMinYears": 15,
-            "objective": "x",
-        },
-        {
-            "riskLevel": "high",
-            "riskCapacity": 6,
-            "horizonMinYears": 15,
-            "objective": "x",
-        },
-        {
-            "riskLevel": "high",
-            "province": "CA",
-            "horizonMinYears": 15,
-            "objective": "x",
-        },
-        {
-            "riskLevel": "high",
-            "province": "US",
-            "horizonMinYears": 15,
-            "objective": "x",
-        },
+        _profile(riskTolerance=None),  # tolérance obligatoire (lot C)
+        _profile(riskCapacity=None),  # capacité obligatoire (lot C)
+        {"riskLevel": "high", "horizonMinYears": 15, "objective": "x"},  # l'ancien niveau seul ne suffit plus
+        _profile(horizonMinYears="15"),
+        _profile(objective=12),
+        _profile(typo=True),
+        _profile(horizonMaxYears=True),
+        _profile(constraints=["ok", 12]),
+        _profile(riskTolerance=0),
+        _profile(riskCapacity=6),
+        _profile(riskCapacity=2.5),
+        _profile(riskLevel=3),  # non chaîne
+        _profile(province="CA"),
+        _profile(province="US"),
     ],
 )
 def test_put_profile_refuse_les_corps_invalides(fake_users, profile):
@@ -156,3 +135,17 @@ def test_put_profile_refuse_les_corps_invalides(fake_users, profile):
     assert body_of(response)["error"]["code"] == "VALIDATION_ERROR"
     assert fake_users["put"] == []
     assert fake_users["update"] == []
+
+
+def test_put_profile_sans_risk_level_est_accepte(fake_users):
+    response = handle_request(event("PUT /v1/me/profile", body=_profile()))
+    assert response["statusCode"] == 200
+    assert "riskLevel" not in body_of(response)["investorProfile"]
+
+
+def test_put_profile_risk_level_ancien_client_accepte_puis_ignore(fake_users):
+    for legacy in ("high", "extreme"):
+        response = handle_request(event("PUT /v1/me/profile", body=_profile(riskLevel=legacy)))
+        assert response["statusCode"] == 200
+        assert "riskLevel" not in body_of(response)["investorProfile"]
+    assert all("riskLevel" not in call["profile"] for call in fake_users["update"])
