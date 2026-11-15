@@ -312,3 +312,52 @@ def test_les_limites_generales_portent_la_mention_sur_le_meme_resultat_pour_tous
     response, _ = _start_run(store, robert_session)
     limitations = body_of(response)["explanation"]["limitations"]
     assert any("same for anyone who gives the same answers" in text and "takes no position" in text for text in limitations)
+
+
+# --- lot E2 : citations fixées de R5 et R9 -------------------------------------------------------------------------
+
+
+def _complete(robert_session, store, scripts, kb_fake):
+    response, sent = _start_run(store, robert_session)
+    _script_completion(scripts)
+    app.handle_internal(sent[0], store=store)
+    return analyses.get_run(robert_session, USER, body_of(response)["runId"])
+
+
+def test_sans_variable_de_corpus_aucune_citation_fixee(robert_session, store, scripts, kb_fake, guard, monkeypatch):
+    monkeypatch.delenv("KB_CORPUS_VERSION", raising=False)
+    run = _complete(robert_session, store, scripts, kb_fake)
+    assert run["status"] == "done" and "noticeCitations" not in run
+
+
+def test_citations_fixees_r5_et_r9_pres_des_mentions_pas_sous_les_regles(robert_session, store, scripts, kb_fake, guard, monkeypatch):
+    monkeypatch.setenv("KB_CORPUS_VERSION", "2026-11-15")
+    run = _complete(robert_session, store, scripts, kb_fake)
+    notice = run["noticeCitations"]
+    assert set(notice) == {"R5", "R9"} and len(notice["R5"]) == 2 and len(notice["R9"]) == 1  # province QC : AMF
+    by_id = {e["id"]: e for e in run["evidence"]}
+    sections = [by_id[i]["section"] for i in notice["R5"]]
+    assert sections == ["s. 2.1.1 Decision-making supports", "s. 3.3 Safeguards for Decision-Making Supports"]
+    assert by_id[notice["R9"][0]]["regulator"] == "AMF" and by_id[notice["R9"][0]]["jurisdiction"] == "QC"
+    assert by_id[notice["R5"][0]]["documentType"] == "guidance_note" and by_id[notice["R5"][0]]["language"] == "en"
+    # Jamais sous une règle non déclenchée.
+    for verdict in run["verdicts"]:
+        if verdict["status"] in ("pass", "not_verified"):
+            assert verdict["citations"] == []
+    # Le récit ne peut pas les citer : elles sont inscrites après le rédacteur et le vérificateur.
+    # (le texte affiché est celui que le vérificateur a gardé : un {KB-nn} inconnu à ce moment-là en est retiré)
+    cited = {i for s in run["narrative"]["sections"] for i in __import__("re").findall(r"KB-\d+", s["text"])}
+    assert cited.isdisjoint(notice["R5"] + notice["R9"])
+
+
+def test_version_de_corpus_differente_aucune_citation_fixee(monkeypatch):
+    from backend.agents.engine.registry import EvidenceRegistry
+    from backend.agents.tools import notices
+
+    monkeypatch.setenv("KB_CORPUS_VERSION", "2026-11-14")  # l'ancien corpus est ingéré, le fichier date de 2026-11-15
+    assert notices.register(EvidenceRegistry("en"), "QC") == {}
+    monkeypatch.setenv("KB_CORPUS_VERSION", "2026-11-15")
+    registry = EvidenceRegistry("en")
+    assert notices.register(registry, "ON")["R9"] and notices.pinned_for("R9", "BC") == []  # province sans texte propre
+    assert all(c["jurisdiction"] in ("CA", "ON") for r in ("R5", "R9") for c in notices.pinned_for(r, "ON"))
+    assert notices.pinned_for("R9", "SK")[0]["status"] == "projet"

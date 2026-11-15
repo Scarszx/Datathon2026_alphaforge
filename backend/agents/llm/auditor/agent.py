@@ -167,7 +167,8 @@ def audit(ctx: RequestContext, verdicts: list[dict[str, Any]], registry: Evidenc
                 kb_by_ref[ref] = registry.add_regulation(
                     document=passage["document"], section=passage.get("section"), excerpt=passage["excerpt"],
                     jurisdiction=passage["jurisdiction"], url=passage.get("url"),
-                    as_of=passage.get("version"),
+                    as_of=passage.get("version"), document_type=passage.get("documentType"), regulator=passage.get("regulator"),
+                    status=passage.get("status"), section_title=passage.get("sectionTitle"), language=passage.get("language"),
                     source=f"Bedrock Knowledge Base: {passage.get('file') or passage['document']}",
                 )
             if kb_by_ref[ref] not in citations:

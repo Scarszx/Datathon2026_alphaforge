@@ -25,6 +25,7 @@ from backend.agents.observability import log_event
 from backend.agents.rules.rules import jurisdiction_notices, scenario_verdicts
 from backend.agents.rules.settings import settings
 from backend.agents.toolbox import TOOLBOX
+from backend.agents.tools import notices
 from backend.agents.tools.context import RequestContext
 from backend.agents.verifier.verifier import forbidden_phrases, verify_narrative
 from backend.common.http import ApiError
@@ -251,10 +252,14 @@ def complete_run(
                 ],
                 "checks": build_explanation(ctx, [], verdicts_t, [], [])["checks"],
             }
+            # Après le rédacteur et le vérificateur : le récit ne peut pas citer ces sections, elles s'affichent près des mentions.
+            notice_citations = notices.register(registry, mandate["province"])
             fields: dict[str, Any] = {
                 "status": status, "verdicts": verdicts_t, "evidence": registry.public_items(),
                 "jurisdictionNotices": notices_t, "explanation": explanation, "completedAt": _now(),
             }
+            if notice_citations:
+                fields["noticeCitations"] = notice_citations
             if narrative is not None:
                 fields["narrative"] = narrative
                 fields["verifier"] = verifier_report

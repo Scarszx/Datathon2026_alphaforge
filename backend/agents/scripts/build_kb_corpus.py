@@ -31,7 +31,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from backend.agents.tools.kb import DOCUMENT_TITLES, KNOWN_SUBJECTS
+from backend.agents.tools.kb import DOCUMENT_TITLES, KNOWN_SUBJECTS, excerpt_of, section_label
 
 HERE = Path(__file__).parent / "kb_corpus"
 CITABLE_REGULATORS = {"CSA", "CSA-IIROC", "CSA-CIRO", "CSA-AMF", "CIRO", "FSRA", "AMF", "FCAA"}
@@ -343,6 +343,34 @@ def build_document(path: Path, rules: dict[str, Any], proposal: dict[str, Any], 
             "inherited": inherited, "checks": checks, "numbered": bool(cfg.get("levels"))}
 
 
+def _pinned(out: Path, entry: dict[str, Any]) -> dict[str, Any]:
+    metadata = json.loads((out / f"{entry['file']}.metadata.json").read_text(encoding="utf-8"))["metadataAttributes"]
+    return {
+        "document": DOCUMENT_TITLES[entry["doc_id"]], "section": section_label(metadata), "sectionTitle": metadata.get("section_titre"),
+        "excerpt": excerpt_of((out / entry["file"]).read_text(encoding="utf-8")), "jurisdiction": metadata["juridiction"],
+        "regulator": metadata["regulateur"], "status": metadata["statut"], "documentType": metadata["type_document"],
+        "language": metadata["langue"], "url": metadata.get("source_url"), "version": metadata.get("date_version"), "file": entry["file"],
+    }
+
+
+def build_fixed_citations(manifest_sections: list[dict[str, Any]], rules: dict[str, Any], version: str, out: Path) -> dict[str, Any]:
+    """Citations que le code attache lui-même (R5, R9) : texte embarqué dans le zip, lié à `corpus_version`."""
+    def find(target: dict[str, Any]) -> dict[str, Any]:
+        for entry in manifest_sections:
+            if entry["doc_id"] != target["doc_id"] or not entry["citable"]:
+                continue
+            if ("section" in target and entry["section"] == target["section"]) or ("order" in target and entry["ordre"] == target["order"]):
+                return entry
+        raise ValueError(f"Section fixée introuvable : {target}")
+
+    spec = rules.get("fixed_citations", {})
+    return {
+        "corpus_version": version,
+        "R5": [_pinned(out, find(t)) for t in spec.get("R5", [])],
+        "R9": {province: [_pinned(out, find(t)) for t in targets] for province, targets in spec.get("R9", {}).items()},
+    }
+
+
 def render_report(results: list[dict[str, Any]], version: str, out: Path) -> str:
     lines = [f"# Rapport du corpus {version}", "", "Généré par `build_kb_corpus.py` (aucun envoi, aucune ingestion).", "",
              "| Document | Sections | Numérotées | Citable | Statut | Taille totale |", "|---|---|---|---|---|---|"]
@@ -365,10 +393,12 @@ def render_report(results: list[dict[str, Any]], version: str, out: Path) -> str
               "Aucune version française dans ce corpus (E3 reporté) : `langue` vaut `en` partout ; `doc_id` et `section` sont conservés "
               "pour qu'un alignement puisse s'ajouter plus tard sans nouvelle ingestion.", "",
               "## Commandes à lancer par l'équipe (non exécutées)", "", "```bash",
+              "cp kb/" + version + "/fixed_citations.json backend/agents/data/fixed_citations.json   # puis reconstruire la Lambda agents",
               "source scripts/aws-env.sh",
               f"aws s3 sync {out}/ s3://alphaforge-dataset-058264316309/kb/{version}/ --delete",
               f"# infra/terraform : kb_corpus_version = \"{version}\", puis terraform plan et apply (accord requis)",
               "aws bedrock-agent start-ingestion-job --knowledge-base-id CHMZAJEICM --data-source-id LJLQ9CGHXK",
+              f"# Lambda agents : variable d'environnement KB_CORPUS_VERSION = \"{version}\" (filtre citable strict + citations fixées R5/R9)",
               "# après l'ingestion : refaire la recherche R5 (CA + QC) et vérifier que la section 2.1.1 figure parmi les 5 passages gardés",
               "```", ""]
     return "\n".join(lines)
@@ -391,6 +421,8 @@ def main(argv: list[str] | None = None) -> int:
     manifest = {"corpus_version": args.version, "documents": len(results),
                 "sections": [s for r in results for s in r["sections"]]}
     (args.out / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+    fixed = build_fixed_citations(manifest["sections"], rules, args.version, args.out)
+    (args.out / "fixed_citations.json").write_text(json.dumps(fixed, ensure_ascii=False, indent=2), encoding="utf-8")
     report = render_report(results, args.version, args.out)
     (args.out / "report.md").write_text(report, encoding="utf-8")
     print(report)

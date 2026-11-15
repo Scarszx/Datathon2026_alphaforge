@@ -1,0 +1,83 @@
+{
+  "corpus_version": "2026-11-15",
+  "R5": [
+    {
+      "document": "CIRO Guidance GN-3200-26-001 (order-execution-only services)",
+      "section": "s. 2.1.1 Decision-making supports",
+      "sectionTitle": "Decision-making supports",
+      "excerpt": "The recommendation prohibition does not capture factual information about investing that might be relevant to any given client’s account, or which may potentially influence the client’s decision-making, so long as the information does not include anything that a reasonable client would consider to be an endorsement by the OEO Dealer of a specific investment decision. Decision-making supports may rely, in part, on information provided by clients about themselves (for example, a self-assessment risk questionnaire). These tools will generally not be considered to produce prohibited recommendations where: the tool helps the client make their own decision without recommending a specific investment decision, the input is provided solely by the client, and it is made clear to the client that the output is generic to investors who input similar information and that the OEO Dealer takes no position on whether that output is suitable for that client (for example, by using language such as: “Here is a typical asset allocation mix that a pre-retirement investor might wish to adopt for their portfolio …”).6 For further details, see the below discussion of decision-making supports.",
+      "jurisdiction": "CA",
+      "regulator": "CIRO",
+      "status": "en_vigueur",
+      "documentType": "guidance_note",
+      "language": "en",
+      "url": "https://www.ciro.ca/newsroom/publications/guidance-order-execution-only-account-services-and-activities",
+      "version": "2026-03-12",
+      "file": "CA_CIRO_GN-3200-26-001__s2.1.1_en.txt"
+    },
+    {
+      "document": "CIRO Guidance GN-3200-26-001 (order-execution-only services)",
+      "section": "s. 3.3 Safeguards for Decision-Making Supports",
+      "sectionTitle": "Safeguards for Decision-Making Supports",
+      "excerpt": "We discuss below some of the key safeguards that should generally be considered for all decision-making supports, where applicable. This section is not exhaustive of the safeguards and best practices that OEO Dealers should consider applying when offering these types of decision-making supports. Clear Disclosures and Disclaimers All disclosures and disclaimers should be drafted in plain language that is clear and accessible to DIY investors, Decision making supports should include disclosures and disclaimers that clearly explain the following: A reminder that the client is solely responsible for making all investment decisions for their account, A prominent disclosure that states that the output: Is not personalized investment advice, Cannot be guaranteed by the OEO Dealer to be aligned with or achieve any client’s specific financial goals, The OEO Dealer has no obligation to notify clients when changes to a tool’s criteria, functionality, or methodology results in outputs different from how the tool was previously characterized, Risk metrics and warnings provided alongside decision-making support, highlighting the risks associated with its results, A prominent disclosure that states that the output is limited to the products and services that the OEO Dealer offers, If the results of a decision-making support reference proprietary or affiliate products or services of the OEO Dealer, or any other product for which the OEO Dealer has a material conflict of interest, the OEO Dealer must explicitly disclose this fact. OEO Dealers should consider whether certain disclaimers should be provided to clients on a repeated, regular or continuous basis, rather than one-time, to achieve meaningful disclosure. For example, if the above disclaimers are information provided to clients alongside the decision-making supports to which they relate, then clients may better understand how these disclaimers apply rather than if disclaimers were provided only once at account opening or housed on a standalone webpage. Clear Descriptors, Transparent and Objective Criteria Provide clear and transparent descriptors in plain language regarding a decision making support’s purpose and its inherent limitations.",
+      "jurisdiction": "CA",
+      "regulator": "CIRO",
+      "status": "en_vigueur",
+      "documentType": "guidance_note",
+      "language": "en",
+      "url": "https://www.ciro.ca/newsroom/publications/guidance-order-execution-only-account-services-and-activities",
+      "version": "2026-03-12",
+      "file": "CA_CIRO_GN-3200-26-001__s3.3_en.txt"
+    }
+  ],
+  "R9": {
+    "QC": [
+      {
+        "document": "AMF: the financial planner title in Québec",
+        "section": null,
+        "sectionTitle": "AMF: the financial planner title in Québec",
+        "excerpt": "Financial planning The title \"financial planner\" or its abbreviation \"F.Pl.\" may be used by a person holding a diploma issued by the Institute of Financial Planning (the “Institute”) who has obtained a certificate from the AMF authorizing them to act in financial planning. How to obtain a representative's certificate: Step 1: Meet the minimum qualifications Step 2: Apply for a certificate Reference Institute of Financial Planning This link will open in a new window",
+        "jurisdiction": "QC",
+        "regulator": "AMF",
+        "status": "en_vigueur",
+        "documentType": "web_page",
+        "language": "en",
+        "url": "https://lautorite.qc.ca/en/becoming-a-professional/financial-planning",
+        "version": "2026-11-14",
+        "file": "QC_AMF_financial-planner-title__o01_en.txt"
+      }
+    ],
+    "ON": [
+      {
+        "document": "FSRA Rule 2020-001 (financial professionals title protection)",
+        "section": "page 1-3",
+        "sectionTitle": null,
+        "excerpt": "Financial Services Regulatory Authority of Ontario Publication of Board Approved Rule on FSRA’s Website Rule 2020-001 Financial Professionals Title Protection Introduction Please find enclosed herein the materials required to satisfy the requirements prescribed by paragraphs (1)-(5) of s. 23(2) of the Financial Services Regulatory Authority of Ontario Act, 2016 (the FSRA Act) for Rule 2020-001- Financial Professionals Title Protection (the Board Approved Rule) made under the Financial Professionals Title Protection Act, 2019 (the FPTPA). The materials herein have been compiled by the Financial Services Regulatory Authority of Ontario (FSRA), following the most recent public consultation, which launched on May 11, 2021 and concluded on June 21, 2021. FSRA’s board of directors approved the Board Approved Rule on December 16, 2021. Background The Financial Planner (FP) / Financial Advisor (FA) title protection framework under the FPTPA is intended to: • mitigate consumer and investor confusion; and • provide confidence to consumers and investors that the individual with whom they are dealing is qualified to provide financial planning or advisory services. FSRA believes these objectives can be achieved by implementing a fair and flexible framework that leverages existing regimes for granting and supervising financial planning and advising designations and licences. This will ensure that individuals using the FP or FA titles meet minimum standards. FSRA posted the first proposed financial professionals title protection rule (the First Proposed FPTP Rule) for a 90-day public consultation between August 2020 and November 2020 (First Consultation). FSRA also posted proposed Approach Guidance – Financial Professionals Title Protection – Administration of Applications (Application Guidance), which sets out FSRA’s approach to the administration of applications for credentialing bodies (CBs) and FP/FA credentials under the FPTPA and the Board Approved Rule. FSRA re-posted the second proposed financial professionals title protection rule (the Second Proposed FPTP Rule) and Application Guidance for a 40-day public consultation between May 11, 2021 and June 21, 2021 (Second Consultation) to address stakeholder feedback.",
+        "jurisdiction": "ON",
+        "regulator": "FSRA",
+        "status": "en_vigueur",
+        "documentType": "rule",
+        "language": "en",
+        "url": "https://fsrao.ca/media/11436/download",
+        "version": "2022-03-28",
+        "file": "ON_FSRA_rule-2020-001__o01_en.txt"
+      }
+    ],
+    "SK": [
+      {
+        "document": "FCAA: proposed Financial Planners and Financial Advisors regulations",
+        "section": "page 1-3",
+        "sectionTitle": null,
+        "excerpt": "The Financial Planners and Financial Advisors Act Notice of Proposed Regulations and Request for Further Comment July 2022 fcaa.gov.sk.ca Contents Financial and Consumer Affairs Authority of Saskatchewan Notice of Proposed Changes and Request for Further Comment Proposed Regulations [2022-001] The Financial Planners and Financial Advisors Regulations Introduction The Financial and Consumer Affairs Authority of Saskatchewan (FCAA or the Authority) is seeking additional feedback on the Proposed Regulations [2022-001] – The Financial Planners and Financial Advisors Regulations (the Proposed Regulations) under The Financial Planners and Financial Advisors Act (FPFAA). The Proposed Regulations were posted for consultation on July 28, 2021 for a 60-day comment period. All comments received were carefully reviewed and considered. For this second consultation, we are posing some general questions about options and approaches as well as some discrete issues. It includes issues that were raised in the previous consultation as well as some new items to consider. The Consultation will be open for 60 days. The text of the Proposed Regulations is set out in Appendix A to this Notice. The FCAA continues to be mindful of the importance of harmonizing our legislation with that of other jurisdictions. We agree with the sentiment expressed by numerous stakeholders that unnecessary regulatory burden should be reduced and consistency promoted. We also note, however, various comments from stakeholders that suggested alternate approaches and preferences respecting certain aspects of the proposed framework that would reduce harmonization. In addition, we have had the benefit of observing the implementation of the Financial Services Regulatory Authority of Ontario’s (“FSRA”) financial professionals title protection legislation and have received comments and responses to that process as it unfolds. In light of all the comments received and reviewed, we ask you to consider the alternate approaches outlined herein and provide feedback as to any potential lack of harmonization that may result. Interested persons are invited to make written representations to the FCAA with respect to the Proposed Regulations on or before September 20th, 2022. We have included throughout this Notice questions for consideration and comment. These questions have been summarized at the end of this Notice.",
+        "jurisdiction": "SK",
+        "regulator": "FCAA",
+        "status": "projet",
+        "documentType": "proposed_regulation_notice",
+        "language": "en",
+        "url": "https://fcaa.gov.sk.ca/public/CKeditorUpload/Notice_of_Proposed_Reg_and_Request_for_Comment_for_FPFA_Regulations_FINAL.v2.pdf",
+        "version": "2022",
+        "file": "SK_FCAA_FPFA-proposed-regulations-notice__o01_en.txt"
+      }
+    ]
+  }
+}

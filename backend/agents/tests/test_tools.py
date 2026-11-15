@@ -155,8 +155,8 @@ def _kb_result(text="A client's risk profile should reflect the lower of risk to
     return {
         "content": {"text": text}, "score": 0.71,
         "location": {"s3Location": {"uri": "s3://b/kb/2026-11-14/CA_31-368_staff-notice-CSA-CIRO_2025-12-10_en.pdf"}},
-        "metadata": {"juridiction": juris, "date_version": "2025-12-10", "source_url": "https://example.test/31-368",
-                     "x-amz-bedrock-kb-document-page-number": 4.0},
+        "metadata": {"juridiction": juris, "regulateur": "CSA-CIRO", "date_version": "2025-12-10",
+                     "source_url": "https://example.test/31-368", "x-amz-bedrock-kb-document-page-number": 4.0},  # ancien corpus : pas de `citable`
     }
 
 
@@ -246,3 +246,67 @@ def test_propose_mandate_refuse_une_capacite_inventee(ctx):
     for source in ("user_answer", "persona"):
         draft["fieldSources"] = {"riskCapacity": source}
         assert catalog.propose_mandate(ctx, draft)["valid"] is True
+
+
+# --- lot E2 : citable, section affichée, champs transportés ------------------------------------------------------------
+
+
+def _new_corpus_result(section="2.1.1", citable=True, regulateur="CIRO", **extra):
+    return {
+        "content": {"text": "The output is generic to investors who input similar information."}, "score": 0.7,
+        "location": {"s3Location": {"uri": "s3://b/kb/2026-11-15/CA_CIRO_GN-3200-26-001__s2.1.1_en.txt"}},
+        "metadata": {"juridiction": "CA", "regulateur": regulateur, "citable": citable, "section": section,
+                     "section_titre": "Decision-making supports", "type_document": "guidance_note", "statut": "en_vigueur",
+                     "langue": "en", "date_version": "2026-03-12", "source_url": "https://example.test/gn", "corpus_version": "2026-11-15", **extra},
+    }
+
+
+def test_filtre_citable_strict_seulement_une_fois_le_nouveau_corpus_ingere(monkeypatch):
+    monkeypatch.delenv("KB_CORPUS_VERSION", raising=False)
+    legacy = kb.build_filter(["CA", "QC"], ["oeo"])
+    assert {"equals": {"key": "citable", "value": True}} not in legacy["andAll"]
+    monkeypatch.setenv("KB_CORPUS_VERSION", "2026-11-15")
+    strict = kb.build_filter(["CA", "QC"], ["oeo"])
+    assert strict["andAll"][0] == {"in": {"key": "juridiction", "value": ["CA", "QC"]}}
+    assert {"equals": {"key": "citable", "value": True}} in strict["andAll"]
+
+
+@pytest.mark.parametrize("metadata,version,expected", [
+    ({"citable": True, "regulateur": "NBDB"}, None, True),
+    ({"citable": "true"}, None, True),
+    ({"citable": False, "regulateur": "CIRO"}, None, False),       # fichier de notes : régulateur de la liste mais non citable
+    ({"regulateur": "CIRO"}, None, True),                           # ancien corpus : régulateur de la liste
+    ({"regulateur": "NBDB"}, None, False),                          # ancien corpus : courtier
+    ({"regulateur": "CIRO"}, "2026-11-15", False),                  # nouveau corpus : clé absente = non citable
+    ({}, None, False),
+])
+def test_is_citable(monkeypatch, metadata, version, expected):
+    monkeypatch.delenv("KB_CORPUS_VERSION", raising=False)
+    if version:
+        monkeypatch.setenv("KB_CORPUS_VERSION", version)
+    assert kb.is_citable(metadata) is expected
+
+
+def test_retrieve_jette_les_passages_non_citables_et_revérifie_citable(ctx, aws, monkeypatch):
+    monkeypatch.setenv("KB_CORPUS_VERSION", "2026-11-15")
+    ctx.clients["kb"] = FakeKb([_new_corpus_result(), _new_corpus_result(citable=False, regulateur="NBDB"),
+                                _new_corpus_result(citable=False), {**_new_corpus_result(), "metadata": {"juridiction": "CA", "regulateur": "CIRO"}}])
+    passages = catalog.search_regulation(ctx, "x", ["oeo"])["passages"]
+    assert len(passages) == 1 and passages[0]["section"] == "s. 2.1.1 Decision-making supports"
+
+
+def test_section_affichee_et_champs_transportes(ctx, aws, monkeypatch):
+    monkeypatch.delenv("KB_CORPUS_VERSION", raising=False)
+    ctx.clients["kb"] = FakeKb([_new_corpus_result(), _new_corpus_result(section=None, section_titre=None, pages="14-16", regulateur="CSA")])
+    catalog.search_regulation(ctx, "x", ["oeo"])
+    first, second = ctx.passages["P1"], ctx.passages["P2"]
+    assert first["section"] == "s. 2.1.1 Decision-making supports" and first["sectionTitle"] == "Decision-making supports"
+    assert (first["documentType"], first["regulator"], first["status"], first["language"]) == ("guidance_note", "CIRO", "en_vigueur", "en")
+    assert second["section"] == "page 14-16"   # section sans numéro : pages, jamais un numéro inventé
+    assert kb.section_label({"section": "13.3"}) == "s. 13.3" and kb.section_label({}, 4.0) == "page 4" and kb.section_label({}) is None
+
+
+def test_un_passage_entier_tient_dans_l_extrait():
+    chunk = ("Une phrase du passage numéro un. " * 70).strip()  # ~2 300 caractères, un passage de 300 jetons
+    assert len(chunk) > 1200 and kb.MAX_EXCERPT_CHARS >= 2400
+    assert kb.excerpt_of(chunk) == chunk

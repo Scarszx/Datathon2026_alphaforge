@@ -38,7 +38,12 @@ DOCUMENT_TITLES = {
 }
 
 MAX_PASSAGES = 5
-MAX_EXCERPT_CHARS = 1200  # médiane des passages de la base : ~1400 caractères ; 700 coupait 29 passages sur 31 en pleine phrase
+# Un passage de la base (300 jetons) mesure jusqu'à ~2 400 caractères (relevé du 2026-11-15) : le plafond laisse tenir un
+# passage entier, toujours coupé à une fin de phrase. (1 200 puis 700 coupaient la majorité des passages en pleine phrase.)
+MAX_EXCERPT_CHARS = 2400
+
+# Seuls les textes de régulateurs se citent (GN-3200-26-001 : un courtier n'est pas une source de la règle).
+CITABLE_REGULATORS = ("CSA", "CSA-IIROC", "CSA-CIRO", "CSA-AMF", "CIRO", "FSRA", "AMF", "FCAA")
 
 
 # Abréviations des textes de loi et des avis : un point qui les suit n'est pas une fin de phrase.
@@ -95,8 +100,12 @@ def neutralize(text: str) -> str:
     )
 
 
-def build_filter(jurisdictions: list[str], subjects: list[str] | None) -> dict[str, Any]:
+def build_filter(jurisdictions: list[str], subjects: list[str] | None, strict_citable: bool | None = None) -> dict[str, Any]:
     clauses: list[dict[str, Any]] = [{"in": {"key": "juridiction", "value": jurisdictions}}]
+    if strict_citable is None:
+        strict_citable = bool(config.kb_corpus_version())
+    if strict_citable:  # nouveau corpus ingéré : chaque fichier porte `citable`
+        clauses.append({"equals": {"key": "citable", "value": True}})
     valid = [s for s in subjects or [] if s in KNOWN_SUBJECTS]
     if len(valid) == 1:
         clauses.append({"listContains": {"key": "sujets", "value": valid[0]}})
@@ -115,6 +124,35 @@ def _client():
 
         _CLIENT = boto3.client("bedrock-agent-runtime", region_name="us-east-1")
     return _CLIENT
+
+
+def is_citable(metadata: dict[str, Any]) -> bool:
+    """Revérifie `citable` dans le code, comme la juridiction (défense en profondeur).
+
+    Corpus par section : `citable` doit valoir vrai. Ancien corpus (clé absente, KB_CORPUS_VERSION non posée) :
+    seuls les régulateurs de la liste sont citables. Dès que le nouveau corpus est ingéré, une clé absente = non citable."""
+    value = metadata.get("citable")
+    if isinstance(value, str):
+        value = value.strip().lower() == "true" if value.strip().lower() in ("true", "false") else None
+    if value is True:
+        return True
+    if value is False:
+        return False
+    if config.kb_corpus_version():
+        return False
+    return metadata.get("regulateur") in CITABLE_REGULATORS  # repli de transition, à retirer avec l'ancien préfixe
+
+
+def section_label(metadata: dict[str, Any], page: Any = None) -> str | None:
+    """« s. 2.1.1 Decision-making supports » si la section existe, sinon « page N » (plage de pages, ou page Bedrock)."""
+    section = metadata.get("section")
+    if section:
+        title = metadata.get("section_titre")
+        return f"s. {section} {title}".strip() if title else f"s. {section}"
+    pages = metadata.get("pages")
+    if pages:
+        return f"page {pages}"
+    return f"page {int(page)}" if isinstance(page, (int, float)) else None
 
 
 def retrieve(query: str, jurisdictions: list[str], subjects: list[str] | None = None, client=None) -> list[dict[str, Any]]:
@@ -144,6 +182,8 @@ def retrieve(query: str, jurisdictions: list[str], subjects: list[str] | None = 
             # ou hors de {CA, province}, est jeté (défense en profondeur, jamais cité).
             if metadata.get("juridiction") not in jurisdictions:
                 continue
+            if not is_citable(metadata):  # documents de courtier, notes de bas de page : jamais cités
+                continue
             if len(passages) >= MAX_PASSAGES:
                 break
             uri = (result.get("location") or {}).get("s3Location", {}).get("uri") or metadata.get("x-amz-bedrock-kb-source-uri")
@@ -152,7 +192,12 @@ def retrieve(query: str, jurisdictions: list[str], subjects: list[str] | None = 
             excerpt = excerpt_of((result.get("content") or {}).get("text", ""))
             passages.append({
                 "document": document_title(uri),
-                "section": f"page {int(page)}" if isinstance(page, (int, float)) else None,
+                "section": section_label(metadata, page),
+                "sectionTitle": metadata.get("section_titre"),
+                "documentType": metadata.get("type_document"),
+                "regulator": metadata.get("regulateur"),
+                "status": metadata.get("statut"),
+                "language": metadata.get("langue"),
                 "excerpt": excerpt,
                 "jurisdiction": metadata.get("juridiction"),
                 "version": metadata.get("date_version"),
