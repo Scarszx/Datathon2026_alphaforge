@@ -17,3 +17,7 @@ class OrchestratorTurn(BaseModel):
 
 class TranslationBatch(BaseModel):
     items: list[str] = Field(description="Translated items, same count and same order as received.")
+
+
+class Refusal(BaseModel):
+    reply: str = Field(description="The short explained refusal, in the requested language, ending with one simulation the user can ask for.")
