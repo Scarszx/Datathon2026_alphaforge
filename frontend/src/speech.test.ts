@@ -48,23 +48,28 @@ describe("parseTranscriptMessage", () => {
 
 describe("PcmResampler", () => {
   it("48 kHz → 16 kHz : un tiers des échantillons, valeurs Int16", () => {
-    const r = new PcmResampler(48000);
-    const out = r.process(new Float32Array(4800).fill(0.5));
+    const out = new PcmResampler(48000).process(new Float32Array(4800).fill(0.5));
     expect(Math.abs(out.length - 1600)).toBeLessThanOrEqual(1);
     expect(out.every((x) => Math.abs(x - 16384) <= 1)).toBe(true);
   });
-  it("le découpage en blocs ne change pas le résultat", () => {
+  it("44,1 kHz : le découpage en blocs ne change pas le résultat", () => {
     const sig = Float32Array.from({ length: 4410 }, (_, i) => Math.sin(i / 20));
     const whole = new PcmResampler(44100).process(sig);
     const r = new PcmResampler(44100);
-    const parts = [r.process(sig.slice(0, 1000)), r.process(sig.slice(1000, 1001)), r.process(sig.slice(1001))];
-    const joined = Int16Array.from(parts.flatMap((p) => Array.from(p)));
-    expect(joined.length).toBe(whole.length);
+    const joined = Int16Array.from([sig.slice(0, 1000), sig.slice(1000, 1001), sig.slice(1001)].flatMap((c) => Array.from(r.process(c))));
     expect(Array.from(joined)).toEqual(Array.from(whole));
+    expect(Math.abs(whole.length - 1600)).toBeLessThanOrEqual(1);
   });
-  it("écrête hors de [-1, 1]", () => {
-    const out = new PcmResampler(16000).process(Float32Array.from([2, -2, 2, -2]));
-    expect(Array.from(out).slice(0, 2)).toEqual([32767, -32768]);
+  it("filtre le bruit au-dessus de 8 kHz au lieu de le replier dans la voix", () => {
+    // 20 kHz à 48 kHz, repliée en 4 kHz par un simple sous-échantillonnage ; la moyenne l'atténue fortement
+    const sig = Float32Array.from({ length: 4800 }, (_, i) => Math.sin((2 * Math.PI * 20000 * i) / 48000));
+    const out = new PcmResampler(48000).process(sig);
+    const peak = Math.max(...Array.from(out, Math.abs)) / 32767;
+    expect(peak).toBeLessThan(0.35);
+  });
+  it("identité à 16 kHz et écrêtage hors de [-1, 1]", () => {
+    const out = new PcmResampler(16000).process(Float32Array.from([2, -2, 0.5]));
+    expect(Array.from(out)).toEqual([32767, -32768, 16384]);
   });
 });
 
