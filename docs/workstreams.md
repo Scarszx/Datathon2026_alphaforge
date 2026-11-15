@@ -67,16 +67,14 @@ Attention :
 ## Intégration (humain, après fusion)
 
 État au 2026-11-14 :
-- ✅ **Infra déployée** (`terraform apply` fait).
+- ✅ **Infra déployée** (`terraform apply` fait). Nouvel `apply` le 2026-11-14 au soir : code de WS4b et WS5 dans les deux Lambdas, auto-invocation de la Lambda agents, timeout de 180 s, `DATASET_VERSION = 2026-11-14` (0 ajout, 3 modifications, 0 suppression).
+- ✅ **Jeu élargi envoyé** : 258 fichiers (43,9 Mo) dans `s3://alphaforge-dataset-058264316309/dataset/2026-11-14/`. `dataset_version = 2026-11-14` dans `terraform.tfvars`. `backend/api/tickers.json` régénéré (241 tickers, commit `cb2d8d0`).
 - ✅ **Knowledge Base chargée** : 13 documents envoyés dans `s3://alphaforge-dataset-058264316309/kb/2026-11-14/` avec leurs `.metadata.json`. Job d'ingestion `DVZ0BNJFGU` en `COMPLETE`, 13 documents indexés, aucun échec. Titan Text Embeddings V2 fonctionne.
 - ⬜ À faire :
   - tester les faux positifs du Guardrail ;
   - créer les comptes Cognito des personas ;
-  - relever les fiches des 15 FNB clés dans `data/ingestion/etf_enriched.source.json`, puis relancer `python -m data.ingestion.build_dataset --mode full --strict-etf` (le cache local rend la relance rapide) ;
-  - envoyer le jeu élargi `data/output/2026-11-14/` dans `dataset/2026-11-14/` (commande dans `data/README.md`), passer la variable Terraform `dataset_version` à `2026-11-14`, et régénérer `backend/api/tickers.json` à partir de `universe.parquet` (validation des tickers de WS4) ;
+  - relever les fiches des 15 FNB clés dans `data/ingestion/etf_enriched.source.json`, puis relancer `python -m data.ingestion.build_dataset --mode full --strict-etf` (le cache local rend la relance rapide), puis renvoyer le jeu dans S3 (même version) ;
   - envoyer le build du front dans le bucket front après WS6 ;
-  - **rafraîchir les identifiants AWS** (`scripts/aws-refresh-creds.sh`, par un humain : ils ont expiré pendant WS5) ;
-  - **`terraform apply`** pour le changement d'infra de WS5 (auto-invocation de la Lambda agents, timeout de 180 s), puis reconstruire et redéployer les Lambdas avec le code de WS4b et de WS5 ;
   - **lancer le banc de fumée de WS5** (`backend/agents/scripts/smoke.py`). Il appelle Bedrock, le Guardrail et la KB sans rien écrire en base. Il couvre les faux positifs du Guardrail, la recherche dans la KB et l'orchestrateur en français. Aucun vrai appel Bedrock n'a encore été fait ;
   - **mesurer la taille de la couche pandas** de la Lambda agents (non mesurée pendant WS5).
 
