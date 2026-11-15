@@ -305,3 +305,10 @@ def test_un_motif_traduit_qui_approuve_retombe_sur_l_anglais(monkeypatch):
         for t in texts])
     _, shown, _, _ = pipeline._translate_run_texts(None, [], verdicts, [], "fr")
     assert [v["message"] for v in shown] == ["The rule was triggered.", "Seuil atteint."]
+
+
+def test_les_limites_generales_portent_la_mention_sur_le_meme_resultat_pour_tous(robert_session, store):
+    """Lot D : la mention « même résultat pour toute personne qui donne les mêmes réponses » est dans le run (en anglais)."""
+    response, _ = _start_run(store, robert_session)
+    limitations = body_of(response)["explanation"]["limitations"]
+    assert any("same for anyone who gives the same answers" in text and "takes no position" in text for text in limitations)
