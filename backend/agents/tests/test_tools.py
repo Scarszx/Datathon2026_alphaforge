@@ -306,6 +306,7 @@ def test_section_affichee_et_champs_transportes(ctx, aws, monkeypatch):
     assert kb.section_label({"section": "13.3"}) == "s. 13.3" and kb.section_label({}, 4.0) == "page 4" and kb.section_label({}) is None
     # Préambule sans numéro : son titre (jamais un numéro inventé), avec les pages d'un PDF.
     assert kb.section_label({"section_titre": "Executive Summary"}) == "Executive Summary"
+    assert kb.section_label({"section_titre": "AMF: the title"}, None, "AMF: the title") is None  # document d'une seule section
     assert kb.section_label({"section_titre": "Introduction and background", "pages": "1-4"}) == "Introduction and background (page 1-4)"
 
 

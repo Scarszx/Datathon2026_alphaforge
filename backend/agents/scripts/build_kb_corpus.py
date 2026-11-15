@@ -347,7 +347,7 @@ def build_document(path: Path, rules: dict[str, Any], proposal: dict[str, Any], 
 def _pinned(out: Path, entry: dict[str, Any]) -> dict[str, Any]:
     metadata = json.loads((out / f"{entry['file']}.metadata.json").read_text(encoding="utf-8"))["metadataAttributes"]
     return {
-        "document": DOCUMENT_TITLES[entry["doc_id"]], "section": section_label(metadata), "sectionTitle": metadata.get("section_titre"),
+        "document": DOCUMENT_TITLES[entry["doc_id"]], "section": section_label(metadata, None, DOCUMENT_TITLES[entry["doc_id"]]), "sectionTitle": metadata.get("section_titre"),
         "excerpt": excerpt_of((out / entry["file"]).read_text(encoding="utf-8")), "jurisdiction": metadata["juridiction"],
         "regulator": metadata["regulateur"], "status": metadata["statut"], "documentType": metadata["type_document"],
         "language": metadata["langue"], "url": metadata.get("source_url"), "version": metadata.get("date_version"), "file": entry["file"],

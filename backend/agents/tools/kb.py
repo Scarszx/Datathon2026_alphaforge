@@ -143,7 +143,7 @@ def is_citable(metadata: dict[str, Any]) -> bool:
     return metadata.get("regulateur") in CITABLE_REGULATORS  # repli de transition, à retirer avec l'ancien préfixe
 
 
-def section_label(metadata: dict[str, Any], page: Any = None) -> str | None:
+def section_label(metadata: dict[str, Any], page: Any = None, document: str | None = None) -> str | None:
     """« s. 2.1.1 Decision-making supports » si la section existe, sinon « page N » (plage de pages, ou page Bedrock)."""
     section = metadata.get("section")
     if section:
@@ -151,7 +151,7 @@ def section_label(metadata: dict[str, Any], page: Any = None) -> str | None:
         return f"s. {section} {title}".strip() if title else f"s. {section}"
     pages = metadata.get("pages")
     title = metadata.get("section_titre")
-    if title:  # partie sans numéro (préambule, résumé) : son titre, jamais un numéro inventé
+    if title and title != document:  # partie sans numéro (préambule, résumé) : son titre, jamais un numéro inventé ; pas le titre du document
         return f"{title} (page {pages})" if pages else title
     if pages:
         return f"page {pages}"
@@ -195,7 +195,7 @@ def retrieve(query: str, jurisdictions: list[str], subjects: list[str] | None = 
             excerpt = excerpt_of((result.get("content") or {}).get("text", ""))
             passages.append({
                 "document": document_title(uri),
-                "section": section_label(metadata, page),
+                "section": section_label(metadata, page, document_title(uri)),
                 "sectionTitle": metadata.get("section_titre"),
                 "documentType": metadata.get("type_document"),
                 "regulator": metadata.get("regulateur"),
