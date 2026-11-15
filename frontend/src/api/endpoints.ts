@@ -1,8 +1,9 @@
 /* Une fonction par route du contrat (section apis). Le front ne calcule rien : il affiche ce que ces routes renvoient. */
 import { request } from "./client";
 import type {
-  AgentsRegistry, Asset, Conversation, Holding, InvestorProfile, Message, MessageCreateResponse,
-  Page, Portfolio, PortfolioSummary, SummaryRange, User,
+  AgentsRegistry, Asset, Conversation, Holding, InvestorProfile, Mandate, MandateCreateRequest,
+  Message, MessageCreateResponse, Page, Portfolio, PortfolioSummary, Run, RunCreateRequest,
+  SummaryRange, User,
 } from "./types";
 
 const enc = encodeURIComponent;
@@ -34,3 +35,14 @@ export const searchAssets = (q: string, assetClass?: string, signal?: AbortSigna
   request<{ items: Asset[] }>("/market/search", { query: { q, assetClass }, signal });
 
 export const getAgentsRegistry = () => request<AgentsRegistry>("/agents");
+
+/* v0.4.0 : mandats (Lambda API, sans LLM) et runs (Lambda agents) */
+export const createMandate = (sessionId: string, mandate: MandateCreateRequest) =>
+  request<Mandate>(`/conversations/${enc(sessionId)}/mandates`, { method: "POST", body: mandate });
+export const listMandates = (sessionId: string) =>
+  request<{ items: Mandate[] }>(`/conversations/${enc(sessionId)}/mandates`);
+
+export const createRun = (sessionId: string, mandateVersion: number) =>
+  request<Run>(`/conversations/${enc(sessionId)}/runs`, { method: "POST", body: { mandateVersion } });
+export const getRun = (sessionId: string, runId: string) =>
+  request<Run>(`/conversations/${enc(sessionId)}/runs/${enc(runId)}`);
