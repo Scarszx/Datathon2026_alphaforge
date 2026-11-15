@@ -24,7 +24,7 @@ Un modèle de langage ne calcule jamais un chiffre et ne décide jamais d'un ver
 
 | Composant | Nature | Rôle | Pourquoi |
 |---|---|---|---|
-| **Orchestrateur** | Agent LLM (Claude Sonnet 5.5) | Seule voix face à l'utilisateur. Détecte la langue, traduit en anglais, lit profil et portefeuille, pose au plus une étape de questions, propose un mandat, traduit la restitution | Un seul point de contact garde la conversation cohérente. La traduction vers l'anglais rend les agents et la recherche dans la KB prévisibles |
+| **Orchestrateur** | Agent LLM (Claude Opus 5.5) | Seule voix face à l'utilisateur. Détecte la langue, traduit en anglais, lit profil et portefeuille, pose au plus une étape de questions, propose un mandat, traduit la restitution | Un seul point de contact garde la conversation cohérente. La traduction vers l'anglais rend les agents et la recherche dans la KB prévisibles |
 | **Auditeur de convenance** | Agent LLM | Pour chaque verdict, trouve dans la KB le passage qui le fonde (juridiction CA et province) et formule le motif | La recherche de passages est un travail de langage. Il ne décide d'aucun verdict |
 | **Rédacteur** | Agent LLM | Écrit quatre sections de restitution en anglais, à partir du registre seulement, avec des emplacements `{EV-nn}` et `{KB-nn}` à la place des chiffres | Séparer la rédaction du calcul rend toute phrase vérifiable |
 | **Moteur de calcul** | Code Python (pandas) | Construit les scénarios 0, 1 et 2 et calcule les mesures | Reproductible et vérifiable : un modèle ne calcule pas de tête |
@@ -45,7 +45,7 @@ Le pipeline des étapes de calcul et d'audit est **fixe en code** : l'orchestrat
 
 | Choix | Justification |
 |---|---|
-| **Strands Agents SDK** (Python) sur **Amazon Bedrock**, Claude Sonnet 5.5 | Outils typés, sortie structurée, limites de cycles et de tokens fixées par agent. Un seul modèle pour les trois agents : simple à régler et à expliquer |
+| **Strands Agents SDK** (Python) sur **Amazon Bedrock**, Claude Opus 5.5 | Outils typés, sortie structurée, limites de cycles et de tokens fixées par agent. Un seul modèle pour les trois agents : simple à régler et à expliquer |
 | **Deux Lambdas** (API légère 256 Mo, 10 s ; agents 2 048 Mo, 180 s) | L'API Gateway coupe à 30 s : le cadrage reste synchrone, l'analyse est faite en deux temps. L'API légère n'embarque pas pandas : elle démarre vite |
 | **DynamoDB** (5 tables), **Cognito**, **API Gateway** (JWT), **S3 + CloudFront** | Services gérés, sans serveur, adaptés à une démonstration. L'identité vient du JWT, jamais du corps de la requête |
 | **Knowledge Base Bedrock sur S3 Vectors**, embeddings Titan Text Embeddings V2 | S3 Vectors se crée en quelques secondes, sans coût fixe et sans étape manuelle, contrairement à OpenSearch Serverless ou Aurora pgvector |
