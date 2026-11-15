@@ -31,10 +31,10 @@ Les chantiers déjà terminés en v0.3.0 (✅) restent valables. Leurs compléme
                       ├──► ✅ WS3 data   (jeu élargi ~250 actifs × 10 ans, publication_date, FNB)     ─┼──► intégration (humain)
                       ├──► ✅ WS4 api    + ✅ WS4b api v0.4 (mandats, registre)                      ─┤
                       ├──►    WS5 agents (orchestrateur, auditeur, rédacteur, modules, runs)         ─┤
-                      └──►    WS6 front  (session en 3 colonnes)                                     ─┘
+                      └──► 🟠 WS6 front  (session en 3 colonnes ; base v0.3.0 de David à adapter)     ─┘
 ```
 
-WS0b, WS1b, WS2b, WS3 et WS4b sont fusionnés dans `main`. **Restent WS5 et WS6, indépendants entre eux : ils peuvent tourner en parallèle.**
+WS0b, WS1b, WS2b, WS3 et WS4b sont fusionnés dans `main`. **Restent WS5 et WS6, indépendants entre eux : ils peuvent tourner en parallèle.** WS6 part du front déjà écrit par David (contrat v0.3.0, à adapter au v0.4.0, voir sa section).
 
 ## Propriété des dossiers
 
@@ -50,7 +50,7 @@ WS0b, WS1b, WS2b, WS3 et WS4b sont fusionnés dans `main`. **Restent WS5 et WS6,
 | ✅ WS4 api | `ws/api` | `backend/api/` | WS0, WS2 |
 | ✅ WS4b api v0.4 | `ws/api-v4` | `backend/api/` | WS0b, WS2b (fusionné) |
 | WS5 agents | `ws/agents` | `backend/agents/` | WS0b, WS2b (fusionné), disposition WS3 |
-| WS6 front | `ws/frontend` | `frontend/` | contrat (apis, schémas) |
+| 🟠 WS6 front (commencé par David, à adapter) | `ws/frontend` | `frontend/` (le front de David est encore à la racine : `src/`, `package.json`…) | contrat v0.4.0 (apis, schémas) |
 
 ## Lancer un chantier
 
@@ -429,10 +429,54 @@ Définition de fini : tous les tests passent ; aucune réponse d'outil ne dépas
 
 ---
 
-## WS6 front (session en 3 colonnes)
+## 🟠 WS6 front (session en 3 colonnes) — commencé, à adapter au contrat v0.4.0
+
+**État au 2026-11-14.** Le coéquipier David a déjà écrit un front. Il est sur `main` depuis la fusion `83538a8` (« Fusionner origin/main (front, prototype et backend de David) »). Ce front est **une base à reprendre, pas à refaire**, mais il a été écrit pour le **contrat v0.3.0** : il faut l'adapter au contrat v0.4.0 avant de le considérer comme WS6.
+
+Ce qui existe et se garde :
+- SPA Vite et React à la racine : `src/`, `index.html`, `package.json`, `vite.config.ts`, documentée dans `README.md` (section « Front (SPA) ») ;
+- connexion et inscription Cognito (`src/api/auth.ts`), client HTTP avec Bearer et erreurs au format `schema-error` (`src/api/client.ts`), une fonction par route (`src/api/endpoints.ts`) ;
+- pages : accueil avec questionnaire public, connexion, inscription avec questionnaire de risque, portefeuille (positions, autocomplétion de ticker), marchés, profil ;
+- **mode démo sans API ni Cognito** (`npm run dev:demo`, `src/api/demo.ts`, données dans le `localStorage`). Il est utile pour la vidéo et pour développer sans backend : on le garde.
+
+Ce qu'il faut changer pour respecter le contrat v0.4.0 :
+1. **Emplacement :** déplacer le front de la racine vers `frontend/` (dossier attribué à WS6), avec `src/`, `index.html`, `package.json`, `package-lock.json`, `tsconfig.json`, `vite.config.ts`, `public/`. Mettre à jour les chemins du README et de `.gitignore`. `portefeuille-prototype/` peut rester tel quel, ou aller sous `frontend/` : à décider avec David.
+2. **Types et routes v0.4.0** dans `src/api/types.ts` et `src/api/endpoints.ts` :
+   - `schema-mandate`, `schema-run`, `schema-evidence`, `schema-rule-verdict`, `schema-narrative`, `schema-verifier-report` ;
+   - les champs `quickReplies`, `mandateDraft` et `runId` du message ;
+   - `userLanguage` sur la conversation, le mandat et le run ;
+   - les nouveaux champs du profil (`riskTolerance`, `riskCapacity`, `province`) ;
+   - les routes `POST` et `GET /mandates`, `POST /runs`, `GET /runs/{runId}`.
+3. **La page `/chat` devient la session en 3 colonnes** décrite plus bas et dans `SOLUTION.md` section 12 :
+   - colonne portefeuille et mandat, avec curseurs « et si » (POST mandates puis POST runs, sans passer par le chat) ;
+   - colonne conversation, avec quickReplies et carte de mandat proposé (Confirmer, Modifier) ;
+   - panneau de simulation : scénarios 0/1/2, verdicts R1-R10 avec badge KB, 4 rubriques, score du vérificateur.
+
+   L'« assistant flottant » actuel ne suffit pas.
+4. **Le front ne calcule rien.** `src/agent/agent.ts` (« agent simulé », qui calcule dans le navigateur) et les calculs de `src/lib/portfolio.ts` ne doivent servir **qu'au mode démo**. En mode réel, tous les chiffres viennent de l'API (`run.evidence`, `/summary`) et s'affichent par les emplacements `{EV-nn}` et `{KB-nn}`.
+5. **Questionnaires et profil :**
+   - le questionnaire d'inscription doit alimenter `riskTolerance` et `riskCapacity` **séparément** (règle R1, avis 31-368), et non un seul score ;
+   - le résultat stocké dans le `localStorage` (`af.risk.<userId>`) doit passer par `PUT /v1/me/profile` ;
+   - la province est demandée à l'inscription ou dans le profil.
+6. **Langue :** l'interface s'affiche dans `userLanguage` (au moins fr et en), et les libellés fixes passent par des clés stables. Les textes générés arrivent déjà traduits, et les extraits KB s'affichent en anglais avec la mention « extrait original (anglais) ».
+7. **Données de `public/data/`** (CSV du prototype pour la page Marchés) : en mode réel, la page doit passer par l'API. Les CSV issus de Yahoo ne doivent pas rester commités (licence, voir `contract` storage-dataset) : à retirer avec David.
+
+Hors du périmètre de WS6, à trancher avec David en même temps :
+- **`backend/alphaforge/`, `backend/local_server.py`, `backend/lambda_handler.py`** : un second backend (Bedrock Converse, Haiku 4.5, prompt en français) qui fait doublon avec WS5 (`backend/agents/`, Strands, Sonnet 5.5, prompts en anglais). Le front ne s'y branche pas. À retirer, ou en reprendre les idées dans WS5.
+- **`data/build_dataset.py`, `data/universe.py`, `data/dataset/*.csv`** : doublon de WS3 (`data/ingestion/`), avec des prix Yahoo commités. À retirer de git.
+- **`data/esg_screen.csv`** : une classification ESG des actions, contraire à la décision R8 (pas d'indicateur ESG inventé pour les actions). À retirer, ou à transformer en liste de documents à vérifier, sans verdict.
+- **`fundamentals_sec.csv`, `news_attention.csv`** : à garder s'ils servent, en documentant leurs sources dans `data/README.md`.
+
+Prompt du chantier (à donner à l'agent ou à David, en partant du front existant) :
+
 
 ```text
-Chantier : interface. Dossier attribué : frontend/ uniquement.
+Chantier : interface. Dossier attribué : frontend/. Exception, pour le déplacement seulement : tu peux déplacer (git mv) vers frontend/ les fichiers du front existant à la racine (src/, public/, index.html, package.json, package-lock.json, tsconfig.json, vite.config.ts, .env.example s'il existe), et mettre à jour la section « Front (SPA) » de README.md et les lignes du front dans .gitignore. Ne touche ni à backend/ ni à data/.
+
+Point de départ : un front existe déjà, écrit par David pour le contrat v0.3.0 (fusion 83538a8 sur main). Ne repars pas de zéro.
+- Lis d'abord la section « WS6 front » de docs/workstreams.md (liste de ce qui se garde et de ce qui change), puis la section « Front (SPA) » de README.md.
+- Commence par déplacer le front dans frontend/ et vérifie que `npm run build` et `npm run dev:demo` fonctionnent encore. Commite ce déplacement seul, avant tout autre changement.
+- Garde le mode démo (src/api/demo.ts) et mets-le aussi au niveau v0.4.0 : mandats, runs, evidence simulés, avec des valeurs fictives marquées comme telles.
 
 Objectif : la SPA du contrat (srv-frontend) pour les pages /login, /chat et /portefeuille. La page /chat est la session décrite dans SOLUTION.md section 12 :
 1. Colonne portefeuille et mandat :
