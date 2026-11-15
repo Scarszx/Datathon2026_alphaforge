@@ -135,6 +135,9 @@ export type MandateCreateRequest = {
   fieldSources?: Record<string, "persona" | "user_answer" | "team_assumption" | "slider">;
 };
 
+/* schema-mandate-warning (contrat 0.4.1). Les mandats enregistrés avant 0.4.1 portent des chaînes : accepter les deux. */
+export type MandateWarning = { code: string; message: string; params?: Record<string, string | number> };
+
 /* schema-mandate : réponse de POST/GET mandates */
 export type Mandate = {
   sessionId: string;
@@ -142,7 +145,7 @@ export type Mandate = {
   mandate: MandateCreateRequest;
   riskProfile: number; // = min(riskTolerance, riskCapacity) (R1)
   effectiveMaxLossPct: number;
-  warnings?: string[];
+  warnings?: (MandateWarning | string)[];
   changedFields?: string[];
   confirmedAt: string;
 };

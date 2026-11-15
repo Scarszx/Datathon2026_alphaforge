@@ -1,12 +1,20 @@
 application:
   name: "AlphaForge"
-  version: "0.4.0"
+  version: "0.4.1"
   description: "Banc d'essai agentique et auto-explicatif pour l'investisseur autonome : il cadre l'intention, simule son impact sur le portefeuille et l'audite contre les textes réglementaires canadiens (simulation seulement). Datathon 2026."
-  status: "validé par l'équipe (2026-11-14)"
+  status: "0.4.0 validé par l'équipe (2026-11-14) ; 0.4.1 proposé, à valider par l'équipe"
   solution_ref: "SOLUTION.md (racine du dépôt) : décisions de produit et de conception détaillées"
   # Règle d'équipe : ce fichier est la référence. Toute modification passe par un accord de l'équipe.
   # Voir aussi : la page de présentation du contrat (même contenu, avec schémas).
   changelog:
+    - version: "0.4.1"
+      date: "2026-11-14"
+      status: "proposition, à valider par l'équipe avant fusion dans main"
+      summary:
+        - "schema-mandate.warnings passe de chaînes à { code, message, params? } (schema-mandate-warning) : le front traduit selon le code ; message reste en anglais (language_policy). Codes : HORIZON_EXCEEDS_PROJECT, HORIZON_LONG_FOR_PROJECT, SHORT_HORIZON_GROWTH, PRESERVATION_VS_HIGH_RISK, RETIREMENT_SHORT_HORIZON_HIGH_RISK, LOSS_EXCEEDS_DEFAULT."
+        - "observability : la règle « jamais le texte des questions ou des réponses » vise les journaux CloudWatch de l'application. Langfuse est un outil de développement (les utilisateurs ne le consultent pas) : il peut contenir le texte des échanges et ne reçoit que des données fictives."
+      impacts_to_handle:
+        - "backend/common/mandates.py, backend/api/routes/mandates.py (tests) et frontend (types, MandateCard, libellés mandate.warning.*, mode démo). Les mandats déjà stockés avec des avertissements en chaînes restent lisibles : le front accepte les deux formes."
     - version: "0.4.0"
       date: "2026-11-14"
       summary:
@@ -641,9 +649,16 @@ data_schemas:
       - { name: "mandate", type: "object", schema_ref: "schema-mandate-create-request", required: true }
       - { name: "riskProfile", type: "integer", required: true, description: "= min(riskTolerance, riskCapacity) (R1)" }
       - { name: "effectiveMaxLossPct", type: "number", required: true, description: "saisi ou défaut par horizon" }
-      - { name: "warnings", type: "array", items_type: "string", description: "contrôle de cohérence (ex. horizon contredit l'objectif)" }
+      - { name: "warnings", type: "array", items_ref: "schema-mandate-warning", description: "contrôle de cohérence (ex. horizon contredit l'objectif)" }
       - { name: "changedFields", type: "array", items_type: "string", description: "champs modifiés depuis la version précédente" }
       - { name: "confirmedAt", type: "string", required: true }
+
+  - id: "schema-mandate-warning"
+    description: "Avertissement du contrôle de cohérence du mandat. Le front traduit selon code (libellés fixes) ; message est en anglais (language_policy) et sert de repli."
+    fields:
+      - { name: "code", type: "string", required: true, enum: ["HORIZON_EXCEEDS_PROJECT", "HORIZON_LONG_FOR_PROJECT", "SHORT_HORIZON_GROWTH", "PRESERVATION_VS_HIGH_RISK", "RETIREMENT_SHORT_HORIZON_HIGH_RISK", "LOSS_EXCEEDS_DEFAULT"] }
+      - { name: "message", type: "string", required: true, description: "anglais" }
+      - { name: "params", type: "object", description: "valeurs à insérer dans le libellé traduit (ex. horizonYears, projectYears, maxAcceptableLossPct, defaultLossPct)" }
 
   - id: "schema-mandate-list"
     fields:
@@ -1024,7 +1039,7 @@ tools:
     used_by: ["agent-orchestrator"]
     params:
       - { name: "draft", type: "object", required: true, validation: "schema-mandate-create-request; tickers dans l'univers" }
-    returns: "{ valid, errors[], riskProfile, effectiveMaxLossPct, warnings[] }"
+    returns: "{ valid, errors[], riskProfile, effectiveMaxLossPct, warnings[] (schema-mandate-warning) }"
     reads: ["storage-dataset: universe.parquet"]
 
   - id: "tool-read-evidence"
@@ -1095,7 +1110,8 @@ observability:
       one_per: "appel d'outil"
       fields: ["agentId", "sessionId", "messageId", "tool", "params", "status", "durationMs", "source"]
   rules:
-    - "Compteurs et paramètres d'outils seulement : jamais le texte des questions ou des réponses."
+    - "Compteurs et paramètres d'outils seulement : jamais le texte des questions ou des réponses (journaux CloudWatch de l'application)."
+    - "Langfuse est un outil de développement, hors de cette règle : les utilisateurs ne le consultent pas, il peut contenir le texte des échanges et ne reçoit que des données fictives (personas, portefeuilles de démo)."
     - "Le champ explanation d'un message est construit à partir des événements tool.call de cette exécution."
   optional: "Traces OpenTelemetry vers un outil d'observabilité, si le temps le permet."
 

@@ -575,9 +575,16 @@ export async function demoRequest(path: string, o: Opts, token: string): Promise
         const version = prev ? prev.version + 1 : 1;
         const riskProfile = Math.min(req.riskTolerance, req.riskCapacity); // R1
         const effectiveMaxLossPct = req.maxAcceptableLossPct ?? (req.horizonYears < 3 ? 10 : req.horizonYears <= 8 ? 20 : 35);
-        const warnings: string[] = [];
-        if (riskProfile < (req.riskTolerance ?? 0) && req.riskCapacity < req.riskTolerance)
-          warnings.push("[démo] Risk capacity is lower than risk tolerance: the retained profile follows the capacity (R1).");
+        const warnings: { code: string; message: string; params?: Record<string, number> }[] = [];
+        const defaultLoss = req.horizonYears < 3 ? 10 : req.horizonYears <= 8 ? 20 : 35;
+        if (req.objective === "growth" && req.horizonYears < 3)
+          warnings.push({ code: "SHORT_HORIZON_GROWTH", message: "Short horizon (< 3 years) conflicts with a long-term growth objective.", params: { horizonYears: req.horizonYears } });
+        if (req.maxAcceptableLossPct !== undefined && req.maxAcceptableLossPct > defaultLoss)
+          warnings.push({
+            code: "LOSS_EXCEEDS_DEFAULT",
+            message: `Maximum acceptable loss (${req.maxAcceptableLossPct}%) exceeds the team assumption default (${defaultLoss}%) for this horizon.`,
+            params: { maxAcceptableLossPct: req.maxAcceptableLossPct, defaultLossPct: defaultLoss },
+          });
         const mandate: Mandate = {
           sessionId: c.sessionId, version, mandate: req, riskProfile, effectiveMaxLossPct,
           warnings: warnings.length ? warnings : undefined, confirmedAt: now(),

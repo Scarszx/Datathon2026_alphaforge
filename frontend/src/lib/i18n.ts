@@ -75,7 +75,13 @@ export const FR: Record<string, string> = {
   "mandate.edit": "Modifier",
   "mandate.confirmedAt": "Confirmé le",
   "mandate.warnings": "Avertissements",
-  "mandate.warningsAssumption": "Avertissements du contrôle de cohérence (textes du serveur).",
+  "mandate.warningsAssumption": "Avertissements du contrôle de cohérence.",
+  "mandate.warning.HORIZON_EXCEEDS_PROJECT": "L'horizon ({horizonYears} ans) dépasse l'échéance du projet ({projectYears} ans).",
+  "mandate.warning.HORIZON_LONG_FOR_PROJECT": "Un horizon de plus de 8 ans ({horizonYears} ans) est inhabituellement long pour un projet précis.",
+  "mandate.warning.SHORT_HORIZON_GROWTH": "Un horizon court (moins de 3 ans, ici {horizonYears} ans) est en tension avec un objectif de croissance à long terme.",
+  "mandate.warning.PRESERVATION_VS_HIGH_RISK": "L'objectif de préservation du capital est en tension avec une tolérance au risque élevée ou une perte maximale acceptée de {maxAcceptableLossPct} %.",
+  "mandate.warning.RETIREMENT_SHORT_HORIZON_HIGH_RISK": "Une retraite proche (moins de 3 ans) est en tension avec une tolérance au risque élevée.",
+  "mandate.warning.LOSS_EXCEEDS_DEFAULT": "La perte maximale acceptée ({maxAcceptableLossPct} %) dépasse le défaut d'équipe ({defaultLossPct} %) pour cet horizon.",
   "mandate.changed": "Modifié depuis la version précédente",
 
   "sim.title": "Simulation",
@@ -220,7 +226,13 @@ export const EN: Record<string, string> = {
   "mandate.edit": "Edit",
   "mandate.confirmedAt": "Confirmed on",
   "mandate.warnings": "Warnings",
-  "mandate.warningsAssumption": "Consistency-check warnings (server-provided texts).",
+  "mandate.warningsAssumption": "Consistency-check warnings.",
+  "mandate.warning.HORIZON_EXCEEDS_PROJECT": "The horizon ({horizonYears} years) exceeds the project timeline ({projectYears} years).",
+  "mandate.warning.HORIZON_LONG_FOR_PROJECT": "A horizon above 8 years ({horizonYears} years) is unusually long for a specific project.",
+  "mandate.warning.SHORT_HORIZON_GROWTH": "A short horizon (under 3 years, here {horizonYears}) conflicts with a long-term growth objective.",
+  "mandate.warning.PRESERVATION_VS_HIGH_RISK": "The capital preservation objective conflicts with a high risk tolerance or a maximum acceptable loss of {maxAcceptableLossPct}%.",
+  "mandate.warning.RETIREMENT_SHORT_HORIZON_HIGH_RISK": "A near-term retirement (under 3 years) conflicts with a high risk tolerance.",
+  "mandate.warning.LOSS_EXCEEDS_DEFAULT": "The maximum acceptable loss ({maxAcceptableLossPct}%) exceeds the team default ({defaultLossPct}%) for this horizon.",
   "mandate.changed": "Changed since previous version",
 
   "sim.title": "Simulation",
@@ -302,6 +314,16 @@ export const LangContext = createContext<Lang>("fr");
 /** t("mandate.objective.growth", lang) → libellé traduit ; clé absente → la clé elle-même (jamais un chiffre inventé). */
 export function t(key: string, lang: Lang): string {
   return DICTS[lang]?.[key] ?? FR[key] ?? key;
+}
+
+/** Avertissement du mandat dans la langue d'affichage : libellé du code avec ses paramètres ;
+ *  code inconnu ou ancienne chaîne → message du serveur (anglais), jamais un texte inventé. */
+export function warningText(w: string | { code: string; message: string; params?: Record<string, string | number> }, lang: Lang): string {
+  if (typeof w === "string") return w;
+  const key = `mandate.warning.${w.code}`;
+  const template = DICTS[lang]?.[key] ?? FR[key];
+  if (!template) return w.message;
+  return template.replace(/\{(\w+)\}/g, (m, name: string) => (w.params && name in w.params ? String(w.params[name]) : m));
 }
 
 /** Hook pratique dans l'arbre sous LangContext. */

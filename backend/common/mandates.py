@@ -75,13 +75,25 @@ def _extract_project_years(detail: str | None) -> float | None:
     return float(match.group(1))
 
 
+def _warning(code: str, message: str, **params: Any) -> dict[str, Any]:
+    """Avertissement stable : `code` sert au front pour traduire, `message` reste en anglais (language_policy)."""
+    warning: dict[str, Any] = {"code": code, "message": message}
+    if params:
+        warning["params"] = params
+    return warning
+
+
 def compute_warnings(
     mandate: dict[str, Any],
     effective_max_loss_pct: int | float,
     default_loss_pct: int | float,
-) -> list[str]:
-    """Contrôle de cohérence déterministe du mandat (messages en anglais, language_policy)."""
-    warnings: list[str] = []
+) -> list[dict[str, Any]]:
+    """Contrôle de cohérence déterministe du mandat (schema-mandate-warning).
+
+    Codes : HORIZON_EXCEEDS_PROJECT, HORIZON_LONG_FOR_PROJECT, SHORT_HORIZON_GROWTH,
+    PRESERVATION_VS_HIGH_RISK, RETIREMENT_SHORT_HORIZON_HIGH_RISK, LOSS_EXCEEDS_DEFAULT.
+    """
+    warnings: list[dict[str, Any]] = []
     objective = mandate["objective"]
     horizon = float(mandate["horizonYears"])
     risk_tolerance = int(mandate["riskTolerance"])
@@ -89,38 +101,50 @@ def compute_warnings(
     if objective == "project":
         project_years = _extract_project_years(mandate.get("objectiveDetail"))
         if project_years is not None and horizon > project_years:
-            warnings.append(
-                f"Horizon ({mandate['horizonYears']} years) exceeds the project timeline ({project_years:g} years)."
-            )
+            warnings.append(_warning(
+                "HORIZON_EXCEEDS_PROJECT",
+                f"Horizon ({mandate['horizonYears']} years) exceeds the project timeline ({project_years:g} years).",
+                horizonYears=mandate["horizonYears"], projectYears=project_years,
+            ))
         elif horizon > 8:
-            warnings.append(
-                "Horizon exceeds 8 years, which is unusually long for a specific project objective."
-            )
+            warnings.append(_warning(
+                "HORIZON_LONG_FOR_PROJECT",
+                "Horizon exceeds 8 years, which is unusually long for a specific project objective.",
+                horizonYears=mandate["horizonYears"],
+            ))
 
     if objective == "growth" and horizon < 3:
-        warnings.append(
-            "Short horizon (< 3 years) conflicts with a long-term growth objective."
-        )
+        warnings.append(_warning(
+            "SHORT_HORIZON_GROWTH",
+            "Short horizon (< 3 years) conflicts with a long-term growth objective.",
+            horizonYears=mandate["horizonYears"],
+        ))
 
     if objective == "preservation" and (
         risk_tolerance >= 4 or effective_max_loss_pct > 20
     ):
-        warnings.append(
-            "Capital preservation objective conflicts with high risk tolerance or maximum acceptable loss."
-        )
+        warnings.append(_warning(
+            "PRESERVATION_VS_HIGH_RISK",
+            "Capital preservation objective conflicts with high risk tolerance or maximum acceptable loss.",
+            riskTolerance=risk_tolerance, maxAcceptableLossPct=effective_max_loss_pct,
+        ))
 
     if objective == "retirement" and horizon < 3 and risk_tolerance >= 4:
-        warnings.append(
-            "Near-term retirement horizon (< 3 years) conflicts with high risk tolerance."
-        )
+        warnings.append(_warning(
+            "RETIREMENT_SHORT_HORIZON_HIGH_RISK",
+            "Near-term retirement horizon (< 3 years) conflicts with high risk tolerance.",
+            horizonYears=mandate["horizonYears"], riskTolerance=risk_tolerance,
+        ))
 
     if (
         "maxAcceptableLossPct" in mandate
         and mandate["maxAcceptableLossPct"] > default_loss_pct
     ):
-        warnings.append(
-            f"Maximum acceptable loss ({mandate['maxAcceptableLossPct']}%) exceeds the team assumption default ({default_loss_pct}%) for this horizon."
-        )
+        warnings.append(_warning(
+            "LOSS_EXCEEDS_DEFAULT",
+            f"Maximum acceptable loss ({mandate['maxAcceptableLossPct']}%) exceeds the team assumption default ({default_loss_pct}%) for this horizon.",
+            maxAcceptableLossPct=mandate["maxAcceptableLossPct"], defaultLossPct=default_loss_pct,
+        ))
 
     return warnings
 

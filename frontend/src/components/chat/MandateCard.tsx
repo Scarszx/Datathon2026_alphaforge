@@ -1,7 +1,7 @@
 /* Carte de mandat : affiche les champs d'un MandateCreateRequest (brouillon proposé par l'orchestrateur
  * ou mandat confirmé), avec la source de chaque ligne quand elle est connue (fieldSources du contrat). */
 import type { Mandate, MandateCreateRequest } from "../../api/types";
-import { t, type Lang } from "../../lib/i18n";
+import { t, warningText, type Lang } from "../../lib/i18n";
 import { PROVINCE_LABELS } from "../../lib/risk";
 
 export function FieldSourceTag({ field, mandate, lang }: { field: string; mandate: MandateCreateRequest; lang: Lang }) {
@@ -52,7 +52,7 @@ export default function MandateCard({ mandate, confirmed, lang }: { mandate: Man
         <div className="banner warn" style={{ marginTop: 10 }}>
           <p className="small">
             <strong>{t("mandate.warnings", lang)}</strong> · <span className="muted">{t("mandate.warningsAssumption", lang)}</span>
-            <br />{confirmed.warnings.map((w, i) => <span key={i} className="pre">{w}<br /></span>)}
+            <br />{confirmed.warnings.map((w, i) => <span key={i} className="pre">{warningText(w, lang)}<br /></span>)}
           </p>
         </div>
       ) : null}
