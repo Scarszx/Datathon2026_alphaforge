@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import Any, Callable
 
 from backend.api import universe
-from backend.api.routes import agents, conversations, mandates, portfolios, users
+from backend.api.routes import agents, conversations, mandates, portfolios, speech, users
 from backend.common.auth import get_user_id
 from backend.common.http import ApiError, error_response, request_id_from_event
 
@@ -29,6 +29,7 @@ ROUTES: dict[str, Callable[..., dict[str, Any]]] = {
     "GET /v1/portfolios": portfolios.list_portfolios,
     "PUT /v1/portfolios/{portfolioId}/holdings": portfolios.put_holdings,
     "GET /v1/agents": agents.get_registry,
+    "POST /v1/speech/session": speech.create_session,
 }
 
 
