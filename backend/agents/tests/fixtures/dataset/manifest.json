@@ -1,0 +1,22 @@
+{
+  "version": "fixture-synthetic",
+  "synthetic": true,
+  "periodStart": "2016-11-14",
+  "periodEnd": "2026-11-12",
+  "tickers": [
+    "XIU.TO",
+    "RY.TO",
+    "TD.TO",
+    "ENB.TO",
+    "XBB.TO",
+    "ZST.TO",
+    "SPY",
+    "QQQ",
+    "ESGV",
+    "AGG",
+    "NVDA",
+    "AAPL",
+    "BTC-USD"
+  ],
+  "source": "make_fixtures.py (seeded generator, no market data)"
+}
