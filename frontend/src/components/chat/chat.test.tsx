@@ -170,7 +170,7 @@ describe("Explication et libellés des métriques (contrat : explanation toujour
 
   it("affiche l'explication du run (sources, étapes, hypothèses, limites) dans le panneau", () => {
     const { container } = render(<SimulationPanel run={{ ...DONE, explanation: EXPLANATION }} lang="fr" />);
-    expect(container.querySelector("details.expl summary")?.textContent).toContain("Explication");
+    expect(container.querySelector("details.expl:not(.provenance) summary")?.textContent).toContain("Explication");
     expect(screen.getByText("prices_daily")).toBeTruthy();
     expect(screen.getByText("get_portfolio")).toBeTruthy();
     expect(screen.getByText("Volatilité annualisée sur 252 jours.")).toBeTruthy();
@@ -183,7 +183,7 @@ describe("Explication et libellés des métriques (contrat : explanation toujour
         <SimulationPanel run={{ ...DONE, userLanguage: "en", explanation: EXPLANATION }} lang="en" />
       </LangContext.Provider>,
     );
-    expect(container.querySelector("details.expl summary")?.textContent).toContain("Explanation");
+    expect(container.querySelector("details.expl:not(.provenance) summary")?.textContent).toContain("Explanation");
     expect(screen.getByText("Assumptions")).toBeTruthy();
     expect(screen.getByText("Limitations")).toBeTruthy();
   });
@@ -288,5 +288,41 @@ describe("Portefeuille construit (mode build)", () => {
     expect(container.textContent).toContain("Banks - Diversified");
     rerender(<MandateCard mandate={{ ...build, preferences: undefined }} lang="fr" />);
     expect(container.textContent).not.toContain("Industries exclues");
+  });
+});
+
+describe("Cartes de synthèse et provenance (idées 1 et 6)", () => {
+  const RUN: Run = {
+    ...DONE,
+    scenarios: [
+      { index: 0, label: "Portefeuille actuel", metrics: { topSingleWeight: "EV-10", maxDrawdownRange: "EV-11" } },
+    ],
+    evidence: [
+      { id: "EV-10", kind: "metric", label: "Top weight, scenario 0", formatted: "12,0 %", source: "dataset" },
+      { id: "EV-11", kind: "metric", label: "Maximum drawdown, 90% resampling range, scenario 0", formatted: "18,0 % à 31,0 %", source: "dataset", window: "2021/2026", asOf: "2026-11-12", method: "Bootstrap." },
+      { id: "KB-01", kind: "regulation", label: "Avis 31-368", source: "kb", document: "Avis 31-368", regulator: "ACVM" },
+    ],
+    verdicts: [
+      { rule: "R6", scenario: 0, status: "warn", reasonCode: "CONCENTRATION_ELEVATED", threshold: { value: 10, nature: "team_assumption" } },
+      { rule: "R2", scenario: 0, status: "pass", reasonCode: "MAX_LOSS_WITHIN_LIMIT", threshold: { value: 20, nature: "team_assumption" } },
+    ],
+  };
+
+  it("affiche le fait chiffré, la fourchette et le seuil, sans jugement", () => {
+    const { container } = render(<SimulationPanel run={RUN} lang="fr" horizonYears={3} />);
+    expect(container.textContent).toContain("Premier titre : 12,0 % du portefeuille.");
+    expect(container.textContent).toContain("entre 18,0 % à 31,0 %");
+    expect(container.textContent).toContain("Ce n'est pas une prévision");
+    expect(container.textContent).toContain("Horizon indiqué dans le mandat : 3 an(s).");
+    expect(container.textContent).not.toMatch(/\bsain\b|concentration forte|à surveiller/i);
+  });
+
+  it("le panneau de provenance sépare moteur de calcul et rédaction par l'IA", () => {
+    const { container } = render(<SimulationPanel run={RUN} lang="fr" />);
+    const prov = container.querySelector("details.provenance")!;
+    expect(prov.querySelector("summary")?.textContent).toBe("Comment AlphaForge arrive à cette conclusion");
+    expect(prov.textContent).toContain("Calculé par le moteur");
+    expect(prov.textContent).toContain("Rédigé par l'IA");
+    expect(prov.textContent).toContain("Avis 31-368");
   });
 });

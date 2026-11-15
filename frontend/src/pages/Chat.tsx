@@ -230,6 +230,7 @@ export default function Chat() {
             onConfirmDraft={(m) => void confirmMandate(m)} />
           <SimulationPanel run={run} lang={lang} busy={busy}
             compareCategory={mandate?.mandate.compareCategory}
+            horizonYears={mandate?.mandate.horizonYears}
             onCompare={(req) => void runCompare(req)}
             onRerun={run ? () => void rerunOld(run.mandateVersion) : undefined} />
         </div>

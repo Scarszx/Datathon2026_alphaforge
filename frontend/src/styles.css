@@ -713,3 +713,10 @@ fieldset.q.missing legend { color: var(--loss-ink); }
 .ticker-logo.mono { color: #fff; font-weight: 600; letter-spacing: .3px; border: 0; }
 .ticker-label { display: inline-flex; align-items: center; gap: 10px; vertical-align: middle; min-width: 0; }
 .ticker-text { display: inline-flex; flex-direction: column; line-height: 1.25; min-width: 0; }
+
+/* Cartes de synthèse, note de graphique, aide à la dictée (idées 1, 2, 8) */
+.summary-cards { display: grid; grid-template-columns: 1fr; gap: 10px; margin: 8px 0; }
+.summary-card { padding: 12px; }
+.summary-card ul { padding-left: 16px; margin: 4px 0; }
+.chart-note { margin-top: 6px; }
+.provenance summary { font-weight: 600; color: var(--ink, inherit); }

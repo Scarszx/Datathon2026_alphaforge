@@ -5,6 +5,7 @@ import type { Asset, Holding, Portfolio, PortfolioSummary, Slice, SummaryRange }
 import AppHeader from "../components/AppHeader";
 import Chart from "../components/Chart";
 import Explanation from "../components/Explanation";
+import { t as tr } from "../lib/i18n";
 import { amount, money, pct, plainPct, shortDate, signedAmount, toSeconds } from "../lib/format";
 import { TickerLabel } from "../components/TickerLogo";
 
@@ -175,6 +176,7 @@ export default function PortfolioPage() {
               {chart
                 ? <Chart key={range} values={chart.values} timestamps={chart.timestamps} axisLabel={(ts) => shortDate(ts, range === "1y" || range === "5y")} format={(v) => amount(v, cur)} />
                 : <div className="chart-empty"><p>Pas assez de points pour tracer la performance.</p></div>}
+              <p className="muted small chart-note">{tr("chart.adjusted", "fr")}</p>
             </section>
             <section className="stats">
               <div className="stat"><div className="stat-label">Valeur investie (coût)</div><div className="stat-value filled">{amount(summary.totals.cost, cur, 0)}</div></div>
