@@ -135,3 +135,22 @@ def test_hausse_isolee_ne_forme_pas_un_cycle(store, monkeypatch):
     monkeypatch.setattr(store, "macro", lambda: macro)
     period = derive_period(store, "rate_hikes")
     assert (period.start, period.end) == (pd.Timestamp("2022-03-02"), pd.Timestamp("2022-06-01"))
+def test_fourchette_de_reechantillonnage_reproductible_et_encadre_la_mesure(store):
+    """Incertitude : fourchette 5e-95e percentile par bootstrap par blocs, graine fixe, inscrite au registre."""
+    registry = EvidenceRegistry("en")
+    result = run_engine(store, _mandate_item(), {"holdings": robert_holdings(store), "baseCurrency": "CAD"}, registry)
+    again = EvidenceRegistry("en")
+    result2 = run_engine(store, _mandate_item(), {"holdings": robert_holdings(store), "baseCurrency": "CAD"}, again)
+    for scenario, scenario2 in zip(result.scenarios, result2.scenarios):
+        vol = registry.get(scenario.evidence["volatilityRange"])
+        assert "bootstrap" in vol["method"] and "not what the future holds" in vol["method"]
+        assert vol["formatted"] == again.get(scenario2.evidence["volatilityRange"])["formatted"]
+        low, high = (float(x) for x in vol["formatted"].replace("%", "").split(" to "))
+        assert low < scenario.metrics["volatility"] < high
+        dd = registry.get(scenario.evidence["maxDrawdownRange"])
+        low, high = (float(x) for x in dd["formatted"].replace("%", "").split(" to "))
+        assert low < high <= 0
+def test_bootstrap_historique_trop_court_ne_donne_pas_de_fourchette():
+    import pandas as pd
+    from backend.agents.engine.analytics import bootstrap_ranges
+    assert bootstrap_ranges(pd.Series([1.0, 1.01, 1.02])) == {}

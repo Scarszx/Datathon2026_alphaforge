@@ -16,6 +16,22 @@ from backend.agents.engine.analytics import is_crypto, listing_currency
 
 TECH_SECTOR = "Information Technology"
 
+# Les onze secteurs GICS : seuls ces libellés comptent pour la concentration sectorielle. Les catégories de
+# FNB sans composition (« Broad market (Canada) », « Bonds (Canada aggregate) »…) ne sont pas des secteurs.
+GICS_SECTORS = {
+    "Information Technology", "Health Care", "Financials", "Consumer Discretionary", "Communication Services",
+    "Industrials", "Consumer Staples", "Energy", "Utilities", "Real Estate", "Materials",
+}
+
+
+def top_sector(concentration: dict[str, Any] | None) -> tuple[str | None, float]:
+    """Plus gros secteur GICS (par transparence des FNB documentés) et son poids en % du portefeuille."""
+    best: tuple[str | None, float] = (None, 0.0)
+    for item in (concentration or {}).get("bySector") or []:
+        if item.get("label") in GICS_SECTORS and float(item.get("weight") or 0.0) > best[1]:
+            best = (item["label"], float(item["weight"]))
+    return best
+
 
 def is_fund(asset_class: str | None) -> bool:
     return (asset_class or "").lower().startswith("etf")

@@ -9,7 +9,7 @@
     {"band": 5}
   ],
   "maxLossWarnRatio": 0.8,
-  "singleSecurity": {"warnPct": 10, "failPct": 20},
+  "singleSecurity": {"warnPct": 10, "failPct": 20, "sectorWarnPct": 40},
   "cryptoCapPct": {"excluded": 0, "profileUpTo3": 5, "profileAbove3": 10},
   "alternativeCategories": {
     "1": [

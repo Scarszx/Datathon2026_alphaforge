@@ -422,6 +422,33 @@ categories:
       - { ticker: "GLD", name: "SPDR Gold Shares" }
       - { ticker: "IAU", name: "iShares Gold Trust" }
 
+  # Classes d'actifs ajoutées pour élargir les alternatives (diversification au-delà des actions et des obligations
+  # nominales) : matières premières, obligations à rendement réel et de sociétés, actions privilégiées, infrastructures.
+  us_etfs_commodities:
+    asset_class: etf_commodity
+    default_sector: "Commodities (broad basket)"
+    candidates:
+      - { ticker: "DBC", name: "Invesco DB Commodity Index Tracking Fund" }
+      - { ticker: "PDBC", name: "Invesco Optimum Yield Diversified Commodity Strategy No K-1 ETF" }
+      - { ticker: "SLV", name: "iShares Silver Trust", sector: "Silver" }
+  canadian_etfs_real_return_corporate:
+    asset_class: etf_bond
+    default_sector: "Bonds (Canada corporate / real return)"
+    candidates:
+      - { ticker: "XRB.TO", name: "iShares Canadian Real Return Bond Index ETF", sector: "Bonds (Canada real return)" }
+      - { ticker: "ZCS.TO", name: "BMO Short Corporate Bond Index ETF", sector: "Bonds (Canada short corporate)" }
+      - { ticker: "XCB.TO", name: "iShares Canadian Corporate Bond Index ETF", sector: "Bonds (Canada corporate)" }
+  canadian_etfs_preferred:
+    asset_class: etf_equity
+    default_sector: "Preferred shares (Canada)"
+    candidates:
+      - { ticker: "CPD.TO", name: "iShares S&P/TSX Canadian Preferred Share Index ETF" }
+      - { ticker: "ZPR.TO", name: "BMO Laddered Preferred Share Index ETF" }
+  us_etfs_infrastructure:
+    asset_class: etf_equity
+    default_sector: "Infrastructure (global)"
+    candidates:
+      - { ticker: "IGF", name: "iShares Global Infrastructure ETF" }
   us_etfs_reit:
     asset_class: etf_reit
     default_sector: "Real Estate (U.S. REIT)"

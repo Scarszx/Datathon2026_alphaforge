@@ -20,7 +20,7 @@ import pandas as pd
 
 from backend.agents.data.store import DataStore
 from backend.agents.engine import analytics as an
-from backend.agents.engine.concentration import by_asset_class, concentration
+from backend.agents.engine.concentration import by_asset_class, concentration, top_sector
 from backend.agents.engine.registry import EvidenceRegistry
 from backend.agents.engine.stress import LABELS as STRESS_LABELS
 from backend.agents.engine.stress import PERIOD_IDS, StressPeriod, derive_period
@@ -242,6 +242,34 @@ def _record_scenario_metrics(
             key="totalReturn",
         )
 
+    ranges = an.bootstrap_ranges(an.portfolio_index(aligned.frame, scenario.weights)) if metrics else {}
+    if ranges:
+        range_method = (
+            f"Moving-block bootstrap ({ranges['resamples']} resamples, {ranges['blockDays']}-day blocks, fixed seed) of the "
+            f"portfolio's daily returns over the window; 5th to 95th percentile. It shows how much the figure depends on the "
+            f"period observed, not what the future holds. {PORTFOLIO_METHOD}"
+        )
+        fmt = "{:.1f}".format
+        vol_low, vol_high = fmt(ranges["volatilityLow"]), fmt(ranges["volatilityHigh"])
+        dd_low, dd_high = fmt(ranges["maxDrawdownLow"]), fmt(ranges["maxDrawdownHigh"])
+        if registry.language == "fr":
+            vol_text = f"{vol_low} % à {vol_high} %".replace(".", ",")
+            dd_text = f"{dd_low} % à {dd_high} %".replace(".", ",")
+        else:
+            vol_text, dd_text = f"{vol_low}% to {vol_high}%", f"{dd_low}% to {dd_high}%"
+        scenario.evidence["volatilityRange"] = registry.add(
+            kind="metric", label=f"Annualized volatility, 90% resampling range, scenario {scenario.index}",
+            value=(ranges["volatilityLow"] + ranges["volatilityHigh"]) / 2, formatted=vol_text,
+            scenario=scenario.index, method=range_method, window=window, currency="CAD", source=dataset_source,
+            as_of=end.date().isoformat(), caveats=caveats, key="volatilityRange",
+        )
+        scenario.evidence["maxDrawdownRange"] = registry.add(
+            kind="metric", label=f"Maximum drawdown, 90% resampling range, scenario {scenario.index}",
+            value=(ranges["maxDrawdownLow"] + ranges["maxDrawdownHigh"]) / 2, formatted=dd_text,
+            scenario=scenario.index, method=range_method, window=window, currency="CAD", source=dataset_source,
+            as_of=end.date().isoformat(), caveats=caveats, key="maxDrawdownRange",
+        )
+
     for period_id, period in periods.items():
         if not period.available:
             continue
@@ -277,6 +305,14 @@ def _record_scenario_metrics(
             value=conc["topSingle"]["weight"], scenario=scenario.index,
             method="Direct positions plus each fund's published top holdings, as a share of the portfolio.",
             source=conc_source, caveats=conc_caveats, key="topSingleWeight",
+        )
+    sector_label, sector_weight = top_sector(conc)
+    if sector_label:
+        scenario.evidence["topSectorWeight"] = registry.add(
+            kind="metric", label=f"Largest sector weight ({sector_label}; direct positions plus the fund exposure available in the dataset), scenario {scenario.index}",
+            value=sector_weight, scenario=scenario.index,
+            method="Direct equities by sector plus each fund's published sector weights, as a share of the portfolio. Funds without a published composition are not counted in a sector.",
+            source=conc_source, caveats=conc_caveats, key="topSectorWeight",
         )
     scenario.evidence["techWeightLookThrough"] = registry.add(
         kind="metric", label=f"Information Technology weight (direct positions plus the fund exposure available in the dataset), scenario {scenario.index}",

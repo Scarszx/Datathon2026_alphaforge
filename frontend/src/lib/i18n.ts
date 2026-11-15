@@ -134,6 +134,9 @@ export const FR: Record<string, string> = {
   "sim.metric.cryptoWeight": "Poids crypto",
   "sim.metric.topSingleWeight": "Poids du premier titre",
   "sim.metric.techWeightLookThrough": "Poids techno (décomposé)",
+  "sim.metric.volatilityRange": "Volatilité : fourchette à 90 % (rééchantillonnage)",
+  "sim.metric.maxDrawdownRange": "Pire baisse : fourchette à 90 % (rééchantillonnage)",
+  "sim.metric.topSectorWeight": "Poids du premier secteur (décomposé)",
   "sim.allocation": "Répartition",
 
   "proof.close": "Fermer",
@@ -285,6 +288,9 @@ export const EN: Record<string, string> = {
   "sim.metric.cryptoWeight": "Crypto weight",
   "sim.metric.topSingleWeight": "Top holding weight",
   "sim.metric.techWeightLookThrough": "Tech weight (look-through)",
+  "sim.metric.volatilityRange": "Volatility: 90% range (resampling)",
+  "sim.metric.maxDrawdownRange": "Worst drop: 90% range (resampling)",
+  "sim.metric.topSectorWeight": "Top sector weight (look-through)",
   "sim.allocation": "Allocation",
 
   "proof.close": "Close",
