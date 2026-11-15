@@ -6,7 +6,7 @@ import type { Mandate, MandateCreateRequest, Run } from "../../api/types";
 import EvidenceText from "./EvidenceText";
 import MandateCard from "./MandateCard";
 import SimulationPanel from "./SimulationPanel";
-import { LangContext, t as tr } from "../../lib/i18n";
+import { LangContext, t as tr, warningText } from "../../lib/i18n";
 
 afterEach(cleanup);
 
@@ -31,7 +31,7 @@ const CONFIRMED: Mandate = {
   mandate: DRAFT,
   riskProfile: 3,
   effectiveMaxLossPct: 20,
-  warnings: ["[démo] Risk capacity is lower than risk tolerance."],
+  warnings: [{ code: "LOSS_EXCEEDS_DEFAULT", message: "Maximum acceptable loss (30%) exceeds the team assumption default (20%) for this horizon.", params: { maxAcceptableLossPct: 30, defaultLossPct: 20 } }],
   changedFields: ["horizonYears"],
   confirmedAt: "2026-11-14T10:00:00.000Z",
 };
@@ -155,6 +155,18 @@ describe("Explication et libellés des métriques (contrat : explanation toujour
   });
 });
 
+describe("warningText (avertissements du mandat { code, message })", () => {
+  it("traduit un code connu en fr et en en, avec ses paramètres", () => {
+    const w = { code: "HORIZON_EXCEEDS_PROJECT", message: "Horizon (10 years) exceeds the project timeline (3 years).", params: { horizonYears: 10, projectYears: 3 } };
+    expect(warningText(w, "fr")).toBe("L'horizon (10 ans) dépasse l'échéance du projet (3 ans).");
+    expect(warningText(w, "en")).toBe("The horizon (10 years) exceeds the project timeline (3 years).");
+  });
+  it("code inconnu ou ancienne chaîne : message du serveur, jamais un texte inventé", () => {
+    expect(warningText({ code: "NOUVEAU_CODE", message: "Server text." }, "fr")).toBe("Server text.");
+    expect(warningText("Ancienne chaîne.", "fr")).toBe("Ancienne chaîne.");
+  });
+});
+
 describe("MandateCard (carte de mandat)", () => {
   it("affiche les champs du brouillon avec la source connue de chaque ligne", () => {
     render(<MandateCard mandate={DRAFT} lang="fr" />);
@@ -168,9 +180,11 @@ describe("MandateCard (carte de mandat)", () => {
   it("affiche le mandat confirmé : version, profil retenu, perte retenue, avertissements", () => {
     render(<MandateCard mandate={DRAFT} confirmed={CONFIRMED} lang="fr" />);
     expect(screen.getByText(/Version 2/)).toBeTruthy();
-    expect(screen.getByText(/20 %/)).toBeTruthy();             // effectiveMaxLossPct
+    expect(screen.getAllByText(/20 %/).length).toBeGreaterThan(0);             // effectiveMaxLossPct
     expect(screen.getByText(/Profil retenu \(R1\) : 3/)).toBeTruthy();
-    expect(screen.getByText(/Risk capacity is lower/)).toBeTruthy();
+    // Traduit selon le code, avec les paramètres du serveur ; jamais le message anglais quand le code est connu.
+    expect(screen.getByText(/La perte maximale acceptée \(30 %\) dépasse le défaut d'équipe \(20 %\)/)).toBeTruthy();
+    expect(screen.queryByText(/Maximum acceptable loss/)).toBeNull();
     expect(screen.getByText(/horizonYears/)).toBeTruthy();     // changedFields
   });
 });

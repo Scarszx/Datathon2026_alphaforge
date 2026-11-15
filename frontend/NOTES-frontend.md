@@ -7,11 +7,7 @@ le back avec des données fictives marquées.
 
 ## Écarts constatés (à trancher à l'intégration)
 
-1. **`warnings` du mandat en anglais.** La réponse de `POST /conversations/{sid}/mandates` livre des
-   textes en anglais (ex. « Risk capacity is lower than risk tolerance… »). Le contrat prévoit que
-   l'interface soit dans `userLanguage` ; le passage des warnings à `{code, message}` (ou leur
-   traduction serveur) est prévu côté back. En attendant, le front les affiche tels quels, avec la
-   mention « Avertissements du contrôle de cohérence (textes du serveur) » (`mandate.warningsAssumption`).
+1. ✅ **`warnings` du mandat** : le passage à `{ code, message, params? }` est implémenté (contrat proposé en 0.4.1, branche `ws/r2-warnings`). Le front traduit par code (`warningText` dans `src/lib/i18n.ts`) et affiche le message du serveur pour un code inconnu ou une ancienne chaîne.
 2. **i18n complet appliqué à `/chat` seulement.** Le module `lib/i18n.ts` (clés stables fr/en) couvre
    la page de session. Les autres pages (Portefeuille, Marchés, Profil, inscription) restent en
    français uniquement, comme avant le chantier. Le contrat `language_policy` vise surtout la

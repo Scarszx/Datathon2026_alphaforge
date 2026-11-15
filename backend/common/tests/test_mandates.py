@@ -27,7 +27,9 @@ def test_evaluate_mandate_profil_retenu_et_plafond_par_horizon():
 def test_evaluate_mandate_garde_la_perte_saisie_et_avertit_si_au_dessus_du_defaut():
     derived = mandates.evaluate_mandate(_mandate(horizonYears=2, maxAcceptableLossPct=15))
     assert derived["effectiveMaxLossPct"] == 15
-    assert any("team assumption default (10%)" in w for w in derived["warnings"])
+    assert any(w["code"] == "LOSS_EXCEEDS_DEFAULT" and "team assumption default (10%)" in w["message"] for w in derived["warnings"])
+    loss = next(w for w in derived["warnings"] if w["code"] == "LOSS_EXCEEDS_DEFAULT")
+    assert loss["params"] == {"maxAcceptableLossPct": 15, "defaultLossPct": 10}
 
 
 def test_defaults_lus_depuis_le_fichier_partage(monkeypatch):

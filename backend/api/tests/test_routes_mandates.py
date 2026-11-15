@@ -254,7 +254,9 @@ def test_create_mandate_detecte_les_incoherences_dans_warnings(
     assert response["statusCode"] == 201
     warnings = body_of(response)["warnings"]
     assert len(warnings) == 1
-    assert "exceeds the project timeline" in warnings[0]
+    assert warnings[0]["code"] == "HORIZON_EXCEEDS_PROJECT"
+    assert "exceeds the project timeline" in warnings[0]["message"]
+    assert warnings[0]["params"] == {"horizonYears": 10, "projectYears": 3}
 
 
 def test_create_mandate_warnings_croissance_court_terme_et_perte_elevee(
@@ -276,7 +278,8 @@ def test_create_mandate_warnings_croissance_court_terme_et_perte_elevee(
     )
     assert response["statusCode"] == 201
     warnings = body_of(response)["warnings"]
-    assert len(warnings) == 2
+    assert [w["code"] for w in warnings] == ["SHORT_HORIZON_GROWTH", "LOSS_EXCEEDS_DEFAULT"]
+    assert all(isinstance(w["message"], str) and w["message"] for w in warnings)
 
 
 def test_create_mandate_mode_diagnose_valide_subject_ticker(
