@@ -30,11 +30,11 @@ Les chantiers déjà terminés en v0.3.0 (✅) restent valables. Leurs compléme
                       ├──► ✅ WS2 db     + ✅ WS2b db v0.4 (repository analyses)                    ─┤
                       ├──► ✅ WS3 data   (jeu élargi ~250 actifs × 10 ans, publication_date, FNB)     ─┼──► intégration (humain)
                       ├──► ✅ WS4 api    + ✅ WS4b api v0.4 (mandats, registre)                      ─┤
-                      ├──►    WS5 agents (orchestrateur, auditeur, rédacteur, modules, runs)         ─┤
+                      ├──► ✅ WS5 agents (orchestrateur, auditeur, rédacteur, modules, runs)         ─┤
                       └──► 🟠 WS6 front  (session en 3 colonnes ; base v0.3.0 de David à adapter)     ─┘
 ```
 
-WS0b, WS1b, WS2b, WS3 et WS4b sont fusionnés dans `main`. **Restent WS5 et WS6, indépendants entre eux : ils peuvent tourner en parallèle.** WS6 part du front déjà écrit par David (contrat v0.3.0, à adapter au v0.4.0, voir sa section).
+WS0b, WS1b, WS2b, WS3, WS4b et WS5 sont fusionnés dans `main`. **Reste WS6**, qui part du front déjà écrit par David (contrat v0.3.0, à adapter au v0.4.0, voir sa section). Puis l'intégration.
 
 ## Propriété des dossiers
 
@@ -49,14 +49,13 @@ WS0b, WS1b, WS2b, WS3 et WS4b sont fusionnés dans `main`. **Restent WS5 et WS6,
 | ✅ WS3 data | `ws/data` | `data/` | contrat (storage) |
 | ✅ WS4 api | `ws/api` | `backend/api/` | WS0, WS2 |
 | ✅ WS4b api v0.4 | `ws/api-v4` | `backend/api/` | WS0b, WS2b (fusionné) |
-| WS5 agents | `ws/agents` | `backend/agents/` | WS0b, WS2b (fusionné), disposition WS3 |
+| ✅ WS5 agents | `ws/agents` | `backend/agents/` | WS0b, WS2b (fusionné), disposition WS3 |
 | 🟠 WS6 front (commencé par David, à adapter) | `ws/frontend` | `frontend/` (le front de David est encore à la racine : `src/`, `package.json`…) | contrat v0.4.0 (apis, schémas) |
 
 ## Lancer un chantier
 
 ```bash
 cd /home/rr-djk/Documents/hackathons/Datathon2026_alphaforge
-git worktree add ../alphaforge-agents   -b ws/agents
 git worktree add ../alphaforge-frontend -b ws/frontend
 # puis, dans chaque dossier : lancer l'agent et coller « Préambule commun » + le prompt du chantier
 ```
@@ -76,9 +75,19 @@ Attention :
   - relever les fiches des 15 FNB clés dans `data/ingestion/etf_enriched.source.json`, puis relancer `python -m data.ingestion.build_dataset --mode full --strict-etf` (le cache local rend la relance rapide) ;
   - envoyer le jeu élargi `data/output/2026-11-14/` dans `dataset/2026-11-14/` (commande dans `data/README.md`), passer la variable Terraform `dataset_version` à `2026-11-14`, et régénérer `backend/api/tickers.json` à partir de `universe.parquet` (validation des tickers de WS4) ;
   - envoyer le build du front dans le bucket front après WS6 ;
-  - reconstruire et redéployer les Lambdas avec le code de WS4b et de WS5.
+  - **rafraîchir les identifiants AWS** (`scripts/aws-refresh-creds.sh`, par un humain : ils ont expiré pendant WS5) ;
+  - **`terraform apply`** pour le changement d'infra de WS5 (auto-invocation de la Lambda agents, timeout de 180 s), puis reconstruire et redéployer les Lambdas avec le code de WS4b et de WS5 ;
+  - **lancer le banc de fumée de WS5** (`backend/agents/scripts/smoke.py`). Il appelle Bedrock, le Guardrail et la KB sans rien écrire en base. Il couvre les faux positifs du Guardrail, la recherche dans la KB et l'orchestrateur en français. Aucun vrai appel Bedrock n'a encore été fait ;
+  - **mesurer la taille de la couche pandas** de la Lambda agents (non mesurée pendant WS5).
 
 **Points à traiter à l'intégration** (décision d'équipe) :
+- **Scénario vedette en WARN au lieu de PASS (WS5).** Sur le jeu élargi, les scénarios 0 et 2 de Robert/NVDA sortent en WARN à cause de R6 : RY pèse déjà 15 % du portefeuille actuel, au-dessus du seuil de 10 %. Le scénario 1 est bien en FAIL. Options :
+  - (a) **modifier le portefeuille de démo, par exemple RY à 8 000 $** (recommandé : la règle reste crédible et la démo est nette) ;
+  - (b) relever le seuil de R6 à 15 % dans `rules_config.json` ;
+  - (c) assumer le WARN dans la vidéo (« vous êtes déjà concentré sur RY »).
+  Si (a) : mettre à jour `SOLUTION.md` section 6, les fixtures de `backend/agents/tests/conftest.py` (`robert_holdings`) et le script de la vidéo.
+- **R2 ne voit pas le krach COVID (relevé à la vérification de WS5 sur le jeu élargi).** La fenêtre d'analyse est restée à 5 ans, alors que le jeu couvre maintenant 10 ans. La pire baisse utilisée par R2 (scénario 0 : −12,2 %) est mesurée sur la fenêtre. Le test `covid_2020` (scénario 0 : **−22,2 %**) est calculé, mais R2 ne le prend pas en compte. **Recommandation :** R2 compare `effectiveMaxLossPct` à la pire baisse entre la fenêtre et les tests de résistance, tous dérivés des données. Si la fenêtre passe à 10 ans, ne convertir en CAD qu'à partir du 2017-01-03 (début du taux USD/CAD, voir WS3). Cela touche `backend/agents/rules/` et ses tests.
+- **Hypothèse d'équipe à valider : bandes de volatilité de R1 (WS5).** Pour savoir si une idée suppose un profil plus élevé que le mandat, le profil implicite se lit dans la volatilité annualisée : ≤ 10 % → 1, ≤ 14 % → 2, ≤ 18 % → 3, ≤ 25 % → 4, au-delà → 5 (`riskBandsByVolatility`). Un écart de 2 crans ou plus donne FAIL, un écart d'un cran WARN, et le scénario 0 est plafonné à WARN. Une fois validée, l'ajouter à `SOLUTION.md` section 9 (R1) comme hypothèse d'équipe. Détail : `backend/agents/NOTES-agents.md`, point 5.
 - **Avertissements du mandat dans la langue de l'utilisateur.** `POST /mandates` (WS4b) renvoie `warnings` sous forme de phrases en anglais, et ces textes s'affichent sans passer par l'orchestrateur, par exemple au chemin des curseurs. La correction prévue : passer `schema-mandate.warnings` à `{ code, message }` avec des codes stables (ex. `HORIZON_EXCEEDS_PROJECT`), que le front traduit comme les autres libellés fixes. Cela touche le contrat, `backend/api/routes/mandates.py` et le front.
 
 1. `terraform plan` puis `apply`, par une seule personne. ✅ fait ; à refaire après la reconstruction des Lambdas.
@@ -353,7 +362,29 @@ Définition de fini : tous les tests passent ; les réponses respectent schema-m
 
 ---
 
-## WS5 agents (Lambda agents)
+## ✅ WS5 agents (Lambda agents) — terminé
+
+Fusionné dans `main` (`bce4616`), worktree supprimé. **253 tests** (1 ignoré : le banc sur le vrai jeu de départ, qui demande `ALPHAFORGE_STARTER_DIR`), plus 106 pour l'API, sans AWS ni appel de modèle. Ce qui a été livré :
+- les 5 routes de srv-agent-runtime :
+  - POST messages : cadrage, Guardrail à trois points (texte original, traduction anglaise, réponse), message refusé jamais écrit dans l'historique ;
+  - POST runs : partial tout de suite, puis complétion par **auto-invocation asynchrone de la Lambda** ;
+  - GET runs, summary et market/search ;
+- le moteur : scénarios 0/1/2, CAD, 4 tests de résistance tirés des données (dont `covid_2020`), concentration avec la composition des FNB ;
+- les règles R1 à R10 en code, avec des seuils configurables ;
+- le vérificateur non bloquant ;
+- les 3 agents Strands, avec prompts et descriptions d'outils en anglais : l'orchestrateur porte la consigne de traduction du contrat, l'auditeur ignore toute citation absente de la KB, le rédacteur écrit des emplacements ;
+- les 13 outils, avec une table des droits vérifiée au chargement et comparée au contrat par un test ;
+- un banc de fumée AWS (`backend/agents/scripts/smoke.py`).
+
+Hors de `backend/agents/`, avec l'accord de l'équipe, chacun dans son commit :
+- la logique du mandat est déplacée dans `backend/common/` (`mandates.py`, `validation.py`, `mandate_defaults.json`), pour la partager avec WS4b ;
+- les repositories stockent `quickReplies`, `mandateDraft`, `runId` et `userLanguage` (contrat complété, commit `e3eb80b`) ;
+- l'infra autorise l'auto-invocation de la Lambda agents et porte son timeout à 180 s (`apply` à faire).
+
+**Vérifié sur le jeu élargi de WS3** (`data/output/2026-11-14/`), après la fusion : le moteur le lit sans erreur et rejoue le scénario vedette (39 preuves EV). Scénario 1 en FAIL ; scénarios 0 et 2 en WARN (R6). Les décisions restantes (portefeuille de démo, R2 et COVID, bandes de volatilité de R1) sont dans la section Intégration. Les écarts sont dans `backend/agents/NOTES-agents.md`.
+
+Prompt d'origine :
+
 
 ```text
 Chantier : Lambda agents. Dossier attribué : backend/agents/ uniquement.
