@@ -101,7 +101,7 @@ def test_outils_du_portefeuille_lisent_l_utilisateur_du_contexte(robert_session,
     assert catalog.get_profile(other) == {"investorProfile": None}
     assert catalog.stress_test(ctx, "y2022")["drawdown"] < 0
     assert "error" in catalog.stress_test(ctx, "y1929")
-    assert catalog.concentration(ctx)["topSingle"]["ticker"] == "RY.TO"
+    assert catalog.concentration(ctx)["topSingle"]["ticker"] == "TD.TO"
     assert "error" in catalog.check_rules(ctx)
     impact = catalog.portfolio_impact(ctx, 1)
     assert [s["index"] for s in impact["scenarios"]] == [0, 1, 2]

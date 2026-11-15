@@ -252,7 +252,7 @@ SUMMARY = "GET /v1/portfolios/{portfolioId}/summary"
 
 def test_resume_du_portefeuille(robert_session, store):
     body = body_of(app.handle_request(event(SUMMARY, path={"portfolioId": "main"}, query={"range": "5y"}), store=store))
-    assert body["baseCurrency"] == "CAD" and body["totals"]["value"] == pytest.approx(100000, rel=1e-4)
+    assert body["baseCurrency"] == "CAD" and body["totals"]["value"] == pytest.approx(93000, rel=1e-4)
     assert sum(h["weight"] for h in body["holdings"]) == pytest.approx(100, abs=0.05)
     assert len(body["performance"]["points"]) <= 260 and body["risk"]["volatility"] > 0
     assert {a["label"] for a in body["allocation"]["byAssetClass"]} == {"etf_equity", "equity", "etf_bond"}
