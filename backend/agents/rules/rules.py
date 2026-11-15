@@ -241,6 +241,8 @@ def run_level_rules(result: EngineResult, scenario_verdicts: list[dict[str, Any]
     # R5 : aucun symbole de titre dans le texte visible sans clic, sauf ceux que l'utilisateur a écrits ou détient.
     own = set(result.scenarios[0].positions_cad) | {op["ticker"] for op in mandate.get("operations") or []}
     own |= {mandate["subjectTicker"]} if mandate.get("subjectTicker") else set()
+    if mandate.get("mode") == "build":  # le portefeuille construit est montré en liste ; ses symboles ne sont pas des « titres nommés »
+        own |= {symbol for scenario in result.scenarios if scenario.index == 1 for symbol in scenario.positions_cad}
     texts = " ".join(visible_texts(result))
     named = sorted(t for t in universe_tickers if t and t not in own and _contains_ticker(texts, t))
     if named:

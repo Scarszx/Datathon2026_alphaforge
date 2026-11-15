@@ -39,7 +39,7 @@ PROVINCES = (
     "NU",
 )
 
-MANDATE_MODES = ("add_asset", "rebalance", "diagnose")
+MANDATE_MODES = ("add_asset", "rebalance", "diagnose", "build")
 MANDATE_OBJECTIVES = ("growth", "income", "preservation", "project", "retirement")
 OPERATION_ACTIONS = ("add", "remove", "set_weight")
 CURRENCIES = ("CAD", "USD")
@@ -243,7 +243,7 @@ def _validate_mandate_preferences(raw: Any) -> dict[str, Any]:
     if not isinstance(raw, dict):
         raise _validation_error("preferences doit être un objet.")
     _reject_unknown_fields(
-        raw, ("esg", "excludedSectors", "excludedAssetClasses")
+        raw, ("esg", "excludedSectors", "excludedAssetClasses", "excludedIndustries", "preferredIndustries")
     )
     preferences: dict[str, Any] = {}
     if "esg" in raw:
@@ -251,11 +251,35 @@ def _validate_mandate_preferences(raw: Any) -> dict[str, Any]:
         if not isinstance(esg, bool):
             raise _validation_error("preferences.esg doit être un booléen.")
         preferences["esg"] = esg
-    for key in ("excludedSectors", "excludedAssetClasses"):
+    for key in ("excludedSectors", "excludedAssetClasses", "excludedIndustries"):
         values = _array_of_strings(raw, key)
         if values is not None:
             preferences[key] = values
+    if "preferredIndustries" in raw:
+        preferences["preferredIndustries"] = _validate_preferred_industries(raw["preferredIndustries"])
     return preferences
+
+
+def _validate_preferred_industries(raw: Any) -> list[dict[str, Any]]:
+    """Industries préférées du mode build : [{ industry, minWeight }], minWeight en % (facultatif, null = bonus seulement)."""
+    if not isinstance(raw, list):
+        raise _validation_error("preferences.preferredIndustries doit être un tableau.")
+    items: list[dict[str, Any]] = []
+    for entry in raw:
+        if not isinstance(entry, dict):
+            raise _validation_error("Chaque industrie préférée doit être un objet { industry, minWeight }.")
+        _reject_unknown_fields(entry, ("industry", "minWeight"))
+        industry = _string(entry, "industry")
+        if not industry:
+            raise _validation_error("preferredIndustries.industry ne peut pas être vide.")
+        item: dict[str, Any] = {"industry": industry}
+        minimum = entry.get("minWeight")
+        if minimum is not None:
+            if isinstance(minimum, bool) or not isinstance(minimum, (int, float)) or not 0 <= minimum <= 100:
+                raise _validation_error("preferredIndustries.minWeight doit être un nombre entre 0 et 100 (en %) ou null.")
+            item["minWeight"] = minimum
+        items.append(item)
+    return items
 
 
 def _validate_operation(raw: Any) -> dict[str, Any]:

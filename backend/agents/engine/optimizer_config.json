@@ -1,0 +1,13 @@
+{
+  "_comment": "Hypothèses d'équipe du constructeur de portefeuille (moyenne-variance). Affichées comme telles. L'aversion au risque A vient du profil de risque 1-5 du mandat (aversionByProfile); les industries préférées et exclues viennent de la conversation et ne sont jamais fixées ici.",
+  "riskFreeRate": 0.03,
+  "windowYears": 5,
+  "minCoverage": 0.95,
+  "maxWeight": 0.10,
+  "industryCap": 0.25,
+  "preferredIndustryCap": 0.35,
+  "preferredBonus": 0.02,
+  "minPositionWeight": 0.005,
+  "universeCurrencies": ["USD"],
+  "aversionByProfile": {"1": 10, "2": 6, "3": 4, "4": 2, "5": 1}
+}

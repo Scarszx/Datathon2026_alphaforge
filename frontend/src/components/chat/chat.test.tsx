@@ -230,3 +230,63 @@ describe("MandateCard (carte de mandat)", () => {
     expect(screen.getByText(/horizonYears/)).toBeTruthy();     // changedFields
   });
 });
+
+/* Mode build (0.4.12) : le portefeuille construit est une liste à puces, sans graphique. */
+describe("Portefeuille construit (mode build)", () => {
+  const BUILT: Run = {
+    ...PARTIAL,
+    status: "done",
+    scenarios: [
+      { index: 0, label: "Portefeuille actuel", verdict: "pass", metrics: {} },
+      {
+        index: 1, label: "Constructed portfolio", verdict: "pass",
+        description: "Simulation built from your parameters.",
+        metrics: { expectedReturn: "EV-10", beta: "EV-11" },
+        allocation: [{ label: "ne doit pas s'afficher", weight: 100 }],
+        holdings: [
+          { symbol: "AAA", name: "Alpha Corp", industry: "Tobacco", weight: 10, evidence: { weight: "EV-03", beta: "EV-04", expectedReturn: "EV-05" } },
+          { symbol: "BBB", name: "Beta Inc", industry: "Software", weight: 8, evidence: { weight: "EV-06", beta: "EV-07", expectedReturn: "EV-08" } },
+        ],
+        parameters: [
+          { key: "riskAversion", value: 4, riskProfile: 3, evidence: "EV-09" },
+          { key: "excludedIndustries", value: ["Medical Devices"] },
+        ],
+      },
+    ],
+    evidence: [
+      EV("EV-03", "Holding AAA: weight", "10,0 %"), EV("EV-04", "Holding AAA: beta", "1,21"), EV("EV-05", "Holding AAA: expected", "9,8 %"),
+      EV("EV-06", "Holding BBB: weight", "8,0 %"), EV("EV-07", "Holding BBB: beta", "0,95"), EV("EV-08", "Holding BBB: expected", "7,1 %"),
+      EV("EV-09", "Risk aversion", "4,00"), EV("EV-10", "Expected return", "8,4 %"), EV("EV-11", "Beta", "1,05"),
+    ],
+  };
+
+  it("liste les titres avec poids, bêta et rendement espéré, et les paramètres, sans barres", () => {
+    const { container } = render(<SimulationPanel run={BUILT} lang="fr" />);
+    expect(screen.getByText(/ni quoi acheter ni quoi détenir/i)).toBeTruthy();
+    const items = container.querySelectorAll("ul.built-holdings li");
+    expect(items.length).toBe(4); // 2 titres + 2 paramètres
+    expect(items[0].textContent).toContain("AAA");
+    expect(items[0].textContent).toContain("10,0 %");
+    expect(items[0].textContent).toContain("1,21");
+    expect(items[0].textContent).toContain("9,8 %");
+    expect(items[2].textContent).toContain("A = 4");
+    expect(items[2].textContent).toContain("profil de risque 3");
+    expect(items[3].textContent).toContain("Medical Devices");
+    expect(container.querySelector(".alloc-row")).toBeNull();
+    expect(screen.getAllByText("Portefeuille construit").length).toBeGreaterThan(0);
+  });
+
+  it("la carte de mandat affiche le mode et les industries, seulement si elles existent", () => {
+    const build: MandateCreateRequest = {
+      ...DRAFT, mode: "build", operations: undefined, subjectTicker: undefined,
+      preferences: { excludedIndustries: ["Medical Devices"], preferredIndustries: [{ industry: "Tobacco", minWeight: 15 }, { industry: "Banks - Diversified", minWeight: null }] },
+    };
+    const { container, rerender } = render(<MandateCard mandate={build} lang="fr" />);
+    expect(container.textContent).toContain("Construire un portefeuille");
+    expect(container.textContent).toContain("Medical Devices");
+    expect(container.textContent).toContain("Tobacco (min. 15 %)");
+    expect(container.textContent).toContain("Banks - Diversified");
+    rerender(<MandateCard mandate={{ ...build, preferences: undefined }} lang="fr" />);
+    expect(container.textContent).not.toContain("Industries exclues");
+  });
+});

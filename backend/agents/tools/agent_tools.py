@@ -70,14 +70,14 @@ def search_assets(query: str, tool_context: ToolContext, asset_class: str | None
 def propose_mandate(draft: dict, tool_context: ToolContext) -> str:
     """Validate a draft mandate and attach it to your reply for the user to confirm. It never confirms anything.
 
-    Call it once the mandate is complete. Fields (all text in English): mode (add_asset | rebalance | diagnose),
+    Call it once the mandate is complete. Fields (all text in English): mode (add_asset | rebalance | diagnose | build),
     objective (growth | income | preservation | project | retirement), objectiveDetail (short English text,
     e.g. "condo purchase in 3 years"), horizonYears (number), riskTolerance and riskCapacity (integers 1-5),
     maxAcceptableLossPct (optional number; omit it to use the team default for the horizon), constraints
-    (list of English strings), preferences ({esg: bool, excludedSectors: [], excludedAssetClasses: []}),
+    (list of English strings), preferences ({esg: bool, excludedSectors: [], excludedAssetClasses: [], excludedIndustries: [dataset English industry names], preferredIndustries: [{industry, minWeight: percent or null}]; the two industry lists are optional and only for mode build),
     province (QC, ON, BC, AB, SK, MB, NB, NS, PE, NL, YT, NT, NU), operations (list of {action: add | remove |
-    set_weight, ticker: exact symbol, amount: number, currency: CAD | USD, weight: percent}; empty for diagnose),
-    subjectTicker (diagnose only), fieldSources ({field: persona | user_answer | team_assumption}).
+    set_weight, ticker: exact symbol, amount: number, currency: CAD | USD, weight: percent}; empty for diagnose and build),
+    subjectTicker (diagnose only; none for build), fieldSources ({field: persona | user_answer | team_assumption}).
     portfolioId and userLanguage are filled in from the session. If valid is false, fix the listed errors.
 
     Args:

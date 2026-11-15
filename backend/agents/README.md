@@ -30,7 +30,7 @@ data/store.py        Parquet local ou S3, colonnes utiles, cache du conteneur
 engine/              analytics (calculs purs), stress, concentration, scenarios, registry (EV/KB)
 rules/               rules.py (R1-R10), rules_config.json (hypothèses d'équipe), settings.py
 verifier/            verifier.py
-tools/               catalog.py (14 outils purs), agent_tools.py (outils Strands, docstrings = consignes),
+tools/               catalog.py (15 outils purs), agent_tools.py (outils Strands, docstrings = consignes),
                      context.py (contexte hors modèle), kb.py (Retrieve filtré)
 toolbox.py           droits agent/module → outils, vérifiés au chargement ; journal tool.call
 llm/                 base.py (Agent Strands, limites, délai, usage) ; orchestrator/, auditor/, writer/

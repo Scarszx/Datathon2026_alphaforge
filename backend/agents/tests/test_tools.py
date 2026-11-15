@@ -1,4 +1,4 @@
-"""Les 14 outils sur le mini-jeu : validation, plafonds du contrat, contexte jamais fourni par le modèle."""
+"""Les 15 outils sur le mini-jeu : validation, plafonds du contrat, contexte jamais fourni par le modèle."""
 
 from __future__ import annotations
 
@@ -334,3 +334,56 @@ def test_un_passage_entier_tient_dans_l_extrait():
     chunk = ("Une phrase du passage numéro un. " * 70).strip()  # ~2 300 caractères, un passage de 300 jetons
     assert len(chunk) > 1200 and kb.MAX_EXCERPT_CHARS >= 2400
     assert kb.excerpt_of(chunk) == chunk
+
+
+# --- mode build ---------------------------------------------------------------
+
+
+def _build_draft(**preferences):
+    draft = {"mode": "build", "objective": "growth", "horizonYears": 10, "riskTolerance": 3, "riskCapacity": 3}
+    if preferences:
+        draft["preferences"] = preferences
+    return draft
+
+
+@pytest.fixture
+def relaxed_optimizer(monkeypatch):
+    """Le mini-jeu n'a que deux actions en USD : plafonds relevés pour que le problème reste faisable."""
+    from backend.agents.engine import optimizer
+
+    config = {**optimizer.load_config(), "maxWeight": 0.6, "industryCap": 1.0, "preferredIndustryCap": 1.0, "minPositionWeight": 0.0}
+    monkeypatch.setattr(optimizer, "load_config", lambda: config)
+
+
+def test_propose_mandate_build_sans_preferences(ctx, relaxed_optimizer):
+    result = catalog.propose_mandate(ctx, _build_draft())
+    assert result["valid"] is True and result["riskProfile"] == 3
+    assert "operations" not in ctx.captured["mandateDraft"]
+
+
+@pytest.mark.parametrize("draft,expected", [
+    ({**_build_draft(), "operations": [{"action": "add", "ticker": "NVDA", "amount": 1000}]}, "no operations"),
+    ({**_build_draft(), "subjectTicker": "NVDA"}, "no operations"),
+    (_build_draft(excludedIndustries=["Semiconducters"]), "Unknown industry 'Semiconducters'"),
+    (_build_draft(preferredIndustries=[{"industry": "Atlantis"}]), "Unknown industry"),
+    (_build_draft(preferredIndustries=[{"industry": "Information Technology (synthetic)", "minWeight": 150}]), "entre 0 et 100"),
+])
+def test_propose_mandate_build_invalide(ctx, draft, expected):
+    result = catalog.propose_mandate(ctx, draft)
+    assert result["valid"] is False and expected in result["errors"][0]
+
+
+def test_propose_mandate_build_propose_les_industries_proches(ctx):
+    error = catalog.propose_mandate(ctx, _build_draft(excludedIndustries=["Information Technology"]))["errors"][0]
+    assert "Information Technology (synthetic)" in error
+
+
+def test_optimize_portfolio_outil(ctx, relaxed_optimizer):
+    from backend.agents.engine import optimizer
+
+    result = catalog.optimize_portfolio(ctx, 3)
+    assert {h["symbol"] for h in result["holdings"]} == {"NVDA", "AAPL"} and sum(h["weight"] for h in result["holdings"]) == pytest.approx(100, abs=0.1)
+    assert result["risk_aversion"] == optimizer.risk_aversion(3) and result["source"].startswith("prices@")
+    assert "error" in catalog.optimize_portfolio(ctx, 9)
+    assert "error" in catalog.optimize_portfolio(ctx, 3, ["Atlantis"])
+    assert "error" in catalog.optimize_portfolio(ctx, 3, None, [{"industry": 5}])

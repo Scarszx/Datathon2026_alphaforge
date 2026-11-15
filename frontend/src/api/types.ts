@@ -113,7 +113,7 @@ export type AgentsRegistry = { agents: AgentInfo[]; modules?: ModuleInfo[]; tool
 
 /* ===== v0.4.0 : mandats et runs (Analyses) ===== */
 
-export type MandateMode = "add_asset" | "rebalance" | "diagnose";
+export type MandateMode = "add_asset" | "rebalance" | "diagnose" | "build";
 export type MandateObjective = "growth" | "income" | "preservation" | "project" | "retirement";
 export type MandateOperation = {
   action: "add" | "remove" | "set_weight";
@@ -134,7 +134,14 @@ export type MandateCreateRequest = {
   riskCapacity: number; // 1 à 5
   maxAcceptableLossPct?: number; // absent = défaut par horizon (hypothèse d'équipe)
   constraints?: string[];
-  preferences?: { esg?: boolean; excludedSectors?: string[]; excludedAssetClasses?: string[] };
+  preferences?: {
+    esg?: boolean;
+    excludedSectors?: string[];
+    excludedAssetClasses?: string[];
+    /** Mode build (0.4.12), facultatifs : noms anglais d'industries du jeu. */
+    excludedIndustries?: string[];
+    preferredIndustries?: { industry: string; minWeight?: number | null }[]; // minWeight en %
+  };
   province: Jurisdiction;
   userLanguage: string; // ISO 639-1 ; tous les champs texte du mandat sont en anglais
   operations?: MandateOperation[];
@@ -189,12 +196,24 @@ export type Evidence = {
 
 /* schema-scenario : 0 actuel, 1 idée telle quelle, 2 comparaison par catégorie (0.4.5, sur demande).
  * 0.4.4 : le front ne lit plus `verdict` — le décompte des règles vient de run.verdicts. */
+/* Mode build (0.4.12) : un titre du portefeuille construit, avec les preuves EV-nn de ses chiffres */
+export type BuiltHolding = {
+  symbol: string;
+  name: string;
+  industry: string;
+  weight: number; // %
+  evidence: { weight: string; beta: string; expectedReturn: string };
+};
+export type BuildParameter = { key: string; value: number | string[] | { industry: string; minWeight?: number | null }[]; riskProfile?: number; evidence?: string };
+
 export type Scenario = {
   index: 0 | 1 | 2;
   label: string;
   description?: string;
   proxyNote?: string;
   allocation?: Slice[];
+  holdings?: BuiltHolding[]; // mode build seulement
+  parameters?: BuildParameter[]; // mode build seulement
   metrics?: Record<string, string>; // mesure -> identifiant EV-nn
   verdict?: "pass" | "warn" | "fail"; // ancien backend : présent mais ignoré
 };

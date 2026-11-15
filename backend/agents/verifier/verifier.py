@@ -165,15 +165,16 @@ def forbidden_phrases(sentence: str) -> list[str]:
 
 def verify_narrative(
     sections: list[dict[str, Any]], evidence_ids: set[str], mandate: dict[str, Any],
-    universe: set[str] | None = None, held: set[str] | None = None,
+    universe: set[str] | None = None, held: set[str] | None = None, built: set[str] | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, str]], dict[str, Any]]:
     """Contrôle les sections { key, textEn, text } ; renvoie (sections nettoyées, phrases masquées, rapport).
 
     `universe` : symboles du jeu de données ; avec lui, toute phrase qui nomme un symbole que l'utilisateur n'a ni écrit
-    (opérations, subjectTicker) ni détenu (`held`) est masquée (le FNB d'approximation de la comparaison, notamment)."""
+    (opérations, subjectTicker) ni détenu (`held`) est masquée (le FNB d'approximation de la comparaison, notamment). `built` : symboles du portefeuille construit (mode build)."""
     constants = mandate_constants(mandate)
     pattern = symbol_pattern(universe or set())
     allowed = set(held or set()) | {op["ticker"] for op in mandate.get("operations") or []}
+    allowed |= set(built or set())  # mode build : les titres du portefeuille construit, montrés dans la liste du scénario
     allowed |= {mandate["subjectTicker"]} if mandate.get("subjectTicker") else set()
     hidden: list[dict[str, str]] = []
     cleaned: list[dict[str, Any]] = []
