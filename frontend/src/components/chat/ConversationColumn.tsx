@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 
 import type { MandateCreateRequest, Message } from "../../api/types";
 import { t, type Lang } from "../../lib/i18n";
 import { PROVINCES } from "../../lib/risk";
+import Explanation from "../Explanation";
 import EvidenceText from "./EvidenceText";
 import MandateCard from "./MandateCard";
 
@@ -69,6 +70,7 @@ function Bubble({
         {m.status === "pending" ? <span className="muted">{t("chat.thinking", lang)}</span> : (
           <>
             <p className="pre">{m.runId ? <EvidenceText text={m.content} evidence={evidence} lang={lang} /> : m.content}</p>
+            {m.role === "assistant" && m.explanation && <Explanation data={m.explanation} />}
             {m.quickReplies?.length ? (
               <div className="suggest" style={{ marginTop: 10 }}>
                 {m.quickReplies.map((qr) => (
