@@ -28,6 +28,16 @@ resource "aws_iam_role" "api" {
   assume_role_policy = data.aws_iam_policy_document.lambda_assume.json
 }
 
+resource "aws_iam_role" "presignup" {
+  name               = "${var.name_prefix}-presignup-role"
+  assume_role_policy = data.aws_iam_policy_document.lambda_assume.json
+}
+
+resource "aws_iam_role_policy_attachment" "presignup_logs" {
+  role       = aws_iam_role.presignup.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
 resource "aws_iam_role" "agents" {
   name               = "${var.name_prefix}-agents-role"
   assume_role_policy = data.aws_iam_policy_document.lambda_assume.json

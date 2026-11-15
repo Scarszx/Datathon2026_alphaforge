@@ -5,8 +5,9 @@
 # éviter leur création automatique au premier appel.
 
 locals {
-  api_zip    = "${path.module}/build/api.zip"
-  agents_zip = "${path.module}/build/agents.zip"
+  api_zip       = "${path.module}/build/api.zip"
+  agents_zip    = "${path.module}/build/agents.zip"
+  presignup_zip = "${path.module}/build/presignup.zip"
 
   # Variables communes aux deux Lambdas (noms exacts de backend/common/config.py).
   # La Lambda API valide les tickers avec une copie embarquée dans son zip
@@ -91,4 +92,20 @@ resource "aws_lambda_function" "agents" {
   depends_on = [
     aws_cloudwatch_log_group.agents,
   ]
+}
+
+# Déclencheur Cognito pre sign-up : auto-confirme les comptes (pas de code par courriel).
+resource "aws_lambda_function" "presignup" {
+  function_name = "${var.name_prefix}-presignup"
+  description   = "Cognito pre sign-up : confirme le compte sans code"
+  role          = aws_iam_role.presignup.arn
+
+  runtime       = "python3.12"
+  architectures = ["arm64"]
+  handler       = "backend/presignup/handler.handler"
+  memory_size   = 128
+  timeout       = 5
+
+  filename         = local.presignup_zip
+  source_code_hash = can(filebase64sha256(local.presignup_zip)) ? filebase64sha256(local.presignup_zip) : null
 }

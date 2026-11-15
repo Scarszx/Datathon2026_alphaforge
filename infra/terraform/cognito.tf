@@ -23,6 +23,20 @@ resource "aws_cognito_user_pool" "pool" {
   }
 
   mfa_configuration = "OFF"
+
+  # Inscription sans code de confirmation par courriel : le déclencheur
+  # pre sign-up confirme le compte (backend/presignup/handler.py).
+  lambda_config {
+    pre_sign_up = aws_lambda_function.presignup.arn
+  }
+}
+
+resource "aws_lambda_permission" "cognito_presignup" {
+  statement_id  = "AllowCognitoPreSignUp"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.presignup.function_name
+  principal     = "cognito-idp.amazonaws.com"
+  source_arn    = aws_cognito_user_pool.pool.arn
 }
 
 resource "aws_cognito_user_pool_client" "client" {

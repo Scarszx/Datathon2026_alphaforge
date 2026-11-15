@@ -7,7 +7,7 @@
 # pandas, pyarrow et numpy sont exclus de la Lambda agents : fournis par la
 # couche AWS SDK for pandas (variable pandas_layer_arn).
 #
-# Usage : infra/scripts/build_lambdas.sh [api|agents]   (aucun appel AWS)
+# Usage : infra/scripts/build_lambdas.sh [api|agents|presignup]   (aucun appel AWS)
 #         sans argument : construit les deux zips ; avec un nom : celui-là seulement.
 
 set -euo pipefail
@@ -96,10 +96,22 @@ build_lambda() {
     fi
 }
 
+# Lambda pre sign-up de Cognito : un seul fichier, sans dépendance ni backend/common.
+build_presignup() {
+    echo "=== Construction de presignup.zip ==="
+    local stage="$staging/presignup"
+    mkdir -p "$stage/backend/presignup" "$build_dir"
+    cp "$repo_root/backend/presignup/handler.py" "$stage/backend/presignup/handler.py"
+    rm -f "$build_dir/presignup.zip"
+    (cd "$stage" && python3 -m zipfile -c "$build_dir/presignup.zip" .)
+    ls -lh "$build_dir/presignup.zip"
+}
+
 target="${1:-all}"
 case "$target" in
-    all) build_lambda api; build_lambda agents ;;
+    all) build_lambda api; build_lambda agents; build_presignup ;;
     api|agents) build_lambda "$target" ;;
-    *) echo "Usage : $0 [api|agents]" >&2; exit 2 ;;
+    presignup) build_presignup ;;
+    *) echo "Usage : $0 [api|agents|presignup]" >&2; exit 2 ;;
 esac
 echo "=== Zips prêts dans $build_dir ==="
