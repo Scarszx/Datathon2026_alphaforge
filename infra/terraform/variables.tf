@@ -19,19 +19,19 @@ variable "dataset_version" {
 variable "model_orchestrator" {
   description = "Profil d'inférence Bedrock de l'orchestrateur (agent-orchestrator, section agents du contrat)."
   type        = string
-  default     = "global.anthropic.claude-sonnet-5-5"
+  default     = "global.anthropic.claude-opus-5-5"
 }
 
 variable "model_auditor" {
   description = "Profil d'inférence Bedrock de l'auditeur (agent-auditor, section agents du contrat v0.4.0)."
   type        = string
-  default     = "global.anthropic.claude-sonnet-5-5"
+  default     = "global.anthropic.claude-opus-5-5"
 }
 
 variable "model_writer" {
   description = "Profil d'inférence Bedrock du rédacteur (agent-writer, section agents du contrat v0.4.0)."
   type        = string
-  default     = "global.anthropic.claude-sonnet-5-5"
+  default     = "global.anthropic.claude-opus-5-5"
 }
 
 variable "kb_corpus_version" {
