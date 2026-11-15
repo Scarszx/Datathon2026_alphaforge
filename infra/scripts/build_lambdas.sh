@@ -39,7 +39,10 @@ check_tickers_json() {
         echo "  (handlers pas encore livrés : contrôle tickers.json reporté)"
         return 0
     fi
-    if unzip -l "$zip" | grep -qE "backend/api/tickers[.]json$"; then
+    # Listing capturé avant grep -q : sous pipefail, la fermeture anticipée du tube faisait échouer unzip (SIGPIPE).
+    local listing
+    listing="$(unzip -l "$zip")"
+    if grep -qE "backend/api/tickers[.]json$" <<<"$listing"; then
         echo "  contrôle tickers.json : présent dans le zip"
     else
         echo "ERREUR : backend/api/tickers.json absent du zip de $name." >&2
