@@ -89,10 +89,10 @@
 | **Tolérance au risque** | Ce que la personne *accepte* de subir (attitude subjective). |
 | **Capacité de perte** | Ce que la personne *peut* financièrement encaisser (situation objective : échéance, besoin de l'argent, autres actifs). |
 | **Profil retenu** | **La plus basse des deux** (avis ACVM/OCRI 31-368). |
-| **Scénarios 0 / 1 / 2** | **0** : portefeuille actuel. **1** : idée appliquée telle quelle. **2** : alternative par catégorie, qui respecte le mandat. |
+| **Scénarios 0 / 1 / 2** | **0** : portefeuille actuel. **1** : idée appliquée telle quelle. **2** : comparaison par catégorie d'actifs, construite **seulement si l'utilisateur la demande** en choisissant une catégorie dans une liste (aucune présélection). |
 | **Test de résistance** | Rejouer un portefeuille sur une période difficile réelle : 2022, cycle de hausse des taux, krach crypto. |
 | **Registre de preuves** | Le journal de la session. Chaque calcul (`EV-xx`) et chaque passage réglementaire cité (`KB-xx`) y est inscrit avec sa source, sa période, sa devise et ses limites. |
-| **Verdict** | `PASS` / `WARN` / `FAIL`, par règle et par scénario. |
+| **Verdict** | Statut interne `pass` / `warn` / `fail` / `not_verified`, par règle et par scénario. L'interface n'affiche jamais ces mots ni « conforme » : elle dit ce que la règle a fait (« non déclenchée », « seuil dépassé », « à vérifier »…), parce que l'outil n'évalue pas la convenance (GN-3200-26-001, 2.1.1). |
 | **Hypothèse d'équipe** | Un seuil choisi par nous. Il est configurable et toujours affiché comme hypothèse. |
 | **Non vérifié** | Statut d'une affirmation qu'aucune source du registre ne soutient. L'outil le dit au lieu de deviner. |
 
@@ -202,10 +202,10 @@ Le prompt système de l'orchestrateur, rédigé en anglais, contient donc explic
   - `correlation(assets, window)` ;
   - `asset_profile(ticker, window)` ;
   - `macro_regime(date)`.
-- **Alternative (scénario 2) :** une règle déterministe. Elle garde le montant de l'idée, mais remplace l'actif risqué par une catégorie compatible avec le profil retenu, ou limite la poche à un plafond d'**hypothèse d'équipe**. Le moteur peut produire 1 ou 2 alternatives. Toutes sont décrites par catégorie.
+- **Comparaison par catégorie (scénario 2, lots B et E) :** une règle déterministe, construite seulement si le mandat porte `compareCategory` (l'utilisateur choisit la catégorie ; l'orchestrateur ne la met jamais). Elle garde le montant de l'idée et remplace chaque titre ajouté par la catégorie choisie, sans juger le titre. Aucun symbole n'apparaît dans le texte visible ; le FNB d'approximation n'est nommé que dans `method` et `source` de la preuve (« calculation only, not a selection »).
 
 ### 7.3 Auditeur de convenance — LLM (Claude Sonnet 5.5) + KB + règles en code
-- **Rôle :** les **verdicts viennent des règles R1 à R10, écrites en code** (section 9). L'auditeur ne décide pas du verdict. Il **cherche dans la Knowledge Base le passage qui fonde chaque verdict**, l'inscrit au registre (`KB-xx` : document, section, extrait court, juridiction, version, URL) et formule le motif en une phrase.
+- **Rôle :** les **verdicts viennent des règles R1 à R10, écrites en code** (section 9). L'auditeur ne décide pas du verdict. Il ne traite que les **règles déclenchées (warn, fail)** : un pass ou un not_verified n'a ni recherche ni citation, car un extrait du régulateur sous une règle « non déclenchée » se lirait comme un accord. Pour chaque règle déclenchée, il **cherche dans la Knowledge Base le passage dont la règle s'inspire**, l'inscrit au registre (`KB-xx` : document, section, extrait court, juridiction, version, URL) et formule le motif en une phrase.
 - **Outils :**
   - `check_rules(mandate, scenarios)` (code) ;
   - `search_regulation(query, subjects, jurisdictions)`, qui appelle Bedrock KB `Retrieve` avec un filtre de métadonnées `juridiction ∈ {CA, <province>}` et éventuellement sur `sujets`. **La requête est toujours en anglais**, comme le corpus.
@@ -304,8 +304,8 @@ Les seuils marqués « hypothèse » vivent dans un fichier de configuration (pa
 | **R1** | `risk_profile = min(risk_tolerance, risk_capacity)`. Si l'idée suppose un profil plus élevé, WARN ou FAIL | Avis 31-368, partie A (le profil global reflète la plus basse des deux) | texte |
 | **R2** | La pire baisse historique simulée du scénario dépasse `max_acceptable_loss_pct`, ou le défaut associé à l'horizon. Défauts proposés : < 3 ans → 10 %, 3–8 ans → 20 %, > 8 ans → 35 % | 31-103 art. 13.2 et 13.3 (horizon, profil) · seuils = hypothèse | texte + hypothèse |
 | **R3** | L'impact est mesuré sur **l'ensemble du portefeuille**, jamais sur le titre ajouté seul | Avis 31-368, partie C « Impact on client's account or portfolio » | texte |
-| **R4** | Au moins une alternative raisonnable est présentée dès qu'un scénario est en WARN ou FAIL | Avis 31-368, partie C « Reasonable range of alternative actions » | texte |
-| **R5** | L'alternative et tout le texte affiché ne recommandent aucun titre nommé (contrôle sur le texte, liste de motifs) | Note de l'OCRI GN-3200-26-001 | texte |
+| **R4** | Comparaison par catégorie d'actifs : affichée seulement sur demande. Motifs `COMPARISON_NOT_REQUESTED` / `COMPARISON_SHOWN` (pass) et `COMPARISON_UNAVAILABLE` (not_verified) ; **R4 ne peut plus échouer** | principe de l'avis 31-368, partie C « Reasonable range of alternative actions », sans évaluation de convenance | texte |
+| **R5** | Aucun symbole de titre dans le texte visible sans clic (libellés, descriptions, `proxyNote`, libellés de preuve, notes), hors les symboles que l'utilisateur a écrits ou détient. Le vérificateur applique la même règle au récit | Note de l'OCRI GN-3200-26-001 | texte |
 | **R6** | Poids d'un titre unique (y compris via la composition des FNB) : WARN au-delà de 10 %, FAIL au-delà de 20 % du portefeuille | hypothèse d'équipe (aucune règle officielle trouvée) | hypothèse |
 | **R7** | Crypto dans un scénario : avertissement sourcé, et plafond (0 % si refusée dans le mandat, 5 % pour un profil ≤ 3, 10 % pour un profil 4–5) | Avis 21-329 et 21-332 · plafonds = hypothèse | texte + hypothèse |
 | **R8** | Préférence ESG : un fonds n'est présenté comme « ESG » que si une source le montre (méthodologie de l'émetteur). Pour une action, on indique seulement le secteur (fait) et « non vérifié » pour les controverses | Avis 81-334 (fonds ESG) | texte |
@@ -406,12 +406,12 @@ Les seuils marqués « hypothèse » vivent dans un fichier de configuration (pa
 2. **Conversation** : messages, boutons de réponse rapide, confirmation du mandat.
 3. **Panneau de simulation** :
    - les 3 scénarios côte à côte, à la même échelle (volatilité, pire baisse 2022, répartition) ;
-   - les pastilles PASS / WARN / FAIL par règle, avec le badge de citation `KB` ;
+   - les règles R1 à R10 avec un libellé par motif (« non déclenchée », « seuil dépassé »…), en style neutre, et le badge de citation `KB` seulement pour une règle déclenchée ;
    - les 4 rubriques d'explication, avec les badges `EV` et `KB` cliquables qui ouvrent la carte de preuve ;
    - le score du vérificateur.
 - **Ordre d'apparition :** scénarios et pastilles d'abord, puis citations, puis texte diffusé en continu.
 - **Mention permanente :** « Simulation pédagogique, pas un conseil financier ». Les mentions de la province (R9) sont ajoutées.
-- **Langue :** l'interface est dans la langue de l'utilisateur (`userLanguage`) : libellés fixes traduits à partir de clés stables, textes générés déjà traduits par l'orchestrateur. Les extraits réglementaires sont affichés en version originale anglaise, avec la mention « extrait original (anglais) ».
+- **Langue :** l'interface est dans la langue de l'utilisateur (`userLanguage`) : libellés fixes traduits à partir de clés stables, textes générés déjà traduits par l'orchestrateur. Les extraits réglementaires sont affichés en version originale anglaise, avec la mention « extrait original (anglais) ». Les textes français officiels ne sont pas dans ce corpus (reporté). Les mentions fixes du lot D (décisions prises par l'utilisateur seul, résultat identique pour des réponses identiques, limite aux titres du jeu de données) s'affichent à côté des résultats.
 
 ## 13. Architecture AWS
 
@@ -445,7 +445,7 @@ Un script lance une douzaine de scénarios sur le pipeline complet, avec **un co
 
 | Scénario | Contrôle |
 |---|---|
-| Robert + « 30 % TSLA/NVDA », « tout sur NVDA », « 50 % BTC » | le scénario 1 est en FAIL et un scénario 2 en PASS existe |
+| Robert + « 30 % TSLA/NVDA », « tout sur NVDA », « 50 % BTC » | le scénario 1 déclenche R1 et R2 ; sur demande de comparaison, un scénario 2 sans règle déclenchée existe |
 | Amira, IA et crypto offensives | crypto ≤ plafond, et au moins 3 secteurs hors tech dans l'alternative |
 | Mateo, préférence ESG | toute affirmation ESG cite un `KB` ou une source d'émetteur ; les autres sont « non vérifié » |
 | Tous | le vérificateur ne masque aucune phrase (`hidden == 0`), 100 % des badges sont résolus |
@@ -505,6 +505,9 @@ Les calculs, les règles et le vérificateur ont aussi des **tests unitaires san
 | Vérificateur bloquant avec nouvelle tentative | Trop lent et risqué en direct : emplacements `{EV}` et masquage non bloquant |
 | Optimisation « portefeuille optimal » sur rendements passés | Contraire à l'esprit de l'énoncé (pas de prédiction à partir du passé) |
 | Univers de 5 000 titres | Inutile pour des personas. On retient environ 250 actifs choisis par cas d'usage, sur 10 ans (section 10) : plus que les 31 du jeu de départ, que son propre README juge insuffisant, mais pas un univers de filtrage de marché |
+| Scénario 2 automatique qui « remplace » le titre jugé incompatible par un FNB nommé (décision du lot B, 2026-11-15) | L'effet combiné se lit comme « remplacez votre idée par ce FNB » (GN-3200-26-001, 3.2) : la comparaison est maintenant demandée et la catégorie choisie par l'utilisateur |
+| « Conforme », PASS vert et citations sous des règles non déclenchées (lot A, 2026-11-15) | Cela dit que l'outil a évalué la convenance et l'a trouvée conforme (GN-3200-26-001, 2.1.1) |
+| Quatre échelles de risque (accueil, profil, score 1-10, mandat) (lot C) | Une seule : tolérance et capacité de 1 à 5, niveau retenu = le plus bas des deux |
 | Corpus ou prompts bilingues, ou en français | Une seule langue interne (l'anglais) rend le comportement des agents et la recherche dans la KB plus prévisibles ; la langue de l'utilisateur ne sert qu'à l'affichage |
 
 ## 19. Points ouverts et risques

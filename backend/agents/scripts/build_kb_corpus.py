@@ -40,6 +40,7 @@ TOC_LEADER = re.compile(r"\.{4,}")
 BARE_PAGE_NUMBER = re.compile(r"^\s*(?:Page\s+)?\d{1,3}(?:\s*(?:of|/)\s*\d{1,3})?\s*$", re.IGNORECASE)
 MAX_METADATA_BYTES = 1500  # S3 Vectors : 2 Ko de métadonnées filtrables par vecteur (limites AWS) ; marge pour la KB
 TITLE_MAX = 80
+NOTES_SUBJECT = "notes"  # fichiers de notes de bas de page : jamais ramenés par une recherche par sujet (et non citables)
 
 
 @dataclass
@@ -108,7 +109,7 @@ def repeated_page_lines(pages: list[str]) -> set[str]:
     return {text for text, n in counts.items() if n >= threshold and len(text) < 160}
 
 
-def clean_lines(pages: list[str], cfg: dict[str, Any], removed: Removed) -> list[Line]:
+def clean_lines(pages: list[str], cfg: dict[str, Any], removed: Removed, is_pdf: bool = True) -> list[Line]:
     headers = repeated_page_lines(pages)
     drop = [re.compile(p) for p in cfg.get("drop_line_regex", [])]
     lines: list[Line] = []
@@ -120,7 +121,7 @@ def clean_lines(pages: list[str], cfg: dict[str, Any], removed: Removed) -> list
                 continue
             if re.sub(r"\d+", "#", text) in headers:
                 removed.add("en-tête ou pied de page")
-            elif BARE_PAGE_NUMBER.match(text):
+            elif is_pdf and BARE_PAGE_NUMBER.match(text):  # une page web n'a pas de pages : un chiffre seul est un numéro de note
                 removed.add("numéro de page isolé")
             elif TOC_LEADER.search(text):
                 removed.add("ligne de table des matières")
@@ -280,7 +281,7 @@ def build_metadata(base: dict[str, Any], doc_key: str, version: str, section: Se
     size = len(json.dumps({"metadataAttributes": attributes}, ensure_ascii=False).encode("utf-8"))
     if size > MAX_METADATA_BYTES:
         raise ValueError(f"{doc_key} {section.section}: métadonnées de {size} octets (> {MAX_METADATA_BYTES})")
-    unknown = [s for s in subjects if s not in KNOWN_SUBJECTS]
+    unknown = [s for s in subjects if s not in KNOWN_SUBJECTS and s != NOTES_SUBJECT]
     if unknown:
         raise ValueError(f"{doc_key}: sujets hors KNOWN_SUBJECTS: {unknown}")
     return {"metadataAttributes": attributes}
@@ -300,7 +301,7 @@ def build_document(path: Path, rules: dict[str, Any], proposal: dict[str, Any], 
     base = json.loads(Path(str(path) + ".metadata.json").read_text(encoding="utf-8"))["metadataAttributes"]
     cfg = rules.get("documents", {}).get(doc_key, {})
     removed = Removed()
-    lines = clean_lines(extract_pages(path), cfg, removed)
+    lines = clean_lines(extract_pages(path), cfg, removed, is_pdf=path.suffix.lower() == ".pdf")
     notes: list[str] = []
     if cfg.get("footnotes") == "txt_numbered_lines":
         lines, notes = split_footnotes(lines, removed)
@@ -328,7 +329,7 @@ def build_document(path: Path, rules: dict[str, Any], proposal: dict[str, Any], 
         stem = f"{doc_key}__notes"
         (out / f"{stem}_en.txt").write_text("\n".join(notes) + "\n", encoding="utf-8")
         note_section = Section(None, "Footnotes", order=999)
-        metadata = build_metadata(base, doc_key, version, note_section, subjects_for(doc_key, None, base.get("sujets", []), proposal)[0], False)
+        metadata = build_metadata(base, doc_key, version, note_section, [NOTES_SUBJECT], False)
         (out / f"{stem}_en.txt.metadata.json").write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
         entries.append({"doc_id": doc_key, "section": None, "section_titre": "Footnotes", "langue": "en", "file": f"{stem}_en.txt",
                         "titre": DOCUMENT_TITLES[doc_key], "taille": sum(len(n) for n in notes), "pages": None, "citable": False,

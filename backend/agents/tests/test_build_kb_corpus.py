@@ -157,7 +157,8 @@ def test_citable_statut_et_sections_cles(corpus):
 def test_metadonnees_courtes_sujets_connus_et_noms_compatibles_avec_la_kb(corpus):
     for name, meta in _metadata(corpus).items():
         assert len(json.dumps({"metadataAttributes": meta}).encode()) <= build.MAX_METADATA_BYTES, name
-        assert set(meta["sujets"]) <= set(kb.KNOWN_SUBJECTS), name
+        allowed = set(kb.KNOWN_SUBJECTS) | ({build.NOTES_SUBJECT} if name.endswith("__notes_en.txt") else set())
+        assert set(meta["sujets"]) <= allowed, name
         assert meta["langue"] == "en" and meta["corpus_version"] == "2026-11-15" and meta["doc_id"]
         assert not kb.document_title(name).endswith("_en.txt"), name  # le préfixe du document est reconnu
 
@@ -186,3 +187,23 @@ def test_citations_fixees_embarquees_sont_celles_du_corpus_construit(corpus):
     assert [c["section"] for c in built["R5"]] == ["s. 2.1.1 Decision-making supports", "s. 3.3 Safeguards for Decision-Making Supports"]
     assert set(built["R9"]) == {"QC", "ON", "SK"} and built["R9"]["SK"][0]["status"] == "projet"
     assert all(len(c["excerpt"]) <= kb.MAX_EXCERPT_CHARS for c in built["R5"] + sum(built["R9"].values(), []))
+
+
+def test_notes_de_bas_de_page_dans_un_fichier_non_citable_sans_sujet_de_recherche(corpus):
+    """Les notes d'une page web (numéro seul, puis texte) vont dans un fichier `notes` : non citable, sujet « notes »."""
+    metadata = _metadata(corpus)
+    notes = [n for n in metadata if n.endswith("__notes_en.txt")]
+    assert "CA_CIRO_GN-3200-26-001__notes_en.txt" in notes
+    for name in notes:
+        assert metadata[name]["citable"] is False and metadata[name]["sujets"] == ["notes"]
+    body = (corpus / "CA_CIRO_GN-3200-26-001__notes_en.txt").read_text()
+    assert "In this guidance, all rule references are to the Investment Dealer and Partially Consolidated Rules" in body
+    sections = " ".join(p.read_text() for p in corpus.glob("CA_CIRO_GN-3200-26-001__s*_en.txt"))
+    assert "all rule references are to the Investment Dealer" not in sections  # plus dans les sections citables
+
+
+def test_un_chiffre_seul_d_une_page_web_n_est_pas_un_numero_de_page():
+    lines = build.clean_lines(["Text.\n1\nA footnote that is clearly longer than thirty characters."], {}, build.Removed(), is_pdf=False)
+    assert [ln.text for ln in lines if ln.text] == ["Text.", "1", "A footnote that is clearly longer than thirty characters."]
+    lines = build.clean_lines(["Text.\n12\nMore."], {}, build.Removed(), is_pdf=True)
+    assert "12" not in [ln.text for ln in lines]

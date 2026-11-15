@@ -64,6 +64,17 @@ Attention :
 - `mes_docs_perso/` est exclu de git, donc absent des worktrees. Les prompts donnent son chemin absolu.
 - `docs/for_KB/` (corpus de la Knowledge Base, 13 documents en anglais) est commité sur `main` : il est présent dans les worktrees.
 
+## Chantier A à E : vocabulaire, comparaison, échelle, mentions, corpus (2026-11-15)
+
+Demandé par l'utilisateur le 2026-11-15 (contrat 0.4.4 à 0.4.7, **à relire par l'équipe**). Notes : `backend/agents/NOTES-agents.md` points 34 à 58, `backend/api/NOTES-api.md` point 15.
+
+- ✅ **Backend fusionné dans `main`** (lots A, B, C, D, E1, E2 ; tag de retour `v0.7.0`) : citations réservées aux règles déclenchées, vocabulaire descriptif et vérificateur élargi (jugements de conformité, symboles non écrits ni détenus), comparaison par catégorie sur demande (`compareCategory`), tolérance et capacité obligatoires, script `build_kb_corpus.py` (corpus par section), filtre `citable`, citations fixées de R5 et R9. 376 + 113 tests.
+- ✅ **Corpus par section** `kb/2026-11-15/` : voir la section Intégration pour l'envoi, le préfixe et l'ingestion.
+- ⬜ **Frontend (`ws/front-ae`)** : libellés par motif, badge neutre, bouton de comparaison, échelle unique, mentions du lot D, citations fixées, anciens runs. Démarre après la fusion du rafraîchissement visuel.
+- ⬜ **Déploiement** : `build_lambdas.sh` + `terraform apply` avec `kb_citable_corpus_version = "2026-11-15"` + frontend, ensemble. Backend avant frontend.
+- ⬜ **Lot F (hors périmètre)** : traduire avant le Guardrail (`routes/messages.py`).
+- E3 (textes français officiels) : reporté ; `doc_id`, `section` et `langue` sont conservés dans les métadonnées.
+
 ## Intégration (humain, après fusion)
 
 État au 2026-11-14 :
