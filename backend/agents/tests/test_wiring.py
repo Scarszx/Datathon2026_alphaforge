@@ -26,8 +26,10 @@ def test_les_13_outils_du_contrat_sont_enregistres():
 
 @pytest.mark.parametrize("component", [a for a in CONTRACT["agents"] if a.get("status") == "retenu"] + CONTRACT["modules"], ids=lambda c: c["id"])
 def test_droits_conformes_au_contrat(component):
-    declared = component.get("allowed_tools", component.get("uses_tools", []))
+    declared = component.get("allowed_tools", component.get("uses_tools", [])) + component.get("code_tools", [])
     assert sorted(GRANTS[component["id"]]) == sorted(TOOL_NAME_BY_ID[t] for t in declared)
+    if component["id"] == "agent-auditor":  # 0.4.3 : le modèle n'a aucun outil, le code de l'auditeur seul passe par la toolbox
+        assert component["allowed_tools"] == []
 
 
 def test_limites_et_modeles_conformes_au_contrat():

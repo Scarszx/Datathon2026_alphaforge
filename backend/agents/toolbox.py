@@ -19,7 +19,7 @@ from backend.agents.tools.context import RequestContext
 # Contrat v0.4.0 : agents.allowed_tools et modules.uses_tools (noms d'outils).
 GRANTS: dict[str, list[str]] = {
     "agent-orchestrator": ["get_portfolio", "get_profile", "search_assets", "propose_mandate", "read_evidence"],
-    "agent-auditor": ["search_regulation", "read_evidence"],
+    "agent-auditor": ["search_regulation"],  # 0.4.3 : appelé par le code de l'auditeur, le modèle n'a aucun outil
     "agent-writer": ["read_evidence"],
     "module-engine": ["get_prices", "get_macro", "compute_metrics", "get_portfolio", "portfolio_impact", "stress_test", "concentration"],
     "module-rules": ["check_rules"],
