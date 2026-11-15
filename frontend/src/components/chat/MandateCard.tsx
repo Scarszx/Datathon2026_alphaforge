@@ -29,7 +29,7 @@ export default function MandateCard({ mandate, confirmed, lang }: { mandate: Man
             {" "}<FieldSourceTag field="maxAcceptableLossPct" mandate={mandate} lang={lang} />
             {confirmed && <span className="muted small"> · {t("mandate.riskProfile", lang)} : {confirmed.riskProfile}</span>}
           </td></tr>
-          {mandate.subjectTicker && <tr><td>{t("mandate.subject", lang)}</td><td><strong>{mandate.subjectTicker}</strong></td></tr>}
+          {mandate.subjectTicker && <tr><td>{t("mandate.subject", lang)}</td><td><strong>{mandate.subjectTicker}</strong> <FieldSourceTag field="subjectTicker" mandate={mandate} lang={lang} /></td></tr>}
           {mandate.operations?.length ? (
             <tr><td>{t("mandate.operations", lang)}</td><td>
               <ul className="mandate-ops">
