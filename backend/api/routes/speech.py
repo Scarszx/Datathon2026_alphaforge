@@ -1,4 +1,5 @@
-"""POST /v1/speech/session : URL WebSocket signée pour Amazon Transcribe Streaming.
+"""POST /v1/speech/session : URL WebSocket signée pour Amazon Transcribe Streaming
+(détection de la langue parlée entre fr-CA et en-US).
 
 La Lambda ne reçoit ni audio ni texte : elle signe seulement l'URL (SigV4, 300 s)
 que le navigateur ouvre ensuite directement vers Transcribe. Le navigateur n'a pas
@@ -19,6 +20,9 @@ from backend.common.http import json_response
 from backend.common.validation import parse_json_body, validate_speech_session
 
 LANGUAGE_CODES = {"fr": "fr-CA", "en": "en-US"}
+# Langue parlée détectée par Transcribe (0.4.10) : une seule variante par langue est acceptée
+# (fr-CA avec fr-FR est refusé). La langue de l'interface n'est que la langue préférée.
+LANGUAGE_OPTIONS = list(LANGUAGE_CODES.values())
 SAMPLE_RATE = 16000
 EXPIRES_IN = 300  # maximum accepté par Transcribe Streaming
 
@@ -34,7 +38,9 @@ def create_session(event: dict[str, Any], user_id: str) -> dict[str, Any]:
     language_code = LANGUAGE_CODES[lang]
     query = urlencode(
         {
-            "language-code": language_code,
+            "identify-language": "true",
+            "language-options": ",".join(LANGUAGE_OPTIONS),
+            "preferred-language": language_code,
             "media-encoding": "pcm",
             "sample-rate": str(SAMPLE_RATE),
         }
@@ -49,6 +55,7 @@ def create_session(event: dict[str, Any], user_id: str) -> dict[str, Any]:
         {
             "url": request.url.replace("https://", "wss://", 1),
             "languageCode": language_code,
+            "languageOptions": LANGUAGE_OPTIONS,
             "sampleRate": SAMPLE_RATE,
             "expiresIn": EXPIRES_IN,
         },

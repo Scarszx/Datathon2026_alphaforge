@@ -9,24 +9,32 @@ export const MAX_SESSION_MS = 60_000; // arrêt automatique, pour limiter le co�
 
 const codec = new EventStreamCodec(toUtf8, fromUtf8);
 
-/** Rééchantillonnage linéaire en flux (d'une fréquence quelconque vers 16 kHz) puis Float32 → Int16. */
+/** Rééchantillonnage en flux vers 16 kHz par moyenne sur la fenêtre de chaque échantillon de sortie
+ * (filtre passe-bas en boîte, sans repliement de spectre), puis Float32 → Int16. Identité si les
+ * fréquences sont égales. */
 export class PcmResampler {
   private readonly step: number;
-  private pos = 0; // position dans le bloc courant ; -1 = entre le dernier échantillon précédent et le premier
-  private prev = 0;
-  constructor(inRate: number, outRate = TARGET_RATE) { this.step = inRate / outRate; }
+  private acc = 0;
+  private need: number; // largeur restante de l'échantillon de sortie en cours, en échantillons d'entrée
+  constructor(inRate: number, outRate = TARGET_RATE) { this.step = inRate / outRate; this.need = this.step; }
 
   process(chunk: Float32Array): Int16Array {
     const out: number[] = [];
-    const at = (k: number) => (k < 0 ? this.prev : chunk[k]);
-    while (Math.floor(this.pos) + 1 < chunk.length) {
-      const i = Math.floor(this.pos);
-      const f = this.pos - i;
-      const x = at(i) * (1 - f) + at(i + 1) * f;
-      out.push(Math.round(Math.max(-1, Math.min(1, x)) * (x < 0 ? 0x8000 : 0x7fff)));
-      this.pos += this.step;
+    for (let n = 0; n < chunk.length; n++) {
+      let left = 1;
+      while (left > 1e-9) {
+        const take = Math.min(left, this.need);
+        this.acc += chunk[n] * take;
+        this.need -= take;
+        left -= take;
+        if (this.need <= 1e-9) {
+          const x = Math.max(-1, Math.min(1, this.acc / this.step));
+          out.push(Math.round(x * (x < 0 ? 0x8000 : 0x7fff)));
+          this.acc = 0;
+          this.need = this.step;
+        }
+      }
     }
-    if (chunk.length) { this.pos -= chunk.length; this.prev = chunk[chunk.length - 1]; }
     return Int16Array.from(out);
   }
 }

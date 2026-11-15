@@ -124,9 +124,11 @@ export default function ConversationColumn({
 
   function submit(e: FormEvent) {
     e.preventDefault();
-    const text = v.trim();
+    // Le texte en cours de reconnaissance fait partie du message : on l'ajoute avant d'abandonner la dictée.
+    const text = appendSpeech(v, partial, MAX_LEN).trim();
     if (!text || busy) return;
-    speech.stop();
+    speech.abort();
+    setPartial("");
     setV("");
     onSend(text);
   }
@@ -150,7 +152,7 @@ export default function ConversationColumn({
             placeholder={t("chat.placeholder", lang)} aria-label={t("chat.send", lang)} maxLength={MAX_LEN} />
           {speech.supported && (
             <button type="button" className={`af-mic${speech.state === "listening" ? " listening" : ""}`}
-              disabled={busy || speech.state === "connecting"} aria-pressed={speech.state === "listening"}
+              disabled={busy || speech.state === "connecting" || speech.state === "finishing"} aria-pressed={speech.state === "listening"}
               aria-label={t(speech.state === "listening" ? "chat.mic.stop" : "chat.mic.start", lang)}
               title={t(speech.state === "listening" ? "chat.mic.stop" : "chat.mic.start", lang)}
               onClick={() => (speech.state === "listening" ? speech.stop() : void speech.start())}>
@@ -159,7 +161,7 @@ export default function ConversationColumn({
               </svg>
             </button>
           )}
-          <button type="submit" className="af-send" disabled={busy || !v.trim()} aria-label={t("chat.send", lang)}>↑</button>
+          <button type="submit" className="af-send" disabled={busy || !(v.trim() || partial.trim())} aria-label={t("chat.send", lang)}>↑</button>
         </form>
         {(partial || speech.state === "denied" || speech.state === "error") && (
           <p className={`af-mic-note${speech.state === "denied" || speech.state === "error" ? " err" : ""}`} role="status">

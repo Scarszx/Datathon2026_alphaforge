@@ -34,6 +34,7 @@ def test_session_fr_par_defaut_sans_corps():
     assert response["statusCode"] == 200
     body = body_of(response)
     assert body["languageCode"] == "fr-CA"
+    assert body["languageOptions"] == ["fr-CA", "en-US"]
     assert body["sampleRate"] == 16000
     assert body["expiresIn"] == 300
     assert body["url"].startswith(
@@ -46,7 +47,11 @@ def test_url_signee_avec_les_parametres_attendus():
     assert response["statusCode"] == 200
     assert body_of(response)["languageCode"] == "en-US"
     q = _query(response)
-    assert q["language-code"] == ["en-US"]
+    assert "language-code" not in q  # remplacé par la détection de la langue
+    assert q["identify-language"] == ["true"]
+    assert q["language-options"] == ["fr-CA,en-US"]
+    assert q["preferred-language"] == ["en-US"]
+    assert body_of(response)["languageOptions"] == ["fr-CA", "en-US"]
     assert q["media-encoding"] == ["pcm"]
     assert q["sample-rate"] == ["16000"]
     assert q["X-Amz-Expires"] == ["300"]
