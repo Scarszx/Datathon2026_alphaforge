@@ -84,7 +84,7 @@ function RiskQuestionnaire({ userId }: { userId: string }) {
               <ul className="risk-portfolios">
                 {shown.map((id) => <li key={id}><span>{name(id)}</span><strong>{stored[id].value.toFixed(2)}</strong><span className="muted small">score {stored[id].score}/{SCORE_MAX}</span></li>)}
               </ul>
-            ) : <p className="muted small">{portfolios === null ? "Chargement…" : "Aucun portefeuille pour l'instant."}</p>}
+            ) : <p className="muted small">{portfolios === null ? "Chargement…" : "Votre portefeuille est vide pour le moment."}</p>}
           </div>
           <div><button type="button" className="btn" onClick={() => { setMsg(""); setEditing(true); }}>Modifier mes réponses</button></div>
         </div>

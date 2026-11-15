@@ -29,8 +29,8 @@ export default function Landing() {
       <main className="wrap">
         <section className="landing-hero">
           <div className="eyebrow">Pour investisseurs particuliers<span className="tag">Simulation</span></div>
-          <h1 className="big filled">Votre portefeuille,<br />enfin clair.</h1>
-          <p className="lead">Suivez vos placements, comprenez votre risque et posez vos questions à un assistant IA, sans aucune transaction réelle.</p>
+          <h1 className="big filled">Vos placements,<br />expliqués simplement.</h1>
+          <p className="lead">Suivez la valeur, la répartition et le risque de vos positions, et posez vos questions à l'assistant. Aucune transaction réelle, aucun conseil financier.</p>
           <div className="actions-row">
             <Link to="/inscription" className="btn">Créer un compte</Link>
             <a href="#profil" className="link">Découvrir mon profil d'investisseur →</a>
