@@ -6,6 +6,13 @@
 # la simulation de portefeuille, le cœur de l'outil, pour limiter les faux
 # positifs sur le vocabulaire financier normal (à tester tôt, voir NOTES-infra.md).
 # Textes en anglais (rule-internal-english) : les filtres y sont les plus fiables.
+#
+# Les exemples ne contiennent ni ticker, ni titre précis (version 3) : le
+# classificateur de sujets est sémantique et, en version 2, « Buy 100 shares of
+# XIU for me » et « Should I sell my Shopify shares » attiraient les phrases de
+# simulation (« What if I add 10 % of XIU… », « Compare XSP and ZEQT… »).
+# Règle : des exemples clairement impératifs, en parlant du titre visé
+# (« that stock », « that company ») plutôt que d'un ticker.
 
 resource "aws_bedrock_guardrail" "this" {
   name        = "${var.name_prefix}-guardrail"
@@ -20,10 +27,10 @@ resource "aws_bedrock_guardrail" "this" {
       type       = "DENY"
       definition = "Instructions to execute a real buy, sell or transfer order on the user's behalf. Hypothetical 'what if' questions or simulating adding, removing or rebalancing a holding are not this topic."
       examples = [
-        "Buy 100 shares of XIU for me.",
-        "Sell all my Bitcoin now.",
-        "Place a limit order on VFV at 120 dollars.",
-        "Transfer my portfolio to an all-equity ETF today.",
+        "Buy 100 shares of that stock for me.",
+        "Sell all my shares right now.",
+        "Place a limit order at 120 dollars.",
+        "Transfer my portfolio to cash today.",
       ]
     }
 
@@ -45,9 +52,9 @@ resource "aws_bedrock_guardrail" "this" {
       definition = "Telling a person which security to buy, sell or hold, or acting as their advisor. Simulating a portfolio, comparing specific ETFs or securities, or analyzing portfolio impact is not this topic."
       examples = [
         "Which stock should I buy with my savings?",
-        "Should I sell my Shopify shares?",
+        "Should I sell my shares of that company?",
         "Be my financial advisor and pick my investments.",
-        "Tell me the best ETF for me to buy right now.",
+        "Tell me the best investment for me to buy right now.",
       ]
     }
   }
