@@ -12,6 +12,7 @@ from __future__ import annotations
 import difflib
 import json
 import re
+import unicodedata
 from datetime import date
 from typing import Any
 
@@ -32,6 +33,14 @@ from backend.common.repositories import users as users_repo
 from backend.common.validation import validate_mandate_create
 
 MAX_ASSETS = 20
+MAX_SEARCH_TERMS = 8
+MIN_FUZZY_CHARS = 4  # sous ce seuil, pas de repli par sous-chaîne : « PM » ne doit pas trouver JPM
+# Noms français courants des émetteurs de l'univers (les noms de l'univers sont en anglais).
+NAME_ALIASES = {
+    "banque royale": "royal bank", "banque td": "toronto dominion", "banque de montreal": "bank of montreal",
+    "banque scotia": "nova scotia", "banque de la nouvelle ecosse": "nova scotia",
+    "banque nationale": "national bank", "banque canadienne imperiale de commerce": "imperial commerce",
+}
 MAX_POINTS = 260
 MAX_METRIC_TICKERS = 20
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -61,24 +70,94 @@ def _unknown_ticker(ctx: RequestContext, ticker: str) -> dict[str, Any]:
 # --- orchestrateur --------------------------------------------------------
 
 
+def _norm(text: Any) -> str:
+    """Minuscules, sans accents, ponctuation remplacée par des espaces (« Coca-Cola » = « coca cola »)."""
+    plain = unicodedata.normalize("NFKD", str(text or "")).encode("ascii", "ignore").decode()
+    return " ".join(re.sub(r"[^a-z0-9]+", " ", plain.lower()).split())
+
+
+def _split_terms(query: str) -> list[str]:
+    terms = [t.strip() for t in re.split(r"[,;\n]+", query) if t.strip()]
+    return terms[:MAX_SEARCH_TERMS]
+
+
+def _matches(term: str, ticker_n: str, name_n: str) -> int | None:
+    """Rang de la correspondance (0 symbole exact, 1 début de symbole, 2 tous les mots, 3 sous-chaîne), sinon None."""
+    needle = NAME_ALIASES.get(term, term)
+    hay_tokens = (ticker_n + " " + name_n).split()
+    if term == ticker_n:
+        return 0
+    if ticker_n.startswith(term):
+        return 1
+    tokens = needle.split()
+    if tokens and all((t in hay_tokens) if len(t) == 1 else any(h.startswith(t) for h in hay_tokens) for t in tokens):
+        return 2
+    if len(needle) >= MIN_FUZZY_CHARS and needle in (ticker_n + " " + name_n):
+        return 3
+    return None
+
+
 def search_assets(ctx: RequestContext, query: str, asset_class: str | None = None) -> dict[str, Any]:
     if not isinstance(query, str) or not query.strip():
         return _error("query must be a non-empty string (name or symbol).")
-    needle = query.strip().lower()[:100]
+    terms = _split_terms(query[:400])
+    if not terms:
+        return _error("query must be a non-empty string (name or symbol).")
     universe = ctx.store.universe()
-    items = []
-    for ticker, row in universe.iterrows():
-        if asset_class and str(row["asset_class"]).lower() != asset_class.lower():
+    rows = [
+        (ticker, row, _norm(ticker), _norm(row["name"]))
+        for ticker, row in universe.iterrows()
+        if not asset_class or str(row["asset_class"]).lower() == asset_class.lower()
+    ]
+    multi = len(terms) > 1
+    per_term = max(MAX_ASSETS // len(terms), 3) if multi else MAX_ASSETS
+    items: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    not_found: list[dict[str, Any]] = []
+    for term in terms:
+        term_n = _norm(term)
+        found = []
+        for ticker, row, ticker_n, name_n in rows:
+            rank = _matches(term_n, ticker_n, name_n)
+            if rank is not None:
+                found.append((rank, ticker, row))
+        found.sort(key=lambda x: (x[0], x[1]))
+        if not found:
+            # Symboles proches (suffixe de place retiré : « RCI.A » ~ « RCI-B.TO »), seuil serré pour éviter le bruit.
+            scored = sorted(
+                ((difflib.SequenceMatcher(None, term_n, _norm(t.split(".")[0])).ratio(), t) for t, _, _, _ in rows),
+                key=lambda x: (-x[0], x[1]),
+            )
+            not_found.append({"query": term, "closest": [t for r, t in scored if r >= 0.8][:3]})
             continue
-        name = str(row["name"] or "")
-        if needle in ticker.lower() or needle in name.lower():
-            score = 0 if ticker.lower() == needle else 1 if ticker.lower().startswith(needle) else 2
-            items.append((score, ticker, {
-                "ticker": ticker, "name": name, "assetClass": row["asset_class"],
+        for _, ticker, row in found[:per_term]:
+            if ticker in seen:
+                continue
+            seen.add(ticker)
+            item = {
+                "ticker": ticker, "name": str(row["name"] or ""), "assetClass": row["asset_class"],
                 "sector": row["sector"], "currency": row["currency"],
-            }))
-    items.sort(key=lambda x: (x[0], x[1]))
-    return {"items": [item for _, _, item in items[:MAX_ASSETS]]}
+            }
+            if multi:
+                item["query"] = term  # quelle saisie a trouvé ce titre
+            items.append(item)
+    result: dict[str, Any] = {"items": items[:MAX_ASSETS]}
+    if not_found:
+        result["notFound"] = not_found  # saisies sans correspondance, avec les symboles proches
+    return result
+
+
+def _holding(ctx: RequestContext, h: dict[str, Any]) -> dict[str, Any]:
+    """Position + nom, classe, secteur et devise lus dans l'univers : l'orchestrateur ne décrit pas le contenu de mémoire."""
+    universe = ctx.store.universe()
+    row = universe.loc[h["ticker"]] if h["ticker"] in universe.index else None
+    return {
+        "ticker": h["ticker"], "quantity": h["quantity"], "avgCost": h["avgCost"],
+        "name": None if row is None else str(row["name"] or ""),
+        "assetClass": None if row is None else row["asset_class"],
+        "sector": None if row is None else row["sector"],
+        "currency": None if row is None else row["currency"],
+    }
 
 
 def get_portfolio(ctx: RequestContext) -> dict[str, Any]:
@@ -88,10 +167,7 @@ def get_portfolio(ctx: RequestContext) -> dict[str, Any]:
     return {
         "portfolioId": portfolio["portfolioId"],
         "baseCurrency": portfolio["baseCurrency"],
-        "holdings": [
-            {"ticker": h["ticker"], "quantity": h["quantity"], "avgCost": h["avgCost"]}
-            for h in portfolio.get("holdings", [])
-        ],
+        "holdings": [_holding(ctx, h) for h in portfolio.get("holdings", [])],
     }
 
 

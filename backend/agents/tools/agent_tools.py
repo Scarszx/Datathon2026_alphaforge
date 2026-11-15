@@ -31,7 +31,9 @@ def _text(result: dict[str, Any]) -> str:
 
 @tool(context=True)
 def get_portfolio(tool_context: ToolContext) -> str:
-    """Return the current user's portfolio holdings (ticker, quantity, average cost in the listing currency).
+    """Return the current user's portfolio holdings (ticker, name, asset class, sector, currency, quantity, average cost in the listing currency).
+
+    Describe the portfolio only from these fields, never from memory.
 
     The user and the portfolio come from the request context; this tool takes no parameter.
     """
@@ -52,9 +54,13 @@ def search_assets(query: str, tool_context: ToolContext, asset_class: str | None
     """Search the dataset universe by name or symbol and return at most 20 assets.
 
     Use it to turn a name the user typed (for example "Nvidia") into the exact symbol required by a mandate.
+    To look up several names, send them in ONE call separated by commas (for example "apple, coca cola, nestle"):
+    never make one call per name, the number of tool calls per turn is limited. Accents and punctuation are
+    ignored. Each item then carries the "query" that found it, and "notFound" lists the inputs with no match,
+    with the closest symbols; a name absent from both lists is not in the universe.
 
     Args:
-        query: Name or symbol to look for, in English (for example "nvidia", "RY.TO", "bond").
+        query: Name(s) or symbol(s) to look for, comma-separated (for example "nvidia", "RY.TO, bond", "royal bank").
         asset_class: Optional filter: equity, etf_equity, etf_bond, etf_commodity, crypto.
     """
     return _text(_call(tool_context, "search_assets", query=query, asset_class=asset_class))

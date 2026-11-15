@@ -29,6 +29,30 @@ def test_search_assets(ctx):
     assert "error" in catalog.search_assets(ctx, "  ")
 
 
+def test_search_assets_plusieurs_noms_en_un_appel(ctx):
+    result = catalog.search_assets(ctx, "nvda, bond, zzzunknown")
+    assert {"NVDA", "XBB.TO"} <= {i["ticker"] for i in result["items"]}
+    assert all("query" in i for i in result["items"])  # chaque titre dit quelle saisie l'a trouvé
+    assert [n["query"] for n in result["notFound"]] == ["zzzunknown"]
+    assert len(result["items"]) <= catalog.MAX_ASSETS
+    # un seul nom : forme inchangée, pas de champ « query » ni de notFound
+    single = catalog.search_assets(ctx, "nvda")
+    assert "notFound" not in single and "query" not in single["items"][0]
+
+
+def test_search_assets_accents_ponctuation_et_alias(ctx):
+    assert catalog.search_assets(ctx, "NVDA")["items"][0]["ticker"] == "NVDA"
+    assert catalog.search_assets(ctx, "Nvidia ")["items"][0]["ticker"] == "NVDA"
+    # « PM » ne doit pas retomber sur un symbole qui le contient (JPM) : suggestion, pas résultat
+    assert catalog.search_assets(ctx, "zz")["items"] == []
+    assert _norm_ok()
+
+
+def _norm_ok():
+    return (catalog._norm("Coca-Cola") == "coca cola" and catalog._norm("Nestlé") == "nestle"
+            and catalog._norm("RCI.A") == "rci a")
+
+
 def test_get_prices_plafond_et_bascule_de_frequence(ctx):
     result = catalog.get_prices(ctx, "SPY", "2021-11-12", "2026-11-12")
     assert len(result["points"]) <= catalog.MAX_POINTS and result["frequency"] in ("weekly", "monthly")
@@ -95,7 +119,9 @@ def test_read_evidence(ctx):
 
 def test_outils_du_portefeuille_lisent_l_utilisateur_du_contexte(robert_session, store):
     ctx = RequestContext(user_id=USER, session_id=robert_session, store=store)
-    assert len(catalog.get_portfolio(ctx)["holdings"]) == 5
+    holdings = catalog.get_portfolio(ctx)["holdings"]
+    assert len(holdings) == 5
+    assert all({"name", "assetClass", "sector", "currency"} <= set(h) for h in holdings)  # décrit par l'outil, pas de mémoire
     other = RequestContext(user_id="intrus", session_id=robert_session, store=store)
     assert "error" in catalog.get_portfolio(other)
     assert catalog.get_profile(other) == {"investorProfile": None}
