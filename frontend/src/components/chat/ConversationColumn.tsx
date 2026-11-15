@@ -117,15 +117,21 @@ export default function ConversationColumn({
 }) {
   const [v, setV] = useState("");
   const [partial, setPartial] = useState("");
-  // Saisie vocale (0.4.8) : le texte final s'ajoute au champ, le partiel n'est qu'un aperçu ; l'envoi reste manuel.
+  // Saisie vocale (0.4.8) : le texte final s'ajoute à `v`, le texte provisoire s'affiche dans le champ à la suite
+  // de `v` (gris italique) et se remplace à chaque mise à jour ; l'envoi reste manuel.
   const speech = useSpeechToText(lang, (seg) => setV((cur) => appendSpeech(cur, seg, MAX_LEN)), setPartial);
+  const dictating = speech.state === "listening" || speech.state === "finishing";
+  const shown = appendSpeech(v, partial, MAX_LEN);
+  const field = useRef<HTMLInputElement>(null);
+  // Garde la fin de la phrase en cours visible quand elle dépasse la largeur du champ.
+  useEffect(() => { const el = field.current; if (el && partial) el.scrollLeft = el.scrollWidth; }, [partial]);
   const end = useRef<HTMLDivElement>(null);
   useEffect(() => { end.current?.scrollIntoView({ block: "end" }); }, [messages.length, busy]);
 
   function submit(e: FormEvent) {
     e.preventDefault();
     // Le texte en cours de reconnaissance fait partie du message : on l'ajoute avant d'abandonner la dictée.
-    const text = appendSpeech(v, partial, MAX_LEN).trim();
+    const text = shown.trim();
     if (!text || busy) return;
     speech.abort();
     setPartial("");
@@ -147,8 +153,9 @@ export default function ConversationColumn({
         <div ref={end} />
       </div>
       <div className="chat-col-foot">
-        <form className="af-composer" onSubmit={submit}>
-          <input value={v} onChange={(e) => setV(e.target.value)} onKeyDown={key}
+        <form className={`af-composer${partial ? " af-composer-live" : ""}`} onSubmit={submit}>
+          {/* Lecture seule pendant la dictée : une frappe copierait le texte provisoire dans `v`, qui serait réaffiché. */}
+          <input ref={field} value={shown} onChange={(e) => setV(e.target.value)} onKeyDown={key} readOnly={dictating}
             placeholder={t("chat.placeholder", lang)} aria-label={t("chat.send", lang)} maxLength={MAX_LEN} />
           {speech.supported && (
             <button type="button" className={`af-mic${speech.state === "listening" ? " listening" : ""}`}
@@ -161,11 +168,11 @@ export default function ConversationColumn({
               </svg>
             </button>
           )}
-          <button type="submit" className="af-send" disabled={busy || !(v.trim() || partial.trim())} aria-label={t("chat.send", lang)}>↑</button>
+          <button type="submit" className="af-send" disabled={busy || !shown.trim()} aria-label={t("chat.send", lang)}>↑</button>
         </form>
-        {(partial || speech.state === "denied" || speech.state === "error") && (
-          <p className={`af-mic-note${speech.state === "denied" || speech.state === "error" ? " err" : ""}`} role="status">
-            {speech.state === "denied" ? t("chat.mic.denied", lang) : speech.state === "error" ? t("chat.mic.error", lang) : partial}
+        {(speech.state === "denied" || speech.state === "error") && (
+          <p className="af-mic-note err" role="status">
+            {speech.state === "denied" ? t("chat.mic.denied", lang) : t("chat.mic.error", lang)}
           </p>
         )}
         <p className="af-disclaimer">{t("app.disclaimer", lang)}</p>
