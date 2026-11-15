@@ -1,12 +1,23 @@
 application:
   name: "AlphaForge"
-  version: "0.4.8"
+  version: "0.4.9"
   description: "Banc d'essai agentique et auto-explicatif pour l'investisseur autonome : il cadre l'intention, simule son impact sur le portefeuille et l'audite contre les textes réglementaires canadiens (simulation seulement). Datathon 2026."
-  status: "validé par l'équipe (0.4.0 le 2026-11-14, 0.4.1 le 2026-11-15) ; 0.4.2 et 0.4.3 validées par l'utilisateur le 2026-11-15, à relire par l'équipe ; 0.4.4 à 0.4.7 demandées par l'utilisateur le 2026-11-15 (lots A, B, C et E), à relire par l'équipe ; 0.4.8 demandée par l'utilisateur le 2026-11-15 (saisie vocale), à relire par l'équipe"
+  status: "validé par l'équipe (0.4.0 le 2026-11-14, 0.4.1 le 2026-11-15) ; 0.4.2 et 0.4.3 validées par l'utilisateur le 2026-11-15, à relire par l'équipe ; 0.4.4 à 0.4.7 demandées par l'utilisateur le 2026-11-15 (lots A, B, C et E), à relire par l'équipe ; 0.4.8 demandée par l'utilisateur le 2026-11-15 (saisie vocale), à relire par l'équipe ; 0.4.9 demandée par l'utilisateur le 2026-11-15 (jeu de données aligné sur le script du collègue), à relire par l'équipe"
   solution_ref: "SOLUTION.md (racine du dépôt) : décisions de produit et de conception détaillées"
   # Règle d'équipe : ce fichier est la référence. Toute modification passe par un accord de l'équipe.
   # Voir aussi : la page de présentation du contrat (même contenu, avec schémas).
   changelog:
+    - version: "0.4.9"
+      date: "2026-11-15"
+      status: "demandé par l'utilisateur le 2026-11-15 (jeu de données, code sur la branche ws/dataset-yf, pas encore déployé) ; à relire par l'équipe"
+      summary:
+        - "storage-dataset : nommage du code de calcul du collègue. universe.parquet : la colonne ticker devient symbol. Fichiers de prix : ticker devient symbol et adj_close devient adjclose (prices/{symbol}.parquet, prices_all). corporate_actions.parquet : symbol. Les routes, schémas et champs d'API (ticker des portefeuilles, des mandats et des réponses) ne changent pas."
+        - "universe.parquet : colonnes industry et country (Yahoo Finance pour actions, FNB et indice; country de repli = suffixe du ticker; nulles pour les cryptos), asset_class « index » pour ^GSPC. Un indice est une référence de comparaison : jamais cherchable ni acceptable dans un mandat ou un portefeuille."
+        - "Univers : nos actifs conservés (universe.yaml), plus les 400 plus grosses capitalisations du S&P 500 absentes (liste Wikipédia et capitalisation Yahoo au jour de l'extraction) et ^GSPC. Historique depuis 2015-01-01 pour tout le jeu."
+        - "tool-concentration : le pays vient de la colonne country quand elle existe (Canada → CA, United States → US), sinon de l'ancienne règle du suffixe."
+      impacts_to_handle:
+        - "Un jeu 0.4.9 et les Lambdas qui le lisent passent ensemble : l'ancien code ne lit ni symbol ni adjclose, et le nouveau ne lit pas les anciens jeux. L'ancienne version reste intacte dans le bucket (retour arrière = ancienne DATASET_VERSION et ancien code)."
+        - "infra : dataset_version, téléversement du nouveau jeu, reconstruction des deux Lambdas; backend/api/tickers.json régénéré (indices exclus)."
     - version: "0.4.8"
       date: "2026-11-15"
       status: "demandé par l'utilisateur le 2026-11-15 (saisie vocale, pas encore déployé) ; à relire par l'équipe"
@@ -617,7 +628,7 @@ data_schemas:
       - { name: "id", type: "string", required: true, description: "ex. prices_daily" }
       - { name: "dataset", type: "string", description: "chemin versionné ex. prices/RY.TO.parquet@2026-11-12" }
       - { name: "asOf", type: "string", description: "date d'extraction ou de dernière observation" }
-      - { name: "note", type: "string", description: "ex. adj_close, devise de cotation" }
+      - { name: "note", type: "string", description: "ex. adjclose, devise de cotation" }
 
   - id: "schema-explanation-step"
     fields:
@@ -929,9 +940,9 @@ storage:
       - path: "dataset/{version}/manifest.json"
         content: "source, date d'extraction, liste des tickers, devises, traitements, version"
       - path: "dataset/{version}/universe.parquet"
-        content: "une ligne par actif : asset_id, ticker, name, asset_class, market, currency, sector + indicateurs précalculés (rendement 1 an, volatilité 1 an, baisse maximale 1 an)"
-      - path: "dataset/{version}/prices/{ticker}.parquet"
-        content: "date, open, high, low, close, adj_close, volume, currency"
+        content: "une ligne par actif : asset_id, symbol, name, asset_class (equity, etf_*, crypto, index), market, currency, sector, sector_source, industry, country + indicateurs précalculés (rendement 1 an, volatilité 1 an, baisse maximale 1 an)"
+      - path: "dataset/{version}/prices/{symbol}.parquet"
+        content: "date, symbol, open, high, low, close, adjclose, volume, currency"
       - path: "dataset/{version}/prices_all/year=YYYY/*.parquet"
         content: "mêmes colonnes, tous les titres, par année (analyses croisées)"
       - path: "dataset/{version}/fx/usdcad.parquet"
@@ -946,7 +957,7 @@ storage:
     written_by: ["job-ingestion"]
     notes:
       - "La version lue est fixée par une variable d'environnement de la Lambda. Elle est citée dans explanation.sources."
-      - "adj_close sert aux rendements. close n'est ajusté que pour les fractionnements. Les prix sont dans la devise de cotation (.TO = CAD, le reste = USD)."
+      - "adjclose sert aux rendements. close n'est ajusté que pour les fractionnements. Les prix sont dans la devise de cotation (.TO = CAD, le reste = USD)."
       - "Pas de remplissage ni d'alignement de calendrier dans les données : les outils doivent signaler les jours sans cours."
       - "Ne pas mettre les CSV dans le dépôt public (conditions d'utilisation de Yahoo). Mettre le script d'ingestion et une note dans le README."
       - "macro.parquet porte une colonne publication_date pour les séries mensuelles (IPC, chômage) : aucune valeur n'est utilisée avant cette date (R10)."
@@ -971,7 +982,7 @@ jobs:
     owner_agent: "Agent-Data"
     reads_from: ["ext-yahoo-finance", "ext-bank-of-canada", "ext-fred"]
     writes_to: ["storage-dataset"]
-    base: "alphaforge_starter/build_dataset.py (jeu fourni : 31 actifs, 2021-11-12 à 2026-11-12), élargi par l'équipe (2026-11-14) à environ 250 actifs (FNB canadiens courants dont XSP.TO et ZEQT.TO, S&P/TSX 60, grandes capitalisations et FNB américains, 3 cryptos) sur 10 ans; liste de candidats dans data/ingestion/universe.yaml, chaque ticker validé à l'ingestion (SOLUTION.md section 10)"
+    base: "alphaforge_starter/build_dataset.py (jeu fourni : 31 actifs, 2021-11-12 à 2026-11-12), élargi par l'équipe (2026-11-14) à environ 250 actifs, puis (0.4.9) aux 400 plus grosses capitalisations du S&P 500 et à ^GSPC depuis 2015-01-01; à l'origine environ 250 actifs (FNB canadiens courants dont XSP.TO et ZEQT.TO, S&P/TSX 60, grandes capitalisations et FNB américains, 3 cryptos) sur 10 ans; liste de candidats dans data/ingestion/universe.yaml, chaque ticker validé à l'ingestion (SOLUTION.md section 10)"
     outputs: ["Parquet par ticker", "universe.parquet avec indicateurs", "manifest.json"]
     deadline_note: "Le compte AWS d'équipe est supprimé le 2026-11-16 en fin de journée : code sur GitHub, données sur les portables."
 
@@ -987,7 +998,7 @@ external_sources:
   - id: "ext-yahoo-finance"
     name: "Yahoo Finance via yfinance"
     used_by: ["job-ingestion"]
-    limits: "non officiel, limites de débit possibles, adj_close change si on retélécharge"
+    limits: "non officiel, limites de débit possibles, adjclose change si on retélécharge"
   - id: "ext-bank-of-canada"
     name: "Banque du Canada (API Valet)"
     used_by: ["job-ingestion"]
@@ -1069,7 +1080,7 @@ modules:
     role: "Construit les scénarios 0/1/2 et calcule : rendement, volatilité annualisée, pire baisse, tests de résistance (2022, krach COVID 2020 dérivé de SPY, hausse des taux dérivée de V39079/DFF, krach crypto dérivé de BTC-USD), concentration par titre, secteur, pays et devise (avec composition des FNB), corrélations. Chaque résultat est inscrit au registre (EV-nn)."
     uses_tools: ["tool-get-prices", "tool-get-macro", "tool-compute-metrics", "tool-get-portfolio", "tool-portfolio-impact", "tool-stress-test", "tool-concentration"]
     rules:
-      - "adj_close, conversion en CAD avec report du dernier taux; devise native aussi affichée."
+      - "adjclose, conversion en CAD avec report du dernier taux; devise native aussi affichée."
       - "Annualisation √252 (actions, FNB) et √365 (crypto); portefeuilles sur l'intersection des jours ouvrés nord-américains."
       - "Comparaison (scénario 2, 0.4.5) : seulement si le mandat porte compareCategory. Même montant, chaque titre ajouté remplacé par la catégorie choisie par l'utilisateur, sans jugement du titre. Le FNB utilisé pour le calcul n'est nommé que dans method et source de la preuve (« calculation only, not a selection »)."
     owner_agent: "Agent-Backend-Agents"
@@ -1103,7 +1114,7 @@ tools:
 
   - id: "tool-get-prices"
     name: "get_prices"
-    description: "Prix ajustés (adj_close) d'un actif, dans sa devise de cotation."
+    description: "Prix ajustés (adjclose) d'un actif, dans sa devise de cotation."
     used_by: ["module-engine"]
     params:
       - { name: "ticker", type: "string", required: true, validation: "doit exister dans universe.parquet" }
@@ -1111,7 +1122,7 @@ tools:
       - { name: "end", type: "string", required: true, format: "YYYY-MM-DD, au plus 5 ans après start" }
       - { name: "frequency", type: "string", enum: ["daily", "weekly", "monthly"], default: "daily" }
     returns: "{ ticker, currency, frequency, adjusted, points: [[date, valeur]], source, notes[] } avec 260 points maximum (bascule en hebdomadaire ou mensuel au-delà)"
-    reads: ["storage-dataset: prices/{ticker}.parquet"]
+    reads: ["storage-dataset: prices/{symbol}.parquet"]
     behavior:
       - "Un jour sans cours (férié, week-end) n'est pas inventé : la note dit quel dernier cours a été utilisé."
       - "Ticker inconnu : message qui dit quoi corriger et propose les plus proches, pas d'exception."
@@ -1139,9 +1150,9 @@ tools:
       - { name: "end", type: "string", required: true, format: "YYYY-MM-DD" }
       - { name: "metrics", type: "array", items_type: "string", enum: ["total_return", "volatility", "max_drawdown", "correlation"], required: true }
     returns: "{ metrics: { ticker: { total_return, volatility, max_drawdown } }, correlation: matrice, period, assumptions[], source }"
-    reads: ["storage-dataset: prices/{ticker}.parquet", "storage-dataset: fx/usdcad.parquet"]
+    reads: ["storage-dataset: prices/{symbol}.parquet", "storage-dataset: fx/usdcad.parquet"]
     behavior:
-      - "Utilise adj_close. Les séries sont alignées sur les dates communes et la méthode est écrite dans assumptions."
+      - "Utilise adjclose. Les séries sont alignées sur les dates communes et la méthode est écrite dans assumptions."
       - "Rendements exprimés dans la devise de cotation, ou convertis si demandé."
 
   - id: "tool-get-portfolio"
@@ -1254,7 +1265,7 @@ rules:
   - { id: "rule-explanation-from-trace", statement: "explanation est fidèle aux actions observées : sources, étapes, contrôles. Ne pas inventer de justification, ne pas exposer le raisonnement interne détaillé du modèle." }
   - { id: "rule-facts-vs-assumptions", statement: "Distinguer faits (issus des données), hypothèses et scénarios fictifs. Signaler les incertitudes et les données manquantes." }
   - { id: "rule-past-not-future", statement: "Le rendement passé décrit le passé; ne pas le présenter comme une prédiction." }
-  - { id: "rule-dataset-pinned", statement: "Toujours citer la version du jeu de données et la devise. Utiliser adj_close pour les rendements." }
+  - { id: "rule-dataset-pinned", statement: "Toujours citer la version du jeu de données et la devise. Utiliser adjclose pour les rendements." }
   - { id: "rule-no-real-data", statement: "Profils et portefeuilles entièrement fictifs. Aucune donnée bancaire ou client réelle." }
   - { id: "rule-contract-changes", statement: "Ce fichier est la référence commune. Une modification du contrat se discute en équipe avant d'être codée." }
   - { id: "rule-no-security-recommendation", statement: "Aucun texte ne recommande d'acheter, vendre ou conserver un titre précis. Les alternatives sont formulées par catégorie d'actifs (cadre OCRI GN-3200-26-001)." }
