@@ -99,6 +99,7 @@ Pour mettre à jour la liste embarquée de validation des tickers de la Lambda A
    - Les jours fériés diffèrent entre la Bourse de Toronto (`TSX`) et les marchés américains (`US`), et les cryptomonnaies (`BTC-USD`, `ETH-USD`, `SOL-USD`) cotent 7 jours sur 7 en jours civils UTC (00:00 à 24:00 UTC).
    - Aucun remplissage (*forward-fill*) n'est appliqué dans les fichiers Parquet : l'alignement des calendriers est effectué par le moteur de calcul au moment de l'analyse (calendrier natif par actif ; intersection des jours ouvrés nord-américains pour les portefeuilles et corrélations).
    - Le fichier `fx/usdcad.parquet` n'a pas de ligne les jours fériés canadiens ; le moteur reporte le dernier taux connu lors des conversions en CAD.
+   - **Le taux USD/CAD ne commence que le `2017-01-03`**, date de début de la série `FXUSDCAD` de l'API Valet de la Banque du Canada. Les prix commencent le `2016-11-12`. Dans le jeu `2026-11-14`, environ 3 250 lignes en USD (novembre et décembre 2016) ne peuvent donc pas être converties en CAD. Les mesures en CAD commencent au `2017-01-03` ; les mesures dans la devise d'origine peuvent utiliser toute la fenêtre. Les périodes de stress (fin 2018, COVID 2020, 2022) restent couvertes.
 
 2. **Ajustement rétroactif de `adj_close` et fractionnements (`splits`)** :
    - `adj_close` est ajusté rétroactivement par Yahoo Finance pour les fractionnements et les dividendes à partir de la date d'extraction. Si l'on retélécharge les données à une date ultérieure, les valeurs passées de `adj_close` changent.
