@@ -52,10 +52,10 @@ locals {
   front_bucket   = "${var.name_prefix}-front-${local.account_id}"
 
   # Modèles Bedrock des 3 agents LLM du contrat v0.4.0 (orchestrateur,
-  # auditeur, rédacteur ; Claude Opus 5.5 par défaut).
+  # auditeur, rédacteur ; Claude Sonnet 5.5 par défaut).
   # L'invocation bedrock-runtime exige un profil d'inférence : l'ID nu
-  # (anthropic.claude-opus-5-5) est refusé en on-demand throughput.
-  # Défaut : profil global (prix liste). Alternative : us.anthropic.claude-opus-5-5
+  # (anthropic.claude-sonnet-5-5) est refusé en on-demand throughput.
+  # Défaut : profil global (prix liste). Alternative : us.anthropic.claude-sonnet-5-5
   # (+10 %, routage limité aux régions US/Canada).
   model_ids = distinct([var.model_orchestrator, var.model_auditor, var.model_writer])
 

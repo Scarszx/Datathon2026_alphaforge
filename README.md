@@ -122,7 +122,7 @@ Ouvrir http://localhost:5173 et se connecter avec **demo** / **demo1234**. Le mo
 | Node.js | 18 ou plus (essayé avec 20) | front |
 | Terraform | 1.5 ou plus (fournisseur `hashicorp/aws` 6.x, version 6.62 ou plus) | infrastructure |
 | Compte AWS | région `us-east-1` | Lambda, API Gateway, DynamoDB, S3, CloudFront, Cognito, Bedrock |
-| Accès Bedrock | Claude Opus 5.5, Titan Text Embeddings V2 | agents et Knowledge Base |
+| Accès Bedrock | Claude Sonnet 5.5, Titan Text Embeddings V2 | agents et Knowledge Base |
 
 ### 1. Environnement Python et tests (sans réseau, sans AWS)
 
@@ -190,7 +190,7 @@ Le banc de fumée interroge le Guardrail, la Knowledge Base et un vrai tour de l
 | `USERS_TABLE`, `CONVERSATIONS_TABLE`, `MESSAGES_TABLE`, `PORTFOLIOS_TABLE`, `ANALYSES_TABLE` | Tables DynamoDB |
 | `KB_ID` | Identifiant de la Knowledge Base |
 | `GUARDRAIL_ID`, `GUARDRAIL_VERSION` | Guardrail Bedrock et version publiée |
-| `MODEL_ORCHESTRATOR`, `MODEL_AUDITOR`, `MODEL_WRITER` | Profils d'inférence Bedrock (défaut `global.anthropic.claude-opus-5-5`) |
+| `MODEL_ORCHESTRATOR`, `MODEL_AUDITOR`, `MODEL_WRITER` | Profils d'inférence Bedrock (défaut `global.anthropic.claude-sonnet-5-5`) |
 | `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_BASE_URL`, `LANGFUSE_SECRET_PARAM` | Traçage de développement (facultatif, voir ci-dessous) |
 | `LOG_LEVEL` | Niveau de journalisation |
 

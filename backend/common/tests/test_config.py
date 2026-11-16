@@ -70,10 +70,10 @@ def test_variables_optionnelles(monkeypatch, fonction, nom):
 
 
 def test_modele_par_agent(monkeypatch):
-    """Un modèle par agent, ex. Claude Opus 5.5 en us-east-1."""
-    monkeypatch.setenv("MODEL_ORCHESTRATOR", "global.anthropic.claude-opus-5-5")
-    monkeypatch.setenv("MODEL_AUDITOR", "global.anthropic.claude-opus-5-5")
-    monkeypatch.setenv("MODEL_WRITER", "global.anthropic.claude-opus-5-5")
+    """Un modèle par agent, ex. Claude Sonnet 5.5 en us-east-1."""
+    monkeypatch.setenv("MODEL_ORCHESTRATOR", "global.anthropic.claude-sonnet-5-5")
+    monkeypatch.setenv("MODEL_AUDITOR", "global.anthropic.claude-sonnet-5-5")
+    monkeypatch.setenv("MODEL_WRITER", "global.anthropic.claude-sonnet-5-5")
     assert config.model_orchestrator() == config.model_auditor() == config.model_writer()
 
 
