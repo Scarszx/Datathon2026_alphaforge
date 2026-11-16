@@ -72,7 +72,7 @@ def test_description_non_vide_pour_chaque_outil_et_parametre(name):
 
 FRENCH = re.compile(r"\b(le|la|les|des|une|est|pour|avec|vous|nous|dans|sur|et|ou|pas|portefeuille|règle|mandat)\b|[éèêàùç]", re.IGNORECASE)
 PROMPTS = {
-    "orchestrator": orchestrator_prompts.SYSTEM_PROMPT, "translate": orchestrator_prompts.TRANSLATE_PROMPT,
+    "orchestrator": orchestrator_prompts.SYSTEM_PROMPT, "translate_fix": orchestrator_prompts.TRANSLATE_FIX_PROMPT,
     "auditor": auditor_prompts.SYSTEM_PROMPT, "writer": writer_prompts.SYSTEM_PROMPT,
     **{f"tool:{n}": t.tool_spec["description"] for n, t in AGENT_TOOLS.items()},
 }

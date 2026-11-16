@@ -6,7 +6,7 @@ import pytest
 
 from backend.agents import app, guardrails
 from backend.agents.tests.conftest import USER, body_of, event
-from backend.agents.tests.fake_model import EchoTranslator, add_section_writers, call, output
+from backend.agents.tests.fake_model import add_section_writers, call, output
 from backend.agents.tests.test_tools import FakeKb, _kb_result
 from backend.agents.tools import kb
 from backend.common.repositories import analyses, conversations, messages
@@ -52,6 +52,22 @@ def kb_fake(monkeypatch):
     return fake
 
 
+SECTIONS_FR = {  # ce que le faux Amazon Translate renvoie pour les quatre sections écrites par _script_completion
+    "Daily adjusted prices over {EV-01} were used, converted to CAD.":
+        "Des prix ajustés quotidiens sur {EV-01} ont été utilisés, convertis en CAD.",
+    "The idea fails because its volatility reaches {EV-01}, above the retained profile {KB-01}. It is up 12% too.":
+        "L'idée échoue car sa volatilité atteint {EV-01}, au-dessus du profil retenu {KB-01}. Elle a aussi gagné 12 %.",
+    "The past does not predict the future.": "Le passé ne prédit pas l'avenir.",
+    "A longer horizon, such as the 3 years you gave, would change the loss limit.":
+        "Un horizon plus long, comme les 3 ans indiqués, changerait la limite de perte.",
+}
+
+
+@pytest.fixture(autouse=True)
+def _french_sections(translate_fake):
+    translate_fake.translations.update(SECTIONS_FR)
+
+
 def _start_run(store, session, version=1):
     sent = []
     response = app.handle_request(event(RUNS, path={"sessionId": session}, body={"mandateVersion": version}),
@@ -70,14 +86,6 @@ def _script_completion(scripts, *, writer_ok=True):
         "why": "The idea fails because its volatility reaches {EV-01}, above the retained profile {KB-01}. It is up 12% too.",
         "limits": "The past does not predict the future.",
         "what_would_change": "A longer horizon, such as the 3 years you gave, would change the loss limit."}, fail=set() if writer_ok else {"limits"})
-    # Traduction (agent-orchestrator) : sections, puis motifs et mentions.
-    scripts.add("agent-orchestrator", output("TranslationBatch", items=[
-        "Des prix ajustés quotidiens sur {EV-01} ont été utilisés, convertis en CAD.",
-        "L'idée échoue car sa volatilité atteint {EV-01}, au-dessus du profil retenu {KB-01}. Elle a aussi gagné 12 %.",
-        "Le passé ne prédit pas l'avenir.",
-        "Un horizon plus long, comme les 3 ans indiqués, changerait la limite de perte."]))
-    for _ in range(4):  # motifs de verdict et mentions : lots de taille variable
-        scripts.add("agent-orchestrator", EchoTranslator())
 
 
 def test_cycle_d_un_run_partial_puis_done(robert_session, store, scripts, kb_fake, guard):
@@ -108,7 +116,7 @@ def test_cycle_d_un_run_partial_puis_done(robert_session, store, scripts, kb_fak
     assert narrative["hiddenSentences"] == [{"section": "why", "reason": "handwritten_number"}]
     assert done["verifier"]["placeholdersMatch"] is True and done["verifier"]["handwrittenNumbers"] == 1
     assert done["verifier"]["placeholdersResolved"] == done["verifier"]["placeholdersTotal"]
-    assert done["jurisdictionNotices"][0].startswith("FR")
+    assert done["jurisdictionNotices"][0].startswith("Au Québec")  # table fixe, sans appel à Translate
     assert {"agent-auditor", "agent-writer"} <= {s["agentId"] for s in done["explanation"]["steps"]} | {c["agentId"] for c in done["explanation"]["checks"]}
     assert kb_fake.calls[0]["retrievalConfiguration"]["vectorSearchConfiguration"]["filter"]["andAll"][0]["in"]["value"] == ["CA", "QC"]
     assert ("OUTPUT", guard.calls[-1][1]) == guard.calls[-1]
@@ -345,18 +353,6 @@ def test_les_controles_de_l_explication_portent_le_motif_et_le_scenario(robert_s
     assert all("reasonCode" in c for c in checks)
     assert any(c["rule"] == "R1" and c.get("scenario") == 1 and c["reasonCode"] == "IDEA_EXCEEDS_RISK_PROFILE" for c in checks)
     assert any(c["rule"] == "R5" and "scenario" not in c for c in checks)
-
-
-def test_un_motif_traduit_qui_approuve_retombe_sur_l_anglais(monkeypatch):
-    from backend.agents import pipeline
-
-    verdicts = [{"rule": "R1", "status": "warn", "reasonCode": "X", "messageEn": "The rule was triggered."},
-                {"rule": "R2", "status": "warn", "reasonCode": "X", "messageEn": "Threshold reached."}]
-    monkeypatch.setattr(pipeline.orchestrator, "translate", lambda c, texts, lang: [
-        "Le scénario est conforme." if t == "The rule was triggered." else "Seuil atteint." if t == "Threshold reached." else t
-        for t in texts])
-    _, shown, _, _ = pipeline._translate_run_texts(None, [], verdicts, [], "fr")
-    assert [v["message"] for v in shown] == ["The rule was triggered.", "Seuil atteint."]
 
 
 def test_les_limites_generales_portent_la_mention_sur_le_meme_resultat_pour_tous(robert_session, store):

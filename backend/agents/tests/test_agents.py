@@ -92,20 +92,19 @@ def test_delai_depasse(ctx, scripts, monkeypatch):
     assert failure.value.reason == "timeout"
 
 
-def test_traduction_conserve_les_emplacements(ctx, scripts):
-    texts = ["Volatility is {EV-07}.", "Grounded in {KB-01}."]
-    scripts.add("agent-orchestrator", output("TranslationBatch", items=["La volatilité est {EV-07}.", "Fondé sur {KB-01}."]))
-    translated = orchestrator.translate(ctx, texts, "fr")
-    assert translated == ["La volatilité est {EV-07}.", "Fondé sur {KB-01}."]
-    assert all(orchestrator.placeholders_preserved(a, b) for a, b in zip(texts, translated))
-    assert orchestrator.translate(ctx, texts, "en") == texts
+def test_correction_de_traduction_un_seul_appel_sans_outil(ctx, scripts):
+    flagged = [{"item": 0, "source": "Volatility is {EV-07}.", "translation": "La volatilité est .", "problem": "placeholders"},
+               {"item": 1, "source": "Based on {KB-01}.", "translation": "Basé sur {KB-1}.", "problem": "placeholders"}]
+    scripts.add("agent-orchestrator", output("TranslationFixes", fixes=[{"item": 0, "find": "est .", "replace": "est {EV-07}."}]))
+    assert orchestrator.fix_translations(ctx, flagged) == [{"item": 0, "find": "est .", "replace": "est {EV-07}."}]
     model = scripts.models["agent-orchestrator"][0]
-    assert model.calls[0]["tools"] == ["TranslationBatch"]  # traduction : aucun outil de données
+    assert len(model.calls) == 1 and model.calls[0]["tools"] == ["TranslationFixes"]  # aucun outil de données, un tour
+    assert "Volatility is {EV-07}." in json.dumps(model.calls[0]["messages"])
 
 
-def test_traduction_en_echec_garde_l_anglais(ctx, scripts):
-    scripts.add("agent-orchestrator", output("TranslationBatch", items=["un seul"]))
-    assert orchestrator.translate(ctx, ["one", "two"], "fr") == ["one", "two"]
+def test_correction_de_traduction_sans_texte_signale_n_appelle_pas_le_modele(ctx, scripts):
+    assert orchestrator.fix_translations(ctx, []) == []
+    assert "agent-orchestrator" not in scripts.models
 
 
 VERDICTS = [

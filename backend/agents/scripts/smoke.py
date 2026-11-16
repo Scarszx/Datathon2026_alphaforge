@@ -31,6 +31,7 @@ from backend.agents.llm.orchestrator import agent as orchestrator
 from backend.agents.scripts.starter_to_dataset import convert
 from backend.agents.tools import kb
 from backend.agents.tools.context import RequestContext
+from backend.agents.translate import service as translate_service
 
 GUARDRAIL_REPEATS = 3
 
@@ -114,10 +115,12 @@ def main(starter: str, guardrail_only: bool = False) -> int:
                                          "Et si j'ajoute 15 000 $ de NVDA ? C'est pour un condo dans 3 ans.", [])
             print(f"  lang={turn.user_language} english={turn.english_request!r}")
             print(f"  reply={turn.reply!r}\n  quickReplies={turn.quick_replies} tools={[c['tool'] for c in ctx.tool_calls]}")
-            translated = orchestrator.translate(ctx, ["Volatility reaches {EV-07} in scenario 1, see {KB-01}."], "fr")
-            ok = orchestrator.placeholders_preserved("{EV-07} {KB-01}", translated[0])
+            # Amazon Translate (sans terminologie : elle est importée à part), HTML avec emplacements protégés.
+            source = "Volatility reaches {EV-07} in scenario 1, see {KB-01}."
+            french, _ = translate_service.translate(translate_service._client(), source, None)
+            ok = translate_service.problem(source, french) is None
             failures += not ok
-            print(f"  [{'ok' if ok else 'KO'}] translation: {translated[0]!r}")
+            print(f"  [{'ok' if ok else 'KO'}] translation: {french!r}")
         telemetry.set_span_output(span, {"failures": failures})
     telemetry.flush_telemetry()
     print(f"== {failures} échec(s)")

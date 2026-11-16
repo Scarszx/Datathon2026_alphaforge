@@ -193,6 +193,17 @@ data "aws_iam_policy_document" "agents" {
     )
   }
 
+  # Traduction de la restitution du run (anglais -> fr-CA) par Amazon Translate. TranslateDocument porte le
+  # ContentType text/html (balises translate="no" qui protègent les emplacements) ; TranslateText n'a pas ce paramètre.
+  # GetTerminology : la politique gérée TranslateReadOnly l'accorde avec TranslateText ; la doc de l'API n'indique pas
+  # si TerminologyNames l'exige, on l'accorde par précaution. Ces actions n'acceptent pas de ressource précise ici.
+  statement {
+    sid       = "TranslateRunTexts"
+    effect    = "Allow"
+    actions   = ["translate:TranslateDocument", "translate:TranslateText", "translate:GetTerminology"]
+    resources = ["*"]
+  }
+
   # Complétion d'un run (partial -> done) : la Lambda s'invoque elle-même en
   # asynchrone (InvocationType=Event, décision WS5). ARN construit à partir du
   # nom pour éviter un cycle rôle <-> fonction.
