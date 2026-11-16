@@ -365,6 +365,39 @@ Le front attend `POST /runs` (partie synchrone seulement), puis `PUT holdings`.
   finissent 8,5 s après lui (`why` : 1 308 jetons, la plus longue).
 - Levier restant : la **provisioned concurrency** sur la Lambda agents (alias, Terraform, `apply` par un humain), ou un ping de préchauffage.
 
+## Constat 9 : comparaison avant et après le déploiement de 04:09 UTC (échantillon après : 4 tours de chat, 4 analyses)
+
+Exports : `data/output/langfuse/` (avant, 200 requêtes jusqu'à 01:44 UTC) et `data/output/langfuse-apres/` (même script, `--out` différent).
+Chaque requête a un identifiant différent : on ne compare donc pas ligne à ligne, mais **par type de requête** (tour de mandat, analyse en anglais,
+analyse en français), en séparant les deux périodes par l'heure du déploiement.
+**L'échantillon après est petit : ce sont des tendances, pas des moyennes fiables.**
+
+| Mesure | Avant (Sonnet, après 00:10 UTC) | Après | Lecture |
+|---|---|---|---|
+| `propose_mandate` invalide | 14 sur 23 appels, 5 timeouts | **0 sur 3** | correctif des industries vérifié |
+| Tour de chat qui propose un mandat | 20 à 31 s (avec échecs) | 12 à 21 s, 3 cycles | plus d'aller-retour perdu |
+| Moteur (partie synchrone du run) | p50 8,6 s | **p50 4,2 s** (9,2 s une fois) | `prices_many` vérifié |
+| Rédacteur, après la fin de l'auditeur | environ 14 s | **5,5 à 11,6 s** | gain réel, mais inférieur à l'attendu (voir ci-dessous) |
+| Analyse en anglais, partie asynchrone | environ 20 à 24 s | **12,5 s** (1 run) | |
+| Analyse en français, partie asynchrone | environ 33 à 36 s | 33,5 à 40,2 s | la traduction LLM (16 à 22 s) est toujours en série ; `ws/translate` n'est pas fusionnée |
+
+### Nouveau problème : le rédacteur fait souvent 2 cycles par section
+
+- **8 sections sur 16** prennent 2 cycles au lieu d'1. Au premier cycle, le modèle écrit la section **en texte libre** (parfois en JSON dans le texte),
+  sans appeler l'outil de sortie structurée `SectionText`. Strands relance alors un second cycle pour obtenir la sortie structurée,
+  et le modèle **réécrit toute la section** (300 à 470 jetons, 3 à 4 s de plus).
+- L'ancien rédacteur à un seul appel (`WriterSections`) n'avait pas ce problème (11 sur 11 en 1 cycle). C'est la nouvelle consigne par section
+  (`llm/writer/prompts.py`, `section_system_prompt` et `write_section_prompt`) qui laisse le modèle répondre en texte.
+- Sonnet 5.5 refuse `tool_choice` forcé, donc on ne peut pas imposer l'outil par l'API.
+  Piste : écrire explicitement dans le prompt « answer only by calling SectionText, with no text before it », ou passer par la sortie structurée native, si Strands la propose.
+- Gain attendu : environ −3 à −4 s sur le chemin critique de l'analyse (sections tardives).
+
+### Ce qui reste lent dans le chat
+
+Un tour de mandat fait 3 cycles : `get_profile` (environ 3 s), puis `propose_mandate` (8 à 11 s, parce que le modèle écrit un brouillon de mandat
+de 1 100 à 1 400 jetons avec 8 000 à 12 000 jetons d'entrée), puis la réponse finale (4 à 6 s). Pistes non faites :
+injecter le profil dans `session_context` (−1 cycle) et alléger le brouillon de mandat.
+
 ## État des chantiers à la fin de la session (2026-11-15, `main` = `9b9bea9`, Lambdas et front déployés le 2026-11-16 vers 04:09-04:10 UTC)
 
 | Chantier | Branche | État | Contrat |
