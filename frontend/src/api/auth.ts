@@ -3,7 +3,7 @@
  * Flux USER_PASSWORD_AUTH, client d'application sans secret. Aucun mot de passe n'est conservé.
  */
 import { inLang } from "../lib/format";
-import { DEMO, demoSignIn, demoSignUp } from "./demo";
+import { DEMO, demoDeleteUser, demoSignIn, demoSignUp } from "./demo";
 import { ApiError } from "./errors";
 import type { ErrorCode } from "./types";
 
@@ -90,6 +90,16 @@ export async function signUp(username: string, password: string, email: string, 
 }
 
 export function signOut() { write(null); inflight = null; }
+/**
+ * Supprime l'identifiant de l'utilisateur connecté dans Cognito (DeleteUser, avec son propre jeton d'accès).
+ * Irréversible. À appeler en dernier : ensuite, le jeton ne permet plus d'appeler l'API.
+ */
+export async function deleteOwnAccount(): Promise<void> {
+  const token = await getAccessToken();
+  if (DEMO) demoDeleteUser(token);
+  else await cognito("DeleteUser", { AccessToken: token });
+  signOut();
+}
 export const hasSession = () => read() !== null;
 
 let inflight: Promise<string> | null = null;

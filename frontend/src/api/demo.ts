@@ -86,6 +86,16 @@ export function demoSignUp(username: string, password: string, email: string, di
   save(db);
 }
 
+/** Suppression du compte simulé (équivalent de Cognito DeleteUser) : utilisateur, portefeuilles, sessions et messages. */
+export function demoDeleteUser(token: string) {
+  const userId = token.startsWith(TOKEN_PREFIX) ? token.slice(TOKEN_PREFIX.length) : "";
+  const db = load();
+  const key = Object.keys(db.users).find((k) => db.users[k].userId === userId);
+  if (!key) throw new ApiError("UNAUTHORIZED", "Session expirée.", 401);
+  for (const c of db.conversations[userId] ?? []) delete db.messages[c.sessionId];
+  delete db.users[key]; delete db.portfolios[userId]; delete db.conversations[userId];
+  save(db);
+}
 /* ---------- Univers d'actifs et prix fictifs ---------- */
 
 type DemoAsset = Asset & { price: number; vol: number; drift: number };

@@ -1563,3 +1563,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 /* Actions de l'historique (renommer, supprimer) : toujours visibles sur écran tactile et sur la session ouverte. */
 @media (hover: none) { .af-acts { opacity: 1; } }
 .af-row.sel .af-acts { opacity: 1; }
+/* Fermeture du compte */
+.danger-zone { border-color: #EBCFC8; }
+.btn.danger { background: var(--loss); }
+.btn.danger:hover:not(:disabled) { background: var(--loss-ink); }
+.btn-ghost.danger { color: var(--loss); border-color: #EBCFC8; }

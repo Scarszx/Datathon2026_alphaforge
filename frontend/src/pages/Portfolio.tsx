@@ -14,6 +14,7 @@ import { amount, colon, localeDateTime, money, pct, plainPct, shortDate, signedA
 import { profileFromAnswers, saveRisk, type ProfileChoices } from "../lib/risk";
 import { useApp } from "../lib/store";
 import { TickerLabel } from "../components/TickerLogo";
+import { loadPersonalAnswers } from "../lib/personalDraft";
 
 const RANGES: { key: SummaryRange; fr: string; en: string }[] = [
   { key: "1m", fr: "1 M", en: "1M" }, { key: "6m", fr: "6 M", en: "6M" }, { key: "1y", fr: "1 A", en: "1Y" }, { key: "5y", fr: "5 A", en: "5Y" },
@@ -261,6 +262,7 @@ export default function PortfolioPage() {
             <RiskForm
               showPreferences
               showAmount
+              initial={loadPersonalAnswers() ?? {}}
               busy={onboardingBusy}
               submitLabel={onboardingBusy ? L("Création…", "Creating…") : L("Créer mon portefeuille", "Create my portfolio")}
               onSubmit={createPortfolio}

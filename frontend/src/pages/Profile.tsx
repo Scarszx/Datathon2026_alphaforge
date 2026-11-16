@@ -17,6 +17,7 @@ import { industryName, industryPrefs, splitPreferences, type IndustryChoice } fr
 import { ESG_ANSWERS, MARKETS, esgMarketPrefs, marketName, splitEsgMarket, toggleMarket, type Market } from "../lib/esgMarket";
 import { useApp } from "../lib/store";
 import { cad, localeDateTime, pct, plainPct, todayLong } from "../lib/format";
+import CloseAccount from "../components/CloseAccount";
 
 /* Questionnaire interactif : consultation des réponses enregistrées, modification, résultat par portefeuille. */
 function RiskQuestionnaire({ userId }: { userId: string }) {
@@ -368,7 +369,8 @@ export default function Profile() {
           </div>
         )}
 
-        {user && <div className="dcard" style={{ margin: "16px 0 64px" }}><RiskQuestionnaire userId={user.userId} /></div>}
+        {user && <div className="dcard" style={{ marginTop: 16 }}><RiskQuestionnaire userId={user.userId} /></div>}
+        <div style={{ marginBottom: 64 }}><CloseAccount /></div>
       </main>
     </>
   );
