@@ -31,7 +31,7 @@ de parcourir l'interface, mais ne reproduit pas les calculs ni les services AWS.
 | Agents | Strands Agents SDK, boto3, OpenTelemetry, quadprog |
 | Tests | pytest, moto, SciPy et scikit-learn |
 | Infrastructure | Terraform >= 1.5, fournisseur AWS 6.x |
-| Services cloud | Amazon Cognito, API Gateway, Lambda, DynamoDB, S3, CloudFront, Bedrock et CloudWatch |
+| Services cloud | Amazon Cognito, API Gateway, Lambda, DynamoDB, S3, CloudFront, Bedrock (modèles, Knowledge Base, Guardrails), Transcribe et CloudWatch. Amazon Translate est prévu pour la traduction française de la restitution (branche `ws/translate`, non fusionnée) |
 
 Les versions et dépendances complètes sont définies dans
 [`requirements-dev.txt`](requirements-dev.txt), les fichiers
@@ -69,11 +69,11 @@ Pour reproduire le déploiement complet, suivre la section
 
 ## Architecture AWS
 
-![Architecture AWS Grow](docs/alphaforge-infra.png)
+![Architecture AWS Grow](docs/grow-infra.png)
 
 Le schéma présente le frontend hébergé sur S3/CloudFront, l'API Gateway,
 les Lambdas, DynamoDB, le jeu de données, Bedrock, la Knowledge Base,
-les Guardrails et CloudWatch.
+les Guardrails et CloudWatch. Version PDF : [`docs/architecture-aws-grow.pdf`](docs/architecture-aws-grow.pdf).
 
 ---
 
@@ -81,10 +81,12 @@ les Guardrails et CloudWatch.
 
 Sur une plateforme de courtage autonome, l'investisseur voit ce qu'il possède, mais il est seul au moment de tester une idée. Grow lui ouvre une session de simulation :
 
-1. **Cadrage.** Un agent lit son profil et son portefeuille, pose au plus une étape de questions, puis propose un *mandat* (objectif, horizon, tolérance et capacité de perte). L'utilisateur le confirme.
-2. **Mesure.** Du code, pas un modèle de langage, construit trois scénarios (portefeuille actuel, idée telle quelle, alternative par catégorie d'actifs) et calcule rendement, volatilité, pire baisse, tests de résistance (2022, krach COVID 2020, hausse des taux, krach crypto) et concentration par titre, secteur, pays et devise.
+1. **Cadrage.** Un agent lit son profil et son portefeuille, pose au plus une étape de questions, puis propose un *mandat* (objectif, horizon, tolérance et capacité de perte, industries préférées ou exclues). L'utilisateur le confirme.
+2. **Mesure.** Du code, pas un modèle de langage, construit les scénarios (portefeuille actuel, idée telle quelle, alternative par catégorie d'actifs, ou portefeuille construit par un modèle moyenne-variance en mode `build`) et calcule rendement, volatilité, pire baisse, tests de résistance (2022, krach COVID 2020, hausse des taux, krach crypto) et concentration par titre, secteur, pays et devise.
 3. **Audit.** Dix règles écrites en code (R1 à R10) donnent les verdicts. Un agent cherche pour chacun le passage fondateur dans les textes des ACVM, de l'OCRI et de la province (Bedrock Knowledge Base).
 4. **Explication.** Chaque chiffre et chaque citation renvoient à un *registre de preuves* (`EV-nn`, `KB-nn`). Le texte est écrit avec des emplacements, jamais avec des chiffres, et un vérificateur masque toute phrase qui déborde.
+
+À l'inscription, le questionnaire (profil de risque, horizon, industries cherchées parmi celles du jeu de données, montant fictif) suffit à construire et adopter un premier portefeuille fictif, sans passer par le chat.
 
 L'outil s'adapte au contexte : Robert (59 ans, retraite proche) voit son idée audacieuse remise en question, Amira (26 ans, risque élevé) voit sa diversification mesurée, Mateo (41 ans, préférences ESG) voit ce que l'outil peut et ne peut pas affirmer sur l'ESG.
 
@@ -93,8 +95,8 @@ L'outil s'adapte au contexte : Robert (59 ans, retraite proche) voit son idée a
 | | |
 |---|---|
 | Vidéo de démonstration (environ 5 min) | *[lien à renseigner]* |
-| One pager | [`docs/one-pager.md`](docs/one-pager.md) |
-| Documentation technique | [`docs/documentation-technique.md`](docs/documentation-technique.md) |
+| One pager | [`docs/One_Pager_equipe_78.pdf`](docs/One_Pager_equipe_78.pdf) (source : [`docs/for_building/one-pager.md`](docs/for_building/one-pager.md)) |
+| Documentation technique | [`docs/for_building/documentation-technique.md`](docs/for_building/documentation-technique.md) |
 | Carte interactive du backend (agents, outils, droits, Guardrail, KB, AWS) | *[lien à renseigner]* |
 | Démonstration en ligne | https://d2vw57xt4nhb4n.cloudfront.net (comptes `robert`, `amira` et `mateo`, mots de passe communiqués séparément) |
 
@@ -121,7 +123,7 @@ Ouvrir http://localhost:5173 et se connecter avec **demo** / **demo1234**. Le mo
 | Python | 3.12 | backend, ingestion des données, tests |
 | Node.js | 18 ou plus (essayé avec 20) | front |
 | Terraform | 1.5 ou plus (fournisseur `hashicorp/aws` 6.x, version 6.62 ou plus) | infrastructure |
-| Compte AWS | région `us-east-1` | Lambda, API Gateway, DynamoDB, S3, CloudFront, Cognito, Bedrock |
+| Compte AWS | région `us-east-1` | Lambda, API Gateway, DynamoDB, S3, CloudFront, Cognito, Bedrock, Transcribe |
 | Accès Bedrock | Claude Sonnet 5.5, Titan Text Embeddings V2 | agents et Knowledge Base |
 
 ### 1. Environnement Python et tests (sans réseau, sans AWS)
@@ -130,10 +132,10 @@ Ouvrir http://localhost:5173 et se connecter avec **demo** / **demo1234**. Le mo
 python3.12 -m venv .venv
 .venv/bin/pip install -r requirements-dev.txt
 
-.venv/bin/python -m pytest -q                  # 274 tests : common et agents
-.venv/bin/python -m pytest -q backend/api      # 106 tests : Lambda API (à lancer séparément)
-.venv/bin/python -m pytest -q data/tests       # 13 tests : ingestion des données
-(cd frontend && npm install && npm test)       # 13 tests : composants du front
+.venv/bin/python -m pytest -q                  # common et agents
+.venv/bin/python -m pytest -q backend/api      # Lambda API (à lancer séparément)
+.venv/bin/python -m pytest -q data/tests       # ingestion des données
+(cd frontend && npm install && npm test)       # composants du front (Vitest)
 ```
 
 `backend/api` se lance à part : l'un de ses tests vérifie que `pyarrow` n'est pas importé, ce que les tests des agents (pandas) rendent faux dans un même processus. Les tests des agents utilisent un faux modèle Strands et `moto` : ils n'appellent ni Bedrock ni AWS.
@@ -143,7 +145,7 @@ python3.12 -m venv .venv
 Le jeu de données est produit par `data/ingestion/` (détails, sources et limites : [`data/README.md`](data/README.md)).
 
 ```bash
-.venv/bin/python -m data.ingestion.build_dataset --mode full     # ~250 actifs sur 10 ans, via yfinance, Banque du Canada et FRED
+.venv/bin/python -m data.ingestion.build_dataset --mode full     # 582 actifs depuis 2015, via yfinance, Banque du Canada et FRED
 # ou, sans réseau, à partir du jeu de départ fourni par les organisateurs :
 .venv/bin/python -m data.ingestion.build_dataset --mode offline --version 2026-11-13-starter
 ```
@@ -206,7 +208,7 @@ Toutes sont publiques. Les sources, dates, traitements et conditions d'utilisati
 
 | Source | Données | Conditions |
 |---|---|---|
-| Yahoo Finance (via `yfinance`) | Prix journaliers ajustés, dividendes, fractionnements, secteurs (241 actifs, 2016 à 2026) | Usage personnel et pédagogique : les fichiers ne sont pas redistribués |
+| Yahoo Finance (via `yfinance`) | Prix journaliers ajustés, dividendes, fractionnements, secteurs, industries et pays (jeu 2026-11-15 : 582 actifs, dont 476 actions, 102 FNB, 3 cryptos et l'indice ^GSPC, depuis 2015) | Usage personnel et pédagogique : les fichiers ne sont pas redistribués |
 | Banque du Canada (API Valet) | USD/CAD, taux directeur, rendements du gouvernement du Canada, IPC | Conditions de la Banque du Canada |
 | FRED (Réserve fédérale de Saint-Louis) | Taux américains, IPC, chômage | Données d'agences fédérales |
 | Fiches des émetteurs de FNB | Composition par secteur, pays, principales positions, frais, à relever à la main avec source et date pour 15 FNB clés. **Non renseignées à ce jour** : l'outil écrit « composition non disponible » | Documentation publique des émetteurs |
@@ -215,12 +217,14 @@ Toutes sont publiques. Les sources, dates, traitements et conditions d'utilisati
 ## Hypothèses et limites à connaître
 
 - **Hypothèses d'équipe, affichées comme telles** : fenêtre d'analyse de 5 ans, pertes maximales par défaut selon l'horizon (10, 20 et 35 %), seuils de concentration (10 et 20 %), plafonds de crypto, bandes de volatilité qui donnent le profil de risque implicite. Aucune n'est une règle officielle.
+- **Constructeur de portefeuille (mode `build`)** : rendements espérés par le CAPM contre ^GSPC (un modèle du passé, pas une prévision), aversion au risque déduite du profil 1-5, au plus 10 % par titre et 25 % par industrie (35 % si préférée). Candidats : actions cotées en USD avec une industrie (101 industries). Hypothèses d'équipe.
 - **Biais du survivant** : l'univers d'actifs a été choisi en 2026.
 - **Passé et avenir** : les rendements passés décrivent le passé, ils ne prédisent rien.
 - **Conversion en CAD** : le taux USD/CAD ne commence que le 2017-01-03, donc les mesures en CAD aussi.
 - **FNB** : aucune composition de FNB n'est renseignée à ce jour. Un FNB compte alors comme une position unique, et l'outil signale la réserve dans les preuves et les verdicts (« look-through incomplete »). La concentration d'un titre détenu à travers un FNB n'est donc pas mesurée.
 - **ESG** : l'outil n'invente aucun indicateur pour les actions (il donne le secteur et « non vérifié »).
-- **Filtre d'entrée (Guardrail)** : il refuse encore certaines formulations légitimes, par exemple « pour mon portefeuille » ou « Je veux déplacer… ». État et pistes : [`docs/guardrail-etat-et-pistes.md`](docs/guardrail-etat-et-pistes.md).
+- **Filtre d'entrée (Guardrail)** : il refuse encore certaines formulations légitimes, par exemple « pour mon portefeuille » ou « Je veux déplacer… ». État et pistes : [`docs/for_building/guardrail-etat-et-pistes.md`](docs/for_building/guardrail-etat-et-pistes.md).
+- **Temps de réponse** (mesures Langfuse du 2026-11-16, petit échantillon) : un tour de chat prend 12 à 21 s, surtout en appels de modèle. Une analyse affiche ses chiffres en 4 à 5 s, puis le récit arrive en arrière-plan en 12 à 13 s en anglais, et 33 à 40 s en français, tant que la traduction passe par le modèle. Le premier appel après une période d'inactivité ajoute environ 5 s (démarrage à froid de la Lambda). Détails : [`profiling/`](profiling/).
 - **Citations** : les passages cités viennent de la Knowledge Base, mais leur pertinence n'a pas été validée sur un jeu étiqueté.
 
 ## Cadre responsable
@@ -237,9 +241,10 @@ Simulation uniquement. Le système distingue faits (issus des données), hypoth�
 | `data/` | Ingestion du jeu de données de marché et ses tests |
 | `infra/` | Infrastructure Terraform et scripts de construction |
 | `frontend/` | Interface web (React et Vite) |
-| `docs/` | Documentation technique, one pager, corpus de la Knowledge Base, notes de décision |
+| `docs/` | Schéma d'architecture, one pager (PDF), corpus de la Knowledge Base (`for_KB/`), documentation technique et notes de travail (`for_building/`) |
+| `profiling/` | Profilage de la latence des agents (traces Langfuse) : constats, mesures avant et après, décisions |
 | `contract/` | Contrat d'API et d'architecture (`knowledge-graph.yaml`) |
-| `scripts/` | Environnement AWS local, création des comptes de démonstration |
+| `scripts/` | Environnement AWS local, comptes de démonstration, liste des industries (`build_industries.py`), export des traces Langfuse (`export_langfuse.py`), banc de bout en bout (`e2e_runs.py`) |
 | `SOLUTION.md` | La solution retenue et les raisons de chaque décision |
 
 ---
@@ -260,12 +265,12 @@ Contexte opérationnel de ce dépôt. Lisez cette section avant toute modificati
 1. **`AGENTS.md`** : consignes du projet (AWS, Terraform, Langfuse). Elles priment sur vos réglages par défaut.
 2. **`contract/knowledge-graph.yaml`**, en entier : services, routes, schémas, tables, agents, outils, règles, avec le propriétaire de chaque service. **Il fait foi** pour les noms de routes, de schémas et de champs.
 3. **`SOLUTION.md`** : les décisions de produit et de conception, et leurs raisons. La section « Ce qu'on a écarté » liste des décisions prises : ne les rouvrez pas sans demande explicite.
-4. **`docs/workstreams.md`** : état du projet, chantiers, points d'intégration et décisions en attente.
-5. Selon la tâche : `docs/guardrail-etat-et-pistes.md` (Guardrail), `backend/agents/NOTES-agents.md` (écarts et choix des agents), `data/README.md` (données), `infra/README.md` (infrastructure).
+4. **`docs/for_building/workstreams.md`** : état du projet, chantiers, points d'intégration et décisions en attente.
+5. Selon la tâche : `docs/for_building/guardrail-etat-et-pistes.md` (Guardrail), `profiling/` (latence), `backend/agents/NOTES-agents.md` (écarts et choix des agents), `data/README.md` (données), `infra/README.md` (infrastructure).
 
 ## Règles à respecter
 
-- **Le contrat ne se modifie pas seul.** Un changement se discute avec l'équipe avant d'être codé. Si ce que vous devez faire n'y figure pas ou le contredit, signalez-le au lieu d'inventer. Version courante : 0.4.1.
+- **Le contrat ne se modifie pas seul.** Un changement se discute avec l'équipe avant d'être codé. Si ce que vous devez faire n'y figure pas ou le contredit, signalez-le au lieu d'inventer. Version courante : 0.4.20 (0.4.18 à 0.4.20 à relire par l'équipe ; 0.4.20 décrit `ws/translate`, non fusionnée).
 - **AWS et Terraform.** Compte de l'événement uniquement (`058264316309`). Chargez les identifiants dans la même commande : `source scripts/aws-env.sh && aws …`. Le script affiche l'identité active ; si elle est absente ou ne correspond pas, arrêtez-vous et demandez. **Ne lancez pas `terraform apply` et ne créez, modifiez ni supprimez de ressource AWS sans demande explicite.** Lecture seule autorisée : `plan`, `describe`, `list`.
 - **Secrets.** N'écrivez jamais d'identifiants ailleurs que dans `.aws-local/` ou `.env`, jamais dans un fichier suivi par git, jamais dans Terraform ni dans une réponse.
 - **Simulation seulement.** Aucune route ni aucun outil n'exécute de transaction. Aucun texte ne recommande un titre nommé : les alternatives sont décrites par catégorie d'actifs.
@@ -284,17 +289,18 @@ Contexte opérationnel de ce dépôt. Lisez cette section avant toute modificati
 | Modifier une règle R1 à R10 ou un seuil | `backend/agents/rules/rules.py`, `rules/rules_config.json` (hypothèses d'équipe) |
 | Modifier un calcul ou un test de résistance | `backend/agents/engine/` (`analytics.py`, `scenarios.py`, `stress.py`, `concentration.py`) |
 | Modifier un prompt | `backend/agents/llm/{orchestrator,auditor,writer}/prompts.py` (en anglais) |
-| Modifier le chaînage d'un run | `backend/agents/pipeline.py` (`start_run`, `complete_run`) |
-| Modifier le Guardrail | `infra/terraform/guardrail.tf` (voir `docs/guardrail-etat-et-pistes.md` avant de toucher) |
+| Modifier le chaînage d'un run | `backend/agents/pipeline.py` (`start_run`, `complete_run` : auditeur et rédacteur en parallèle, section par section) |
+| Modifier le Guardrail | `infra/terraform/guardrail.tf` (voir `docs/for_building/guardrail-etat-et-pistes.md` avant de toucher) |
 | Modifier une route ou une validation | `backend/api/routes/`, `backend/common/validation.py`, et le contrat d'abord |
 | Modifier l'infrastructure | `infra/terraform/*.tf` ; `infra/README.md` |
 
 ## Commandes utiles
 
 ```bash
-.venv/bin/python -m pytest -q                      # common et agents (274)
-.venv/bin/python -m pytest -q backend/api          # API, à part (106)
-.venv/bin/python -m pytest -q data/tests           # ingestion (13)
+.venv/bin/python -m pytest -q                      # common et agents
+.venv/bin/python -m pytest -q backend/api          # API, à part
+.venv/bin/python -m pytest -q data/tests           # ingestion
+python3 scripts/export_langfuse.py --n 200 --out data/output/langfuse-<date>   # traces Langfuse en local (lecture seule)
 terraform -chdir=infra/terraform fmt -check -recursive && terraform -chdir=infra/terraform validate
 source scripts/aws-env.sh && terraform -chdir=infra/terraform plan -lock=false     # lecture seule
 ```
