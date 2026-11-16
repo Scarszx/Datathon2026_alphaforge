@@ -4,6 +4,7 @@ import { useApp } from "./lib/store";
 import AssetPage from "./pages/AssetPage";
 import Chat from "./pages/Chat";
 import Dashboard from "./pages/Dashboard";
+import Explore from "./pages/Explore";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Markets from "./pages/Markets";
@@ -11,7 +12,7 @@ import Portfolio from "./pages/Portfolio";
 import Profile from "./pages/Profile";
 import Register from "./pages/Register";
 
-/* Sans session (déconnexion, session expirée, lien ouvert directement) : retour à l'accueil. Publiques : /, /login, /inscription. */
+/* Sans session (déconnexion, session expirée, lien ouvert directement) : retour à l'accueil. Publiques : /, /login, /inscription, /explorer (questionnaire sans compte). */
 export function Private({ children }: { children: ReactNode }) {
   const { status } = useApp();
   if (status === "loading") return <p className="muted" style={{ padding: 48 }}>Chargement…</p>;
@@ -24,6 +25,7 @@ export default function App() {
       <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login />} />
       <Route path="/inscription" element={<Register />} />
+      <Route path="/explorer" element={<Explore />} />
       <Route path="/accueil" element={<Private><Dashboard /></Private>} />
       <Route path="/chat" element={<Private><Chat /></Private>} />
       <Route path="/portefeuille" element={<Private><Portfolio /></Private>} />
