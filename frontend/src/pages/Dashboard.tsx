@@ -196,7 +196,7 @@ export default function Dashboard() {
                   </div>
                 </div>
                 {chart
-                  ? <div className="chart"><Chart key={range} values={chart.values} timestamps={chart.timestamps} axisLabel={(ts) => shortDate(ts, range === "1y" || range === "5y")} format={(v) => amount(v, cur)} /></div>
+                  ? <div className="chart"><Chart key={range} trend={summary && summary.totals.pnl < 0 ? "down" : "up"} values={chart.values} timestamps={chart.timestamps} axisLabel={(ts) => shortDate(ts, range === "1y" || range === "5y")} format={(v) => amount(v, cur)} /></div>
                   : <p className="muted">{L("Pas assez de points pour tracer la performance.", "Not enough points to plot performance.")}</p>}
               </div>
 

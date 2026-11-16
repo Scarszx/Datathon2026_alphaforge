@@ -243,7 +243,7 @@ export default function PortfolioPage() {
             <section className="chart" aria-label={L("Évolution de la valeur", "Value over time")}>
               <div className="muted small" style={{ marginBottom: 4 }}>{L("Évolution de la valeur", "Value over time")}<InfoTip text={tr("info.performance", lang)} /></div>
               {chart
-                ? <Chart key={range} values={chart.values} timestamps={chart.timestamps} axisLabel={(ts) => shortDate(ts, range === "1y" || range === "5y")} format={(v) => amount(v, cur)} />
+                ? <Chart key={range} trend={summary.totals.pnl >= 0 ? "up" : "down"} values={chart.values} timestamps={chart.timestamps} axisLabel={(ts) => shortDate(ts, range === "1y" || range === "5y")} format={(v) => amount(v, cur)} />
                 : <div className="chart-empty"><p>{L("Pas assez de points pour tracer la performance.", "Not enough points to plot performance.")}</p></div>}
             </section>
             <p className="muted small chart-note">{tr("chart.adjusted", lang)}</p>
