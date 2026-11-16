@@ -1,45 +1,28 @@
 /*
- * Industries d'intérêt (choix multiple) à l'inscription et dans le profil.
- * Regroupe les industries Yahoo Finance du jeu de données en catégories plus larges.
+ * Industries d'intérêt à l'inscription et dans le profil, choisies par une recherche.
+ * La liste (`industries.json`, générée par scripts/build_industries.py) est celle des candidats de l'optimiseur :
+ * `en` est le nom exact du jeu de données (valeur stockée et transmise à l'agent), `fr` la traduction pour l'affichage.
  * Deux listes : ce que le client aime et ce qu'il préfère éviter (une industrie ne peut pas être dans les deux).
  * Stockage : dans `preferences` du profil investisseur (liste de textes du contrat), sous la forme
- * « Industrie : <libellé> » ou « Industrie à éviter : <libellé> », sans nouveau champ de contrat.
+ * « Industrie : <nom du jeu> » ou « Industrie à éviter : <nom du jeu> », sans nouveau champ de contrat.
  */
-export const INDUSTRIES: { label: string; en: string; covers: string }[] = [
-  { label: "Semi-conducteurs et équipements", en: "Semiconductors and equipment", covers: "Semiconductors, Semiconductor Equipment & Materials" },
-  { label: "Logiciels et infonuagique", en: "Software and cloud", covers: "Software - Application, Software - Infrastructure" },
-  { label: "Matériel informatique et équipements de communication", en: "Computer hardware and communication equipment", covers: "Computer Hardware, Communication Equipment" },
-  { label: "Télécommunications et contenu Internet", en: "Telecommunications and Internet content", covers: "Telecom Services, Internet Content & Information" },
-  { label: "Pharmaceutique et biotechnologie", en: "Pharmaceuticals and biotechnology", covers: "Drug Manufacturers - General, Biotechnology" },
-  { label: "Dispositifs médicaux, diagnostics et distribution médicale", en: "Medical devices, diagnostics and medical distribution", covers: "Medical Devices, Diagnostics & Research, Medical Distribution" },
-  { label: "Banques et crédit", en: "Banks and credit", covers: "Banks - Diversified, Credit Services" },
-  { label: "Gestion d'actifs et marchés financiers", en: "Asset management and capital markets", covers: "Asset Management, Capital Markets, Financial Data & Stock Exchanges" },
-  { label: "Assurance et régimes de santé", en: "Insurance and health plans", covers: "Insurance - Property & Casualty, Insurance Brokers, Healthcare Plans" },
-  { label: "Aérospatiale et défense", en: "Aerospace and defence", covers: "Aerospace & Defense" },
-  { label: "Machinerie et équipement industriel", en: "Industrial machinery and equipment", covers: "Specialty Industrial Machinery, Farm & Heavy Construction Machinery" },
-  { label: "Transport ferroviaire et logistique", en: "Rail transport and logistics", covers: "Railroads, Integrated Freight & Logistics" },
-  { label: "Services publics (électricité)", en: "Utilities (electricity)", covers: "Utilities - Regulated Electric" },
-  { label: "Produits chimiques de spécialité", en: "Specialty chemicals", covers: "Specialty Chemicals" },
-  { label: "Pétrole et gaz", en: "Oil and gas", covers: "Oil & Gas Refining & Marketing, Oil & Gas Midstream, Oil & Gas Integrated" },
-  { label: "Immobilier (FPI)", en: "Real estate (REITs)", covers: "REIT - Specialty" },
-  { label: "Biens de consommation courante", en: "Consumer staples", covers: "Beverages - Non-Alcoholic, Tobacco, Household & Personal Products" },
-  { label: "Commerce de détail et en ligne", en: "Retail and e-commerce", covers: "Discount Stores, Internet Retail, Home Improvement Retail" },
-  { label: "Automobile", en: "Automotive", covers: "Auto Manufacturers" },
-  { label: "Voyages et services de voyage", en: "Travel and travel services", covers: "Travel Services" },
-  { label: "Conglomérats", en: "Conglomerates", covers: "Conglomerates" },
-];
+import DATA from "./industries.json";
+
+export type IndustryEntry = { en: string; fr: string };
+export const INDUSTRIES: IndustryEntry[] = DATA;
+
 const LIKED = "Industrie : ";
 const AVOIDED = "Industrie à éviter : ";
 export type IndustryChoice = { liked: string[]; avoided: string[] };
 export const EMPTY_INDUSTRIES: IndustryChoice = { liked: [], avoided: [] };
-/** Industries choisies → entrées de `preferences` (« Industrie : X », « Industrie à éviter : X »). */
+/** Industries choisies (noms du jeu) → entrées de `preferences` (« Industrie : X », « Industrie à éviter : X »). */
 export const industryPrefs = ({ liked, avoided }: IndustryChoice) => [
   ...liked.map((l) => LIKED + l),
   ...avoided.map((l) => AVOIDED + l),
 ];
-/** Sépare `preferences` en industries aimées, industries à éviter (libellés connus) et autres préférences. */
+/** Sépare `preferences` en industries aimées, industries à éviter (noms du jeu connus) et autres préférences. */
 export function splitPreferences(prefs: string[] = []): IndustryChoice & { others: string[] } {
-  const known = new Set(INDUSTRIES.map((i) => i.label));
+  const known = new Set(INDUSTRIES.map((i) => i.en));
   const liked: string[] = [], avoided: string[] = [], others: string[] = [];
   for (const p of prefs) {
     // AVOIDED d'abord : « Industrie à éviter : » commence aussi par « Industrie ».
@@ -50,5 +33,33 @@ export function splitPreferences(prefs: string[] = []): IndustryChoice & { other
   return { liked, avoided, others };
 }
 
-/** Libellé d'une industrie dans la langue d'affichage (la valeur stockée reste le libellé français). */
-export const industryName = (label: string, lang: "fr" | "en") => (lang === "en" ? INDUSTRIES.find((i) => i.label === label)?.en ?? label : label);
+/** Nom d'une industrie dans la langue d'affichage (la valeur stockée reste le nom du jeu). */
+export const industryName = (en: string, lang: "fr" | "en") =>
+  lang === "fr" ? INDUSTRIES.find((i) => i.en === en)?.fr ?? en : en;
+
+/** Minuscules, sans accents, « & » = « and », ponctuation et espaces multiples réduits. */
+export const normalizeSearch = (text: string) =>
+  text.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/&/g, " and ").replace(/[^a-z0-9]+/g, " ").trim();
+
+const INDEX = INDUSTRIES.map((i) => ({ ...i, keys: [normalizeSearch(i.en), normalizeSearch(i.fr)] }));
+
+/** Industries dont le nom anglais ou français contient la recherche (début de mot d'abord), hors `exclude` (noms du jeu). */
+export function searchIndustries(query: string, exclude: string[] = [], limit = 8): IndustryEntry[] {
+  const q = normalizeSearch(query);
+  if (!q) return [];
+  const rank = (keys: string[]) => {
+    let best = 99;
+    for (const k of keys) {
+      if (k.startsWith(q)) best = Math.min(best, 0);
+      else if (` ${k}`.includes(` ${q}`)) best = Math.min(best, 1);
+      else if (k.includes(q)) best = Math.min(best, 2);
+    }
+    return best;
+  };
+  return INDEX.filter((i) => !exclude.includes(i.en))
+    .map((i) => ({ i, r: rank(i.keys) }))
+    .filter((x) => x.r < 99)
+    .sort((a, b) => a.r - b.r || a.i.en.localeCompare(b.i.en))
+    .slice(0, limit)
+    .map(({ i }) => ({ en: i.en, fr: i.fr }));
+}

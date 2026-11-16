@@ -1,0 +1,406 @@
+[
+ {
+  "en": "Advertising Agencies",
+  "fr": "Agences de publicité"
+ },
+ {
+  "en": "Aerospace & Defense",
+  "fr": "Aérospatiale et défense"
+ },
+ {
+  "en": "Airlines",
+  "fr": "Compagnies aériennes"
+ },
+ {
+  "en": "Apparel Manufacturing",
+  "fr": "Fabrication de vêtements"
+ },
+ {
+  "en": "Apparel Retail",
+  "fr": "Commerce de détail de vêtements"
+ },
+ {
+  "en": "Asset Management",
+  "fr": "Gestion d'actifs"
+ },
+ {
+  "en": "Auto & Truck Dealerships",
+  "fr": "Concessionnaires automobiles et de camions"
+ },
+ {
+  "en": "Auto Manufacturers",
+  "fr": "Constructeurs automobiles"
+ },
+ {
+  "en": "Auto Parts",
+  "fr": "Pièces automobiles"
+ },
+ {
+  "en": "Banks - Diversified",
+  "fr": "Banques diversifiées"
+ },
+ {
+  "en": "Banks - Regional",
+  "fr": "Banques régionales"
+ },
+ {
+  "en": "Beverages - Brewers",
+  "fr": "Boissons – brasseurs"
+ },
+ {
+  "en": "Beverages - Non-Alcoholic",
+  "fr": "Boissons non alcoolisées"
+ },
+ {
+  "en": "Biotechnology",
+  "fr": "Biotechnologie"
+ },
+ {
+  "en": "Building Materials",
+  "fr": "Matériaux de construction"
+ },
+ {
+  "en": "Building Products & Equipment",
+  "fr": "Produits et équipements de construction"
+ },
+ {
+  "en": "Capital Markets",
+  "fr": "Marchés financiers"
+ },
+ {
+  "en": "Chemicals",
+  "fr": "Produits chimiques"
+ },
+ {
+  "en": "Communication Equipment",
+  "fr": "Équipements de communication"
+ },
+ {
+  "en": "Computer Hardware",
+  "fr": "Matériel informatique"
+ },
+ {
+  "en": "Confectioners",
+  "fr": "Confiserie"
+ },
+ {
+  "en": "Conglomerates",
+  "fr": "Conglomérats"
+ },
+ {
+  "en": "Consulting Services",
+  "fr": "Services de conseil"
+ },
+ {
+  "en": "Consumer Electronics",
+  "fr": "Électronique grand public"
+ },
+ {
+  "en": "Copper",
+  "fr": "Cuivre"
+ },
+ {
+  "en": "Credit Services",
+  "fr": "Services de crédit"
+ },
+ {
+  "en": "Diagnostics & Research",
+  "fr": "Diagnostics et recherche"
+ },
+ {
+  "en": "Discount Stores",
+  "fr": "Magasins à prix réduit"
+ },
+ {
+  "en": "Drug Manufacturers - General",
+  "fr": "Fabricants de médicaments – grandes sociétés"
+ },
+ {
+  "en": "Drug Manufacturers - Specialty & Generic",
+  "fr": "Fabricants de médicaments – spécialité et génériques"
+ },
+ {
+  "en": "Electrical Equipment & Parts",
+  "fr": "Équipements et pièces électriques"
+ },
+ {
+  "en": "Electronic Components",
+  "fr": "Composants électroniques"
+ },
+ {
+  "en": "Electronic Gaming & Multimedia",
+  "fr": "Jeux électroniques et multimédia"
+ },
+ {
+  "en": "Engineering & Construction",
+  "fr": "Ingénierie et construction"
+ },
+ {
+  "en": "Entertainment",
+  "fr": "Divertissement"
+ },
+ {
+  "en": "Farm & Heavy Construction Machinery",
+  "fr": "Machinerie agricole et de construction lourde"
+ },
+ {
+  "en": "Farm Products",
+  "fr": "Produits agricoles"
+ },
+ {
+  "en": "Financial Data & Stock Exchanges",
+  "fr": "Données financières et bourses"
+ },
+ {
+  "en": "Food Distribution",
+  "fr": "Distribution alimentaire"
+ },
+ {
+  "en": "Footwear & Accessories",
+  "fr": "Chaussures et accessoires"
+ },
+ {
+  "en": "Gold",
+  "fr": "Or"
+ },
+ {
+  "en": "Grocery Stores",
+  "fr": "Épiceries"
+ },
+ {
+  "en": "Health Information Services",
+  "fr": "Services d'information sur la santé"
+ },
+ {
+  "en": "Healthcare Plans",
+  "fr": "Régimes de soins de santé"
+ },
+ {
+  "en": "Home Improvement Retail",
+  "fr": "Rénovation domiciliaire (détail)"
+ },
+ {
+  "en": "Household & Personal Products",
+  "fr": "Produits ménagers et de soins personnels"
+ },
+ {
+  "en": "Industrial Distribution",
+  "fr": "Distribution industrielle"
+ },
+ {
+  "en": "Information Technology Services",
+  "fr": "Services de technologies de l'information"
+ },
+ {
+  "en": "Insurance - Diversified",
+  "fr": "Assurance diversifiée"
+ },
+ {
+  "en": "Insurance - Life",
+  "fr": "Assurance vie"
+ },
+ {
+  "en": "Insurance - Property & Casualty",
+  "fr": "Assurance de dommages"
+ },
+ {
+  "en": "Insurance Brokers",
+  "fr": "Courtiers d'assurance"
+ },
+ {
+  "en": "Integrated Freight & Logistics",
+  "fr": "Fret et logistique intégrés"
+ },
+ {
+  "en": "Internet Content & Information",
+  "fr": "Contenu et information sur Internet"
+ },
+ {
+  "en": "Internet Retail",
+  "fr": "Commerce de détail en ligne"
+ },
+ {
+  "en": "Lodging",
+  "fr": "Hébergement"
+ },
+ {
+  "en": "Luxury Goods",
+  "fr": "Produits de luxe"
+ },
+ {
+  "en": "Medical Care Facilities",
+  "fr": "Établissements de soins médicaux"
+ },
+ {
+  "en": "Medical Devices",
+  "fr": "Dispositifs médicaux"
+ },
+ {
+  "en": "Medical Distribution",
+  "fr": "Distribution médicale"
+ },
+ {
+  "en": "Medical Instruments & Supplies",
+  "fr": "Instruments et fournitures médicaux"
+ },
+ {
+  "en": "Oil & Gas E&P",
+  "fr": "Pétrole et gaz – exploration et production"
+ },
+ {
+  "en": "Oil & Gas Equipment & Services",
+  "fr": "Pétrole et gaz – équipements et services"
+ },
+ {
+  "en": "Oil & Gas Integrated",
+  "fr": "Pétrole et gaz – intégrés"
+ },
+ {
+  "en": "Oil & Gas Midstream",
+  "fr": "Pétrole et gaz – transport et stockage"
+ },
+ {
+  "en": "Oil & Gas Refining & Marketing",
+  "fr": "Pétrole et gaz – raffinage et commercialisation"
+ },
+ {
+  "en": "Packaged Foods",
+  "fr": "Aliments emballés"
+ },
+ {
+  "en": "Packaging & Containers",
+  "fr": "Emballages et contenants"
+ },
+ {
+  "en": "Pollution & Treatment Controls",
+  "fr": "Contrôle de la pollution et traitement"
+ },
+ {
+  "en": "REIT - Diversified",
+  "fr": "FPI – diversifiés"
+ },
+ {
+  "en": "REIT - Healthcare Facilities",
+  "fr": "FPI – établissements de santé"
+ },
+ {
+  "en": "REIT - Industrial",
+  "fr": "FPI – industriels"
+ },
+ {
+  "en": "REIT - Residential",
+  "fr": "FPI – résidentiels"
+ },
+ {
+  "en": "REIT - Retail",
+  "fr": "FPI – commerciaux"
+ },
+ {
+  "en": "REIT - Specialty",
+  "fr": "FPI – spécialisés"
+ },
+ {
+  "en": "Railroads",
+  "fr": "Chemins de fer"
+ },
+ {
+  "en": "Real Estate Services",
+  "fr": "Services immobiliers"
+ },
+ {
+  "en": "Rental & Leasing Services",
+  "fr": "Services de location"
+ },
+ {
+  "en": "Residential Construction",
+  "fr": "Construction résidentielle"
+ },
+ {
+  "en": "Resorts & Casinos",
+  "fr": "Centres de villégiature et casinos"
+ },
+ {
+  "en": "Restaurants",
+  "fr": "Restaurants"
+ },
+ {
+  "en": "Scientific & Technical Instruments",
+  "fr": "Instruments scientifiques et techniques"
+ },
+ {
+  "en": "Semiconductor Equipment & Materials",
+  "fr": "Équipements et matériaux pour semi-conducteurs"
+ },
+ {
+  "en": "Semiconductors",
+  "fr": "Semi-conducteurs"
+ },
+ {
+  "en": "Software - Application",
+  "fr": "Logiciels – applications"
+ },
+ {
+  "en": "Software - Infrastructure",
+  "fr": "Logiciels – infrastructure"
+ },
+ {
+  "en": "Specialty Business Services",
+  "fr": "Services aux entreprises spécialisés"
+ },
+ {
+  "en": "Specialty Chemicals",
+  "fr": "Produits chimiques de spécialité"
+ },
+ {
+  "en": "Specialty Industrial Machinery",
+  "fr": "Machinerie industrielle spécialisée"
+ },
+ {
+  "en": "Specialty Retail",
+  "fr": "Commerce de détail spécialisé"
+ },
+ {
+  "en": "Steel",
+  "fr": "Acier"
+ },
+ {
+  "en": "Telecom Services",
+  "fr": "Services de télécommunications"
+ },
+ {
+  "en": "Tobacco",
+  "fr": "Tabac"
+ },
+ {
+  "en": "Travel Services",
+  "fr": "Services de voyage"
+ },
+ {
+  "en": "Trucking",
+  "fr": "Camionnage"
+ },
+ {
+  "en": "Utilities - Diversified",
+  "fr": "Services publics diversifiés"
+ },
+ {
+  "en": "Utilities - Independent Power Producers",
+  "fr": "Services publics – producteurs d'électricité indépendants"
+ },
+ {
+  "en": "Utilities - Regulated Electric",
+  "fr": "Services publics – électricité réglementée"
+ },
+ {
+  "en": "Utilities - Regulated Gas",
+  "fr": "Services publics – gaz réglementé"
+ },
+ {
+  "en": "Utilities - Regulated Water",
+  "fr": "Services publics – eau réglementée"
+ },
+ {
+  "en": "Waste Management",
+  "fr": "Gestion des déchets"
+ }
+]

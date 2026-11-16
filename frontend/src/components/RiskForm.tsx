@@ -4,7 +4,7 @@ import { colon, money } from "../lib/format";
 import { useT } from "../lib/i18n";
 import { levelName, levelText, retainedLevel, VOLATILITY_ASSUMPTION } from "../lib/riskScale";
 import type { Jurisdiction } from "../api/types";
-import IndustryPicker from "./IndustryPicker";
+import IndustrySearch from "./IndustrySearch";
 import { EMPTY_INDUSTRIES, type IndustryChoice } from "../lib/industries";
 import { ESG_ANSWERS, MARKETS, marketName, toggleMarket, type Market } from "../lib/esgMarket";
 
@@ -109,7 +109,7 @@ export default function RiskForm({
           </fieldset>
           <fieldset className="q preference-question">
             <legend>{QUESTIONS.length + 4}. {L("Industries : ce que vous aimez et ce que vous préférez éviter (facultatif, plusieurs choix possibles)", "Industries: what you like and what you prefer to avoid (optional, several choices possible)")}</legend>
-            <IndustryPicker value={industries} onChange={setIndustries} />
+            <IndustrySearch value={industries} onChange={setIndustries} />
           </fieldset>
         </>
       )}

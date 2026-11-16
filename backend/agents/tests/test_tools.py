@@ -398,3 +398,44 @@ def test_propose_mandate_build_signale_toutes_les_industries_inconnues(ctx):
     result = catalog.propose_mandate(ctx, _build_draft(excludedIndustries=["Atlantis", "Semiconducters"], preferredIndustries=[{"industry": "Mordor"}]))
     assert result["valid"] is False
     assert [e.split("'")[1] for e in result["errors"]] == ["Atlantis", "Semiconducters", "Mordor"]
+
+
+# --- correction des noms d'industries proches -----------------------------------
+
+
+@pytest.fixture
+def ctx_industries(ctx, monkeypatch):
+    """Univers à industries réelles du jeu (noms exacts), pour tester la correction des noms."""
+    import pandas as pd
+
+    names = ["Healthcare Plans", "Oil & Gas E&P", "Oil & Gas Midstream", "REIT - Retail", "REIT - Residential", "Semiconductors"]
+    universe = pd.DataFrame({"symbol": [f"T{i}" for i in range(len(names))], "asset_class": "equity", "currency": "USD", "industry": names})
+    monkeypatch.setattr(ctx.store, "universe", lambda: universe)
+    monkeypatch.setattr(catalog.optimizer, "check_preferences", lambda *a, **k: None)
+    return ctx
+
+
+def test_propose_mandate_build_corrige_un_nom_presque_exact(ctx_industries):
+    draft = _build_draft(excludedIndustries=["Health Care Plans", "oil and gas e&p"], preferredIndustries=[{"industry": "Semiconducters", "minWeight": 10}])
+    result = catalog.propose_mandate(ctx_industries, draft)
+    assert result["valid"] is True
+    preferences = ctx_industries.captured["mandateDraft"]["preferences"]
+    assert preferences["excludedIndustries"] == ["Healthcare Plans", "Oil & Gas E&P"]
+    assert preferences["preferredIndustries"] == [{"industry": "Semiconductors", "minWeight": 10}]
+    assert result["corrections"] == [
+        "Industry 'Health Care Plans' was corrected to the dataset name 'Healthcare Plans'.",
+        "Industry 'oil and gas e&p' was corrected to the dataset name 'Oil & Gas E&P'.",
+        "Industry 'Semiconducters' was corrected to the dataset name 'Semiconductors'."]
+    assert not any("corrected" in str(w) for w in result["warnings"])
+
+
+def test_propose_mandate_build_ne_devine_pas_une_industrie_differente(ctx_industries):
+    # « REIT - Office » est proche de « REIT - Retail » et de « REIT - Residential » : jamais remplacé.
+    result = catalog.propose_mandate(ctx_industries, _build_draft(excludedIndustries=["REIT - Office", "Oil & Gas Drilling"]))
+    assert result["valid"] is False
+    assert [e.split("'")[1] for e in result["errors"]] == ["REIT - Office", "Oil & Gas Drilling"]
+
+
+def test_propose_mandate_build_sans_correction_pas_d_avertissement(ctx_industries):
+    result = catalog.propose_mandate(ctx_industries, _build_draft(excludedIndustries=["Healthcare Plans"]))
+    assert result["valid"] is True and "corrections" not in result

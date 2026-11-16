@@ -182,28 +182,68 @@ def get_profile(ctx: RequestContext) -> dict[str, Any]:
     return {"investorProfile": {k: v for k, v in profile.items() if k != "riskLevel"} if profile else profile}
 
 
-def _check_build_preferences(ctx: RequestContext, mandate: dict[str, Any]) -> list[str]:
-    """Industries exclues ou préférées du mode build : noms exacts du jeu, minimums atteignables (liste vide si tout va bien).
+def _industry_key(name: str) -> str:
+    """Clé de comparaison : casse, espaces, ponctuation et « & »/« and » n'ont pas d'effet (« Health Care Plans » = « Healthcare Plans »)."""
+    return re.sub(r"[^a-z0-9]", "", str(name).lower().replace("&", "and"))
 
+
+def _fix_industry_name(name: str, known: list[str]) -> str | None:
+    """Nom exact du jeu si une seule industrie correspond (après normalisation, ou à 0,85 de ressemblance), sinon None.
+
+    Une ressemblance partagée entre plusieurs noms, ou trop faible, n'est jamais devinée : mieux vaut l'erreur que
+    remplacer une industrie par une autre de sens différent."""
+    key = _industry_key(name)
+    same = [k for k in known if _industry_key(k) == key]
+    if len(same) == 1:
+        return same[0]
+    if same:
+        return None
+    close = difflib.get_close_matches(name, known, n=2, cutoff=0.85)
+    return close[0] if len(close) == 1 else None
+
+
+def _check_build_preferences(ctx: RequestContext, mandate: dict[str, Any]) -> tuple[list[str], list[str]]:
+    """Industries exclues ou préférées du mode build : noms exacts du jeu, minimums atteignables.
+
+    Renvoie (erreurs, corrections). Un nom presque exact est corrigé dans le mandat, et la correction est signalée à l'agent
+    (champ `corrections` du retour de propose_mandate, hors schema-mandate-warning).
     Toutes les industries inconnues sont signalées d'un coup : l'agent corrige en un seul aller-retour (délai de 30 s)."""
     preferences = mandate.get("preferences") or {}
+    universe = ctx.store.universe()
+    known = sorted(set(universe["industry"].dropna())) if "industry" in universe.columns else []
+    warnings: list[str] = []
+    fixed: dict[str, str] = {}
+
+    def resolve(name: str) -> str:
+        if name in known:
+            return name
+        if name not in fixed:
+            correct = _fix_industry_name(name, known)
+            if correct is None:
+                return name
+            fixed[name] = correct
+            warnings.append(f"Industry '{name}' was corrected to the dataset name '{correct}'.")
+        return fixed[name]
+
+    if preferences.get("excludedIndustries"):
+        preferences["excludedIndustries"] = list(dict.fromkeys(resolve(n) for n in preferences["excludedIndustries"]))
+    if preferences.get("preferredIndustries"):
+        preferences["preferredIndustries"] = [{**p, "industry": resolve(p["industry"])} for p in preferences["preferredIndustries"]]
     excluded = list(preferences.get("excludedIndustries") or [])
     preferred = [{"industry": p["industry"], "minWeight": (p["minWeight"] / 100.0 if p.get("minWeight") is not None else None)}
                  for p in preferences.get("preferredIndustries") or []]
-    universe = ctx.store.universe()
-    known = sorted(set(universe["industry"].dropna())) if "industry" in universe.columns else []
     problems: list[str] = []
     for name in dict.fromkeys(excluded + [p["industry"] for p in preferred]):
         if name not in known:
             close = difflib.get_close_matches(name, known, n=5, cutoff=0.4)
             problems.append(f"Unknown industry '{name}'. Use the dataset's English industry names" + (f", for example: {', '.join(close)}." if close else "."))
     if problems:
-        return problems
+        return problems, warnings
     try:
         optimizer.check_preferences(universe, excluded, preferred)
     except optimizer.OptimizerError as error:
-        return [str(error)]
-    return []
+        return [str(error)], warnings
+    return [], warnings
 
 
 def propose_mandate(ctx: RequestContext, draft: dict[str, Any]) -> dict[str, Any]:
@@ -230,10 +270,11 @@ def propose_mandate(ctx: RequestContext, draft: dict[str, Any]) -> dict[str, Any
         unknown.append(mandate["subjectTicker"])
     if unknown:
         return {"valid": False, "errors": [f"Unknown ticker(s): {', '.join(unknown)}. Use search_assets."]}
+    corrections: list[str] = []
     if mandate["mode"] == "build":
         if mandate.get("operations") or mandate.get("subjectTicker"):
             return {"valid": False, "errors": ["build describes a portfolio to construct: no operations and no subjectTicker."]}
-        problems = _check_build_preferences(ctx, mandate)
+        problems, corrections = _check_build_preferences(ctx, mandate)
         if problems:
             return {"valid": False, "errors": problems}
     if mandate["mode"] in ("add_asset", "rebalance") and not mandate.get("operations"):
@@ -246,7 +287,7 @@ def propose_mandate(ctx: RequestContext, draft: dict[str, Any]) -> dict[str, Any
             "riskCapacity cannot be a team assumption: use the profile value, or ask the user for it with quick replies."]}
     derived = evaluate_mandate(mandate)
     ctx.captured["mandateDraft"] = mandate
-    return {"valid": True, "errors": [], **derived}
+    return {"valid": True, "errors": [], **derived, **({"corrections": corrections} if corrections else {})}
 
 
 def read_evidence(ctx: RequestContext, evidence_id: str | None = None) -> dict[str, Any]:
