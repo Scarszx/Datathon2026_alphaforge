@@ -11,14 +11,14 @@ application:
       date: "2026-11-15"
       status: "demandé par l'utilisateur le 2026-11-15 ; code en cours sur la branche ws/translate (non fusionné, non déployé) ; à relire par l'équipe"
       summary:
-        - "Traduction de la restitution du run (narrative, motifs de verdict, mentions) : anglais vers fr-CA par Amazon Translate (srv-translate, TranslateText en text/html), et non plus par agent-orchestrator. Une seule langue cible : seulement quand userLanguage = fr. Un run en anglais ne traduit rien. Toute autre langue affiche l'anglais."
+        - "Traduction de la restitution du run (narrative, motifs de verdict, mentions) : anglais vers fr-CA par Amazon Translate (srv-translate, TranslateDocument en text/html : TranslateText n'a pas de ContentType), et non plus par agent-orchestrator. Une seule langue cible : seulement quand userLanguage = fr. Un run en anglais ne traduit rien. Toute autre langue affiche l'anglais."
         - "Les textes connus d'avance (motifs par défaut de module-rules, baseNotice et provinceNotices) ont une version française fixe, relue, à la source : aucun appel."
         - "Les textes variables (chaque section du rédacteur dès qu'elle est écrite, motifs reformulés par l'auditeur dès qu'il a fini) passent par Translate avec la terminologie grow-finance-en-fr (CSV en,fr-CA dans le dépôt, importée par un humain). Les emplacements {EV-nn}/{KB-nn} et les extraits entre guillemets sont protégés par <span translate=\"no\">, puis restitués (balises retirées, entités HTML décodées)."
         - "Contrôles en code après traduction : emplacements identiques, aucune formulation interdite ou de jugement (module-verifier), aucun chiffre ajouté. Un texte signalé passe par un seul appel de correction d'agent-orchestrator (sans outil, 1 tour, sortie limitée aux corrections), puis par un nouveau contrôle. Les textes fixes ne passent pas par ces contrôles (les mentions nomment des titres protégés)."
         - "Fail-open : une erreur de Translate, une terminologie absente ou une correction qui échoue donnent le texte anglais pour ce texte (placeholdersMatch = false pour une section). Le run n'échoue jamais pour la traduction. textEn reste la version de référence ; les schémas ne changent pas."
         - "La traduction en anglais des messages du chat reste faite par agent-orchestrator dans son propre appel (english_request), sans changement."
       impacts_to_handle:
-        - "infra/terraform/iam.tf : translate:TranslateText (et translate:GetTerminology si la documentation l'exige pour TerminologyNames) sur alphaforge-agents-role ; terraform apply par un humain."
+        - "infra/terraform/iam.tf : translate:TranslateDocument, translate:TranslateText et translate:GetTerminology (ressource *) sur alphaforge-agents-role ; variable translate_terminology (TRANSLATE_TERMINOLOGY) ; terraform apply par un humain."
         - "scripts/import_terminology.py (ImportTerminology, à exécuter par un humain) ; reconstruire la Lambda agents."
         - "SOLUTION.md (politique de langue) : la traduction de la restitution n'est plus faite par l'orchestrateur."
     - version: "0.4.19"
@@ -465,9 +465,9 @@ services:
   - id: "srv-translate"
     name: "Amazon Translate"
     type: "managed_service"
-    description: "Traduction anglais → fr-CA de la restitution d'un run (sections du rédacteur, motifs reformulés par l'auditeur), seulement quand userLanguage = fr (0.4.20). TranslateText en text/html : emplacements {EV-nn}/{KB-nn} et extraits entre guillemets protégés par <span translate=\"no\">. Terminologie personnalisée grow-finance-en-fr. Fail-open : en cas d'erreur, le texte anglais est affiché."
+    description: "Traduction anglais → fr-CA de la restitution d'un run (sections du rédacteur, motifs reformulés par l'auditeur), seulement quand userLanguage = fr (0.4.20). TranslateDocument en text/html : emplacements {EV-nn}/{KB-nn} et extraits entre guillemets protégés par <span translate=\"no\">. Terminologie personnalisée grow-finance-en-fr. Fail-open : en cas d'erreur, le texte anglais est affiché."
     notes:
-      - "Droit translate:TranslateText (et translate:GetTerminology si nécessaire) sur le rôle de la Lambda agents. Région us-east-1. La terminologie est importée par un humain (scripts/import_terminology.py), jamais par le code de la Lambda."
+      - "Droits translate:TranslateDocument, translate:TranslateText et translate:GetTerminology (ressource *) sur le rôle de la Lambda agents. Région us-east-1. La terminologie est importée par un humain (scripts/import_terminology.py), jamais par le code de la Lambda."
       - "Translate ne suit aucune consigne : les contrôles de module-verifier (emplacements, formulations interdites, chiffres) servent de filet ; un texte signalé passe par un appel de correction d'agent-orchestrator."
 
   - id: "srv-cloudwatch"
