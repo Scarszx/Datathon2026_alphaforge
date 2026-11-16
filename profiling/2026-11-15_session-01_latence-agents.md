@@ -249,9 +249,127 @@ Le relever ne le rend ni plus rapide ni plus bavard. Le seul effet connu : Bedro
 donc un plafond plus haut consomme plus de quota par appel. Couper la réflexion **et** relever `max_tokens` donne le même gain de temps
 que couper la réflexion seule.
 
+## Constat 7 : la traduction (analyse hors anglais)
+
+Code : `pipeline._translate_run_texts` → `orchestrator.translate` (`llm/orchestrator/agent.py:60`), avec un agent sans outil, 1 tour,
+`TRANSLATION_SPEC` (8 192 jetons, 30 s) et une sortie structurée `TranslationBatch {items: [str]}`.
+Elle n'a lieu que si `userLanguage` ≠ `en` : 9 analyses sur 16 dans l'échantillon. En anglais, son coût est nul.
+
+- **Toujours 2 appels LLM, l'un après l'autre**, chacun en 1 cycle :
+  1. **Les 4 sections du récit.** Avec Sonnet : 8 à 11 s, environ 1 550 jetons de sortie pour environ 3 600 caractères traduits.
+  2. **Les motifs des verdicts et les mentions de juridiction**, soit 14 à 15 textes. Avec Sonnet : 6 à 7 s, environ 1 100 jetons de sortie.
+  - Total : **environ 16 s avec Sonnet**, contre 23 à 37 s avec Opus.
+- **Réflexion :** avec Opus, les 10 appels réfléchissaient. Avec Sonnet, aucun des 8 appels n'a de bloc de raisonnement.
+  Ce n'est donc plus la cause aujourd'hui.
+- **Dépendances réelles :**
+  - L'appel 1 dépend du rédacteur.
+  - L'appel 2 ne dépend **pas** du rédacteur. Il attend l'appel 1 uniquement à cause de l'ordre du code dans `_translate_run_texts`.
+- **L'appel 2 retraduit chaque fois les mêmes phrases.** Sur 9 runs, 43 textes distincts. Environ 10 des 14 textes sont des phrases fixes
+  du module de règles ou des mentions de province, identiques d'un run à l'autre (par exemple « The scenario holds no crypto assets: the rule does not apply. », présente 9 fois sur 9).
+  Seuls les motifs des règles **déclenchées** varient, parce que l'auditeur les reformule.
+
+### Hypothèses sur la lenteur en français (à vérifier)
+
+1. **Deux appels en série**, alors que le second pourrait partir plus tôt. Mesuré.
+2. **Le français coûte plus de jetons que l'anglais.** Le texte est environ 15 à 20 % plus long (3 070 → 3 600 caractères),
+   et la sortie donne environ 2,3 caractères par jeton, contre environ 4 pour le texte anglais du rédacteur. Explications possibles : accents,
+   emplacements `{EV-07}` découpés en plusieurs jetons (25 à 33 par récit), JSON de l'appel d'outil (guillemets, échappements). Le ratio est mesuré,
+   mais sa décomposition est une hypothèse : à vérifier en comptant les jetons d'un échantillon.
+3. **Du travail répété :** environ 70 % des textes de l'appel 2 sont fixes et pourraient être traduits une seule fois, puis mis en table. Mesuré.
+4. Avec le rédacteur en 4 appels parallèles (worktree `ws/writer-parallel`), l'appel 1 attendrait encore la dernière section, puis traduirait tout d'un bloc.
+
+### Leviers sur la traduction (à discuter, rien n'est fait)
+
+- **Table de traduction fixe** pour les phrases du module de règles et les mentions de province. Ce sont des textes connus d'avance, traduits une fois, puis relus par l'équipe.
+  L'appel 2 ne traiterait plus que les motifs reformulés par l'auditeur (2 à 4 textes), ou disparaîtrait.
+- **Lancer l'appel 2 dès la fin de l'auditeur**, en même temps que les sections tardives du rédacteur.
+- **Traduire chaque section dès qu'elle est écrite** (en continu, section par section, et en parallèle) au lieu d'attendre les 4.
+- Plus radical (à évaluer, contraintes du vérificateur) : faire écrire au rédacteur la version française en même temps que `textEn`.
+
+### Proposition retenue en principe (2026-11-15) : Amazon Translate au lieu du LLM pour la traduction du run
+
+D'après les mesures de Kiro, faites dans le compte (us-east-1, en → fr-CA) et **non revérifiées ici** :
+- environ 0,7 à 1,1 s par section, contre 8 à 11 s pour les 4 sections avec Sonnet ;
+- 16 motifs en environ 3 s avec 4 appels simultanés (environ 1 s attendu dans la Lambda avec un pool de threads, non mesuré) ;
+- 15 $ par million de caractères.
+
+Vérifié dans le dépôt :
+- Le rôle s'appelle bien `alphaforge-agents-role` (`infra/terraform/iam.tf:42`, `name_prefix = "alphaforge"`).
+- Le vérificateur a déjà des motifs français (`FORBIDDEN_PATTERNS`, `JUDGEMENT_PATTERNS` : « conforme », « vous convient », « recommandé »…).
+- Les motifs par défaut viennent de `rules/rules.py` (`_verdict`, en anglais) et les mentions de `rules_config` (`provinceNotices`, `baseNotice`).
+  L'auditeur ne réécrit que les motifs des règles déclenchées (`llm/auditor/agent.py:176-180`).
+
+Points d'attention :
+- **Pas de détection de langue à faire :** `run["userLanguage"]` est déjà connu (il vient du mandat).
+- **Emplacements :** envoyer en `text/html`, protéger chaque `{EV-nn}` et `{KB-nn}` avec `<span translate="no">`, puis retirer les balises et
+  **décoder les entités HTML** de la réponse (`&amp;`, `&#39;`…).
+- **Vocabulaire financier :** il faut une terminologie personnalisée (CSV de 30 à 50 termes, relue). C'est une ressource AWS à créer,
+  ce qui demande un accord explicite.
+- **Consignes :** Translate n'en suit aucune. Le filet de sécurité reste le vérificateur (emplacements, formulations interdites) et le Guardrail de sortie.
+- **Repli :** il existe déjà. Une section dont les emplacements changent s'affiche en anglais (`placeholdersMatch = false`). Pas besoin de repli LLM.
+- **Contrat et SOLUTION.md :** la traduction est attribuée à agent-orchestrator (SOLUTION.md, environ lignes 177-179). Il faut ajouter le droit IAM
+  `translate:TranslateText` (et peut-être `translate:GetTerminology`, à vérifier), puis faire un `terraform apply` par un humain.
+
+### Idée examinée : Translate d'abord, puis un LLM qui relit et corrige
+
+- **Si le LLM renvoie le texte corrigé en entier,** on ne gagne rien : il réécrit environ 1 500 jetons, soit à peu près la durée de la traduction actuelle.
+- **Si le LLM ne renvoie que des corrections** (`[]`, ou une liste `{item, avant, après}`), sa sortie est courte : quelques secondes.
+  Il doit quand même lire la source et la traduction (environ 2 000 à 3 000 jetons d'entrée), et la réflexion adaptative peut l'allonger.
+- **Une bonne partie des consignes se vérifie déjà dans le code, sans LLM :** emplacements (`placeholders_preserved`), formulations interdites
+  et jugements (`FORBIDDEN_PATTERNS`, `JUDGEMENT_PATTERNS`, motifs français compris), chiffres écrits à la main.
+  Le vocabulaire financier relève de la terminologie Translate.
+- **Version retenue à discuter :**
+  1. Translate avec la terminologie ;
+  2. contrôles en code ;
+  3. relecture LLM **seulement pour les textes signalés**, avec une sortie limitée aux corrections, puis un nouveau contrôle en code ;
+  4. si ça échoue encore, le texte anglais.
+
+  Le cas courant reste à environ 1 s. Le LLM n'intervient que sur les exceptions, et il faudra mesurer à quelle fréquence.
+
+### Précisions (2026-11-15)
+
+- **Langues :** seulement le français et l'anglais. Un utilisateur anglophone ne déclenche aucune traduction. Translate n'a donc qu'une cible, `fr-CA`.
+- **Sens des traductions :**
+  - **Entrée du chat (français → anglais) :** l'orchestrateur la fait lui-même, dans le même appel que sa réponse (champ `english_request` d'`OrchestratorTurn`).
+    Il n'y a pas d'appel séparé, donc rien à gagner ici.
+  - **Sortie du run (anglais → français) :** le rédacteur et le module de règles écrivent en anglais (`textEn`, `messageEn`), puis
+    `_translate_run_texts` traduit vers `userLanguage` pour l'affichage. **C'est cette étape de 16 s que Translate remplacerait.**
+- **Terminologie Translate :** c'est un glossaire (CSV `en,fr`) importé une fois dans le compte (`ImportTerminology`), puis cité par son nom à chaque appel
+  (`TerminologyNames`). Translate l'applique **pendant** la traduction. Ce n'est pas un contrôle après coup.
+- `ws/writer-parallel` est fusionné dans `main` (`0a913cc`).
+
+### Décision (2026-11-15) : Translate délégué à un agent (worktree `ws/translate`), sans banc de test réel
+
+- L'utilisateur n'a pas le temps de tester avant la soumission. Le glossaire de départ (environ 50 termes) est rédigé à partir du vocabulaire de l'application,
+  **sans relecture d'un spécialiste** : c'est une dette à reprendre.
+- Piège relevé en préparant la tâche : les mentions de province contiennent « planificateur financier », qui figure dans `FORBIDDEN_PATTERNS`.
+  Elles viennent donc de la table fixe relue et ne passent pas par ce contrôle.
+
+## État des chantiers à la fin de la session (2026-11-15, `main` = `0a913cc`)
+
+| Chantier | Branche | État | Contrat |
+|---|---|---|---|
+| Industries recherchées dans le jeu (constats 3 et 5) | `ws/industry-search` | fusionné, **non déployé**. Profils supprimés (`scripts/delete_profiles.py`) | 0.4.18 |
+| Agents repassés sur Sonnet 5.5 | `main` (`290bccc`) | fusionné | 0.4.19 |
+| Délai de l'orchestrateur à 30 s, toutes les industries inconnues d'un coup | `ws/mandate-errors` (`157a87e`) | fusionné | déjà dans le contrat, rappel en 0.4.19 |
+| Cours de l'optimiseur lus en bloc (`prices_all`) | `ws/prices-many` (`994b521`) | fusionné, **non déployé** | 0.4.19 |
+| Rédacteur en 4 appels parallèles, dont 2 pendant l'auditeur (constat 6) | `ws/writer-parallel` (`2670aca`) | fusionné, **non déployé** | 0.4.19 |
+| Contexte OpenTelemetry dans les threads (traces `kb.retrieve` orphelines, constat 4) | `f1edb4e` | fusionné | 0.4.19 |
+| Restitution traduite par Amazon Translate (constat 7) | `ws/translate` | **en cours** (agent délégué), sans banc réel | 0.4.20 |
+| Moteur à chaud (8,6 s), démarrages à froid, provisioned concurrency | — | **mis de côté** par l'utilisateur | — |
+
+Gains attendus, non mesurés après déploiement :
+- tours de chat sans aller-retour perdu sur `propose_mandate` (environ −4 à −5 s par échec évité, plus de timeouts) ;
+- rédacteur passant d'environ 14 s à environ 4 s après l'auditeur ;
+- traduction passant d'environ 16 s à environ 1 s après la dernière section.
+
+Il faudra **refaire ce profilage après déploiement** (mêmes scripts, ou `scripts/export_langfuse.py`) pour confirmer ces gains.
+
 ## Questions ouvertes pour la suite
 
-- Comment se répartissent les 8,6 s du moteur (S3 ou calcul numpy/pandas) ? Il faut des spans.
+- Comment se répartissent les 8,6 s du moteur (S3 ou calcul numpy/pandas) ? Il faut des spans. `prices_many` a sans doute réduit la part S3 : à mesurer.
 - Quelle fraction des sessions réelles est en français, donc paie la traduction ?
-- Les libellés d'industrie du profil investisseur viennent-ils du questionnaire ? Une table fixe libellé → industries du jeu
-  supprimerait la devinette de l'agent.
+- ~~Les libellés d'industrie du profil investisseur viennent-ils du questionnaire ?~~ Oui : réglé par la recherche d'industries (0.4.18).
+- Le glossaire `grow-finance-en-fr` et les traductions fixes doivent être relus par quelqu'un qui connaît le vocabulaire des placements au Canada.
+- Orchestrateur : `get_profile` et `get_portfolio` coûtent encore chacun un cycle LLM. L'idée de les injecter dans `session_context` (piste 2) n'est pas faite.
+- Prompt caching Bedrock (piste 5) : non fait.
