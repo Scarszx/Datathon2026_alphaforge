@@ -14,7 +14,7 @@
       "delegatesTo": [],
       "limits": {
         "max_agent_cycles": 8,
-        "timeout_seconds": 25
+        "timeout_seconds": 30
       }
     },
     {

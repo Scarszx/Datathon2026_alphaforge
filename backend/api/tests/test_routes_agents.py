@@ -56,7 +56,7 @@ def test_le_registre_respecte_les_droits_et_limites_du_contrat():
     assert by_id["agent-orchestrator"]["delegatesTo"] == []
     assert by_id["agent-orchestrator"]["limits"] == {
         "max_agent_cycles": 8,
-        "timeout_seconds": 25,
+        "timeout_seconds": 30,
     }
     assert by_id["agent-auditor"]["allowedTools"] == []  # 0.4.3 : le code de l'auditeur lance les recherches
     assert by_id["agent-auditor"]["limits"] == {
