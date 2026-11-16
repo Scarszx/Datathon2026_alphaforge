@@ -129,7 +129,7 @@ DEFAULT_TRANSLATE_TERMINOLOGY = "grow-finance-en-fr"
 def translate_terminology() -> str | None:
     """Nom de la terminologie Translate à citer, ou None (variable vide = aucune terminologie).
 
-    Importée par scripts/import_terminology.sh ; absente du compte, la traduction se fait sans elle."""
+    Importée par scripts/import_terminology.py ; absente du compte, la traduction se fait sans elle."""
     value = os.environ.get("TRANSLATE_TERMINOLOGY")
     if value is None:
         return DEFAULT_TRANSLATE_TERMINOLOGY

@@ -95,7 +95,7 @@ variable "langfuse_secret_param" {
 }
 
 variable "translate_terminology" {
-  description = "Nom de la terminologie Amazon Translate (en vers fr-CA) importée par scripts/import_terminology.sh. Vide = aucune terminologie."
+  description = "Nom de la terminologie Amazon Translate (en vers fr-CA) importée par scripts/import_terminology.py. Vide = aucune terminologie."
   type        = string
   default     = "grow-finance-en-fr"
 }
