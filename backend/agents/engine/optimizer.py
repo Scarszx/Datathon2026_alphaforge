@@ -21,7 +21,6 @@ from __future__ import annotations
 
 import json
 import math
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
@@ -210,11 +209,9 @@ def optimize_portfolio(store: DataStore, risk_profile: int, excluded_industries:
         excluded_industries, preferred_industries, set(candidates["industry"]), cfg
     )
 
-    # Lectures S3 en parallèle : une par titre, séquentielles elles dépassaient 30 s sur une Lambda froide.
-    # 10 threads = pool de connexions par défaut de boto3 ; le cache de DataStore est sûr entre threads.
     symbols = [*candidates.index, MARKET_INDEX]
-    with ThreadPoolExecutor(max_workers=10) as pool:
-        series = dict(zip(symbols, pool.map(lambda symbol: native_series(store, symbol), symbols)))
+    store.prices_many(symbols)  # ~400 tickers : lecture groupée au lieu d'un GET S3 par ticker
+    series = {symbol: native_series(store, symbol) for symbol in symbols}
     prices = pd.DataFrame(series).sort_index()
     end = store.last_date()
     window = prices.loc[end - pd.DateOffset(years=int(cfg["windowYears"])):end]

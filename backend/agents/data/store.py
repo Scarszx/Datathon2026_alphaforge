@@ -15,15 +15,22 @@ from __future__ import annotations
 import io
 import json
 import threading
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
+import numpy as np
 import pandas as pd
 
 from backend.common import config
 
 PRICE_COLUMNS = ["date", "close", "adjclose", "currency"]
+# Mêmes cours que prices/{ticker}.parquet, regroupés par année (un fichier par année, tous les tickers).
+PRICES_ALL = "prices_all/year={year}/part-0.parquet"
+# Au-delà de ce nombre de tickers absents du cache, une lecture groupée (≈12 fichiers) bat ~400 GET séquentiels.
+BULK_THRESHOLD = 20
+FETCH_WORKERS = 16  # GET S3 en parallèle (lecture groupée et repli par ticker)
 UNIVERSE_COLUMNS = ["symbol", "name", "asset_class", "market", "currency", "sector"]
 OPTIONAL_UNIVERSE_COLUMNS = ["industry", "country"]  # absentes des jeux antérieurs à 0.4.8
 NON_INVESTABLE_CLASSES = {"index"}  # ex. ^GSPC : référence de comparaison, jamais en portefeuille
@@ -129,13 +136,60 @@ class DataStore:
 
         def load() -> pd.DataFrame:
             safe = ticker.replace("/", "_")
-            frame = self._parquet(f"prices/{safe}.parquet", PRICE_COLUMNS)
-            frame["date"] = pd.to_datetime(frame["date"])
-            frame = frame.dropna(subset=["adjclose"]).sort_values("date")
-            frame = frame[frame["adjclose"] > 0]
-            return frame.drop_duplicates("date", keep="last").set_index("date")
+            return _clean_prices(self._parquet(f"prices/{safe}.parquet", PRICE_COLUMNS))
 
         return self._cached(f"prices:{ticker}", load)
+
+    def prices_many(self, tickers: Iterable[str]) -> dict[str, pd.DataFrame]:
+        """prices() pour plusieurs tickers, sans ~400 GET S3 séquentiels (30 s et plus à cache vide).
+
+        Beaucoup de tickers absents du cache : lecture groupée de prices_all (un fichier par année, en parallèle).
+        Les tickers encore absents (jeu sans prices_all, ticker manquant) sont lus fichier par fichier, en parallèle.
+        Résultat identique à prices() : même nettoyage, même cache.
+        """
+        wanted = list(dict.fromkeys(tickers))
+        missing = [t for t in wanted if f"prices:{t}" not in self._cache]
+        if len(missing) >= BULK_THRESHOLD:
+            self._load_all_prices()
+            missing = [t for t in missing if f"prices:{t}" not in self._cache]
+        if missing:
+            with ThreadPoolExecutor(max_workers=min(FETCH_WORKERS, len(missing))) as pool:
+                list(pool.map(self.prices, missing))
+        return {t: self.prices(t) for t in wanted}
+
+    def _load_all_prices(self) -> bool:
+        """Remplit le cache prices:{ticker} depuis prices_all ; False (cache inchangé) si la disposition est absente."""
+        with self._lock:
+            if self._cache.get("prices_all_loaded"):
+                return True
+        period = self.manifest().get("period") or {}
+        start, end = period.get("actualStart"), period.get("actualEnd")
+        if not start or not end:
+            return False
+        years = range(pd.Timestamp(start).year, pd.Timestamp(end).year + 1)
+        try:
+            with ThreadPoolExecutor(max_workers=min(FETCH_WORKERS, len(years))) as pool:
+                parts = list(pool.map(
+                    lambda year: self._parquet(PRICES_ALL.format(year=year), ["symbol", *PRICE_COLUMNS]), years
+                ))
+        except DatasetError:
+            return False
+        # Nettoyage de _clean_prices fait une fois sur ~1,7 M lignes, puis découpe par ticker (582 nettoyages : ~1,3 s).
+        frame = pd.concat(parts, ignore_index=True)
+        frame["date"] = pd.to_datetime(frame["date"])
+        frame = frame.dropna(subset=["adjclose"])
+        frame = frame[frame["adjclose"] > 0]
+        frame = frame.sort_values(["symbol", "date"], kind="stable")
+        frame = frame.drop_duplicates(["symbol", "date"], keep="last").set_index("date")
+        symbols = frame.pop("symbol").to_numpy()
+        cuts = [0, *(np.flatnonzero(symbols[1:] != symbols[:-1]) + 1), len(symbols)]
+        # copy() : chaque ticker a son propre tableau, comme avec prices() (pas de vue sur le grand cadre).
+        loaded = {str(symbols[a]): frame.iloc[a:b].copy() for a, b in zip(cuts[:-1], cuts[1:]) if b > a}
+        with self._lock:
+            for symbol, prices in loaded.items():
+                self._cache.setdefault(f"prices:{symbol}", prices)
+            self._cache["prices_all_loaded"] = True
+        return True
 
     def fx_usdcad(self) -> pd.Series:
         """Taux USD/CAD (CAD par USD), indexé par date."""
@@ -217,6 +271,15 @@ class DataStore:
         return f"{relative}@{self.version}"
 
 
+def _clean_prices(frame: pd.DataFrame) -> pd.DataFrame:
+    """Cours d'un ticker : index date, sans adjclose vide ou nul, une ligne par date (la dernière)."""
+    frame = frame.copy()
+    frame["date"] = pd.to_datetime(frame["date"])
+    frame = frame.dropna(subset=["adjclose"]).sort_values("date")
+    frame = frame[frame["adjclose"] > 0]
+    return frame.drop_duplicates("date", keep="last").set_index("date")
+
+
 _S3 = None
 
 
@@ -224,8 +287,10 @@ def _s3_client():
     global _S3
     if _S3 is None:
         import boto3
+        from botocore.config import Config
 
-        _S3 = boto3.client("s3")
+        # Un pool par défaut de 10 connexions ferait attendre les GET parallèles de prices_many.
+        _S3 = boto3.client("s3", config=Config(max_pool_connections=FETCH_WORKERS))
     return _S3
 
 
