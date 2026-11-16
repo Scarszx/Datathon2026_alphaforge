@@ -29,7 +29,7 @@ from backend.agents.rules.rules import check_rules as run_rules
 from backend.agents.tools import kb
 from backend.agents.tools.context import RequestContext
 from backend.common.http import ApiError
-from backend.common.mandates import _warning, evaluate_mandate
+from backend.common.mandates import evaluate_mandate
 from backend.common.repositories import analyses as analyses_repo
 from backend.common.repositories import portfolios as portfolios_repo
 from backend.common.repositories import users as users_repo
@@ -202,15 +202,16 @@ def _fix_industry_name(name: str, known: list[str]) -> str | None:
     return close[0] if len(close) == 1 else None
 
 
-def _check_build_preferences(ctx: RequestContext, mandate: dict[str, Any]) -> tuple[list[str], list[dict[str, Any]]]:
+def _check_build_preferences(ctx: RequestContext, mandate: dict[str, Any]) -> tuple[list[str], list[str]]:
     """Industries exclues ou préférées du mode build : noms exacts du jeu, minimums atteignables.
 
-    Renvoie (erreurs, avertissements). Un nom presque exact est corrigé dans le mandat (avertissement INDUSTRY_NAME_CORRECTED).
+    Renvoie (erreurs, corrections). Un nom presque exact est corrigé dans le mandat, et la correction est signalée à l'agent
+    (champ `corrections` du retour de propose_mandate, hors schema-mandate-warning).
     Toutes les industries inconnues sont signalées d'un coup : l'agent corrige en un seul aller-retour (délai de 30 s)."""
     preferences = mandate.get("preferences") or {}
     universe = ctx.store.universe()
     known = sorted(set(universe["industry"].dropna())) if "industry" in universe.columns else []
-    warnings: list[dict[str, Any]] = []
+    warnings: list[str] = []
     fixed: dict[str, str] = {}
 
     def resolve(name: str) -> str:
@@ -221,8 +222,7 @@ def _check_build_preferences(ctx: RequestContext, mandate: dict[str, Any]) -> tu
             if correct is None:
                 return name
             fixed[name] = correct
-            warnings.append(_warning(
-                "INDUSTRY_NAME_CORRECTED", f"Industry '{name}' was corrected to the dataset name '{correct}'.", given=name, corrected=correct))
+            warnings.append(f"Industry '{name}' was corrected to the dataset name '{correct}'.")
         return fixed[name]
 
     if preferences.get("excludedIndustries"):
@@ -270,7 +270,7 @@ def propose_mandate(ctx: RequestContext, draft: dict[str, Any]) -> dict[str, Any
         unknown.append(mandate["subjectTicker"])
     if unknown:
         return {"valid": False, "errors": [f"Unknown ticker(s): {', '.join(unknown)}. Use search_assets."]}
-    corrections: list[dict[str, Any]] = []
+    corrections: list[str] = []
     if mandate["mode"] == "build":
         if mandate.get("operations") or mandate.get("subjectTicker"):
             return {"valid": False, "errors": ["build describes a portfolio to construct: no operations and no subjectTicker."]}
@@ -287,9 +287,7 @@ def propose_mandate(ctx: RequestContext, draft: dict[str, Any]) -> dict[str, Any
             "riskCapacity cannot be a team assumption: use the profile value, or ask the user for it with quick replies."]}
     derived = evaluate_mandate(mandate)
     ctx.captured["mandateDraft"] = mandate
-    if corrections:
-        derived = {**derived, "warnings": [*corrections, *derived.get("warnings", [])]}
-    return {"valid": True, "errors": [], **derived}
+    return {"valid": True, "errors": [], **derived, **({"corrections": corrections} if corrections else {})}
 
 
 def read_evidence(ctx: RequestContext, evidence_id: str | None = None) -> dict[str, Any]:
