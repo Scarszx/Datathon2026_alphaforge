@@ -15,8 +15,17 @@ class OrchestratorTurn(BaseModel):
     )
 
 
-class TranslationBatch(BaseModel):
-    items: list[str] = Field(description="Translated items, same count and same order as received.")
+class TranslationEdit(BaseModel):
+    item: int = Field(description="The 'item' number of the flagged translation to correct.")
+    find: str = Field(description="Exact text to find in that translation (a short span, copied character for character).")
+    replace: str = Field(description="Text that replaces the first occurrence of `find`.")
+
+
+class TranslationFixes(BaseModel):
+    fixes: list[TranslationEdit] = Field(
+        default_factory=list,
+        description="Only the corrections, as find/replace pairs. Empty if no flagged translation can be fixed with a local edit.",
+    )
 
 
 class Refusal(BaseModel):

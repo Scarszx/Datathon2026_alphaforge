@@ -66,19 +66,41 @@ def call(name: str, **params: Any) -> list[dict[str, Any]]:
     return [{"name": name, "input": params}]
 
 
-class EchoTranslator(ScriptedModel):
-    """Traducteur simulé : renvoie chaque élément reçu préfixé, emplacements conservés."""
+class FakeTranslate:
+    """Faux client boto3 `translate` : traduit en renvoyant `translations[anglais]` ou « FR » + l'anglais.
 
-    def __init__(self, prefix: str = "FR "):
-        super().__init__([])
-        self.prefix = prefix
+    Il reçoit le HTML réellement envoyé (balises translate="no" comprises), le garde dans `calls`, et renvoie du HTML
+    comme Amazon Translate : les segments protégés restent enveloppés, `&` redevient `&amp;`.
+    `delays` : secondes d'attente par texte anglais ; `errors` : texte anglais -> exception à lever ;
+    `raw` : texte anglais -> HTML renvoyé tel quel (pour simuler des défauts de traduction)."""
 
-    async def stream(self, messages, tool_specs=None, system_prompt=None, **kwargs):
-        text = messages[-1]["content"][0].get("text", "")
-        items = json.loads(text.split("<items>\n", 1)[1].split("\n</items>", 1)[0])
-        self.script = [output("TranslationBatch", items=[self.prefix + item for item in items])]
-        async for chunk in super().stream(messages, tool_specs, system_prompt, **kwargs):
-            yield chunk
+    def __init__(self, translations: dict[str, str] | None = None, *, delays: dict[str, float] | None = None,
+                 errors: dict[str, Exception] | None = None, raw: dict[str, str] | None = None):
+        self.translations = dict(translations or {})
+        self.delays, self.errors, self.raw = delays or {}, errors or {}, raw or {}
+        self.calls: list[dict[str, Any]] = []
+        self.terminology_missing = False
+
+    def translate_document(self, **params: Any) -> dict[str, Any]:
+        import time
+
+        from backend.agents.translate import service
+
+        html_in = params["Document"]["Content"].decode("utf-8")
+        english = service.unprotect(html_in)
+        self.calls.append({"english": english, "html": html_in, "params": params, "start": time.perf_counter()})
+        if params.get("TerminologyNames") and self.terminology_missing:
+            from botocore.exceptions import ClientError
+
+            raise ClientError({"Error": {"Code": "ResourceNotFoundException", "Message": "no terminology"}}, "TranslateDocument")
+        time.sleep(self.delays.get(english, 0.0))
+        if english in self.errors:
+            raise self.errors[english]
+        self.calls[-1]["end"] = time.perf_counter()
+        if english in self.raw:
+            return {"TranslatedDocument": {"Content": self.raw[english].encode("utf-8")}}
+        french = self.translations.get(english, "FR " + english)
+        return {"TranslatedDocument": {"Content": service.protect(french).encode("utf-8")}}
 
 
 class SectionWriter(ScriptedModel):
@@ -88,7 +110,7 @@ class SectionWriter(ScriptedModel):
     `log` est partagé entre les instances d'un même run : {"calls": {clé: {"start", "end", "system", "record"}}}.
     """
 
-    def __init__(self, log: dict[str, Any], texts: dict[str, str] | None = None, *, delay: float = 0.0,
+    def __init__(self, log: dict[str, Any], texts: dict[str, str] | None = None, *, delay: float | dict[str, float] = 0.0,
                  fail: set[str] = frozenset(), evidence_reads: int = 0):  # type: ignore[assignment]
         super().__init__([])
         self.log, self.texts, self.delay, self.fail, self.evidence_reads = log, texts or {}, delay, fail, evidence_reads
@@ -101,7 +123,7 @@ class SectionWriter(ScriptedModel):
         key = text.split("<section>", 1)[1].split("</section>", 1)[0]
         entry = self.log["calls"].setdefault(key, {"start": time.perf_counter(), "system": system_prompt,
                                                    "record": json.loads(text.split("<analysis_record>\n", 1)[1].split("\n</analysis_record>", 1)[0])})
-        await asyncio.sleep(self.delay)
+        await asyncio.sleep(self.delay.get(key, 0.0) if isinstance(self.delay, dict) else self.delay)
         if key in self.fail:
             self.script = ["no output"] * 3
         else:

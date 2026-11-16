@@ -1,5 +1,5 @@
 """Chaîne d'un run (contrat api-runs-create) : module-engine → module-rules → [partial]
-→ agent-auditor (KB) → agent-writer → traduction (agent-orchestrator) → module-verifier → [done].
+→ agent-auditor (KB) → agent-writer → traduction (Amazon Translate, section par section) → module-verifier → [done].
 
 La partie déterministe est écrite tout de suite (status = partial) ; la suite est
 exécutée par une invocation asynchrone de la Lambda elle-même (événement
@@ -28,7 +28,8 @@ from backend.agents.rules.settings import settings
 from backend.agents.toolbox import TOOLBOX
 from backend.agents.tools import notices
 from backend.agents.tools.context import RequestContext
-from backend.agents.verifier.verifier import SECTION_KEYS, forbidden_phrases, verify_narrative
+from backend.agents.translate import RunTranslator
+from backend.agents.verifier.verifier import SECTION_KEYS, verify_narrative
 from backend.common.http import ApiError
 from backend.common.ids import new_run_id
 from backend.common.repositories import analyses as analyses_repo
@@ -152,29 +153,19 @@ def start_run(ctx: RequestContext, mandate_version: int) -> dict[str, Any]:
 # --- complétion (auditeur, rédacteur, traduction, vérificateur) -------------
 
 
-def _translate_run_texts(ctx: RequestContext, sections: list[dict[str, Any]], verdicts: list[dict[str, Any]],
-                         notices: list[str], language: str) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[str], bool]:
-    """Traduit sections, motifs et mentions ; renvoie aussi si la traduction a gardé les emplacements."""
-    if language == "en":
-        return ([{**s, "text": s["textEn"]} for s in sections],
-                [{**v, "message": v["messageEn"]} for v in verdicts], list(notices), True)
-    section_texts = orchestrator.translate(ctx, [s["textEn"] for s in sections], language)
-    match = all(orchestrator.placeholders_preserved(s["textEn"], t) for s, t in zip(sections, section_texts))
-    translated_sections = []
-    for section, text in zip(sections, section_texts):
-        # Une traduction qui perd ou ajoute un emplacement n'est pas affichée : la version anglaise la remplace.
-        shown = text if orchestrator.placeholders_preserved(section["textEn"], text) else section["textEn"]
-        translated_sections.append({**section, "text": shown})
-    unique_messages = sorted({v["messageEn"] for v in verdicts})
-    message_texts = orchestrator.translate(ctx, unique_messages + list(notices), language)
-    # Un motif traduit qui affirme une conformité ou une convenance est remplacé par la phrase anglaise de départ :
-    # ces textes ne passent pas par le récit, le vérificateur ne les a pas vus.
-    by_message = {
-        english: (translated if not forbidden_phrases(translated) else english)
-        for english, translated in zip(unique_messages, message_texts[: len(unique_messages)])
-    }
-    translated_verdicts = [{**v, "message": by_message.get(v["messageEn"], v["messageEn"])} for v in verdicts]
-    return translated_sections, translated_verdicts, message_texts[len(unique_messages):], match
+def _apply_translations(translator: RunTranslator, sections: list[dict[str, Any]], verdicts: list[dict[str, Any]],
+                        notices: list[str]) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[str], bool]:
+    """Texte affiché de chaque section, motif et mention (traduits par `translator`, déjà lancés pendant le run).
+
+    Renvoie aussi `match` : faux si une section est affichée en anglais parce que sa traduction a échoué
+    (erreur de Translate, emplacements perdus, formule interdite ou chiffre ajouté non corrigés)."""
+    sections_t, match = [], True
+    for section in sections:
+        item = translator.section(section["key"], section["textEn"])
+        match = match and (item.translated or not translator.active)
+        sections_t.append({**section, "text": item.text})
+    verdicts_t = [{**v, "message": translator.text(v["messageEn"]).text} for v in verdicts]
+    return sections_t, verdicts_t, [translator.text(n).text for n in notices], match
 
 
 def complete_run(
@@ -184,6 +175,7 @@ def complete_run(
     run_id: str,
     *,
     kb_client=None,
+    translate_client=None,
     trace_context: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     run = analyses_repo.get_run(session_id, user_id, run_id)
@@ -195,7 +187,8 @@ def complete_run(
     registry = EvidenceRegistry(language, run["evidence"])
     ctx = RequestContext(user_id=user_id, session_id=session_id, store=store, run_id=run_id,
                          portfolio_id=mandate["portfolioId"], province=mandate["province"], user_language=language,
-                         evidence=registry.items, clients={"kb": kb_client} if kb_client else {})
+                         evidence=registry.items,
+                         clients={k: c for k, c in (("kb", kb_client), ("translate", translate_client)) if c})
     steps_before = run.get("explanation", {}).get("steps", [])
     with telemetry.trace_span(
         "analysis-complete-run",
@@ -212,19 +205,28 @@ def complete_run(
             verifier_report = None
             # data_used et limits ne citent aucune KB : elles partent en même temps que l'auditeur, avec les verdicts
             # du module de règles et une copie figée du registre. why et what_would_change attendent les verdicts audités.
-            with ThreadPoolExecutor(max_workers=len(SECTION_KEYS)) as pool:
-                early = writer.submit(pool, ctx, writer.analysis_record(mandate, run["scenarios"], run["verdicts"], registry.items),
-                                      run["verdicts"], writer.EARLY_KEYS, with_citations=False)
-                verdicts = auditor.audit(ctx, run["verdicts"], registry)
-                late = writer.submit(pool, ctx, writer.analysis_record(mandate, run["scenarios"], verdicts, registry.items),
-                                     verdicts, writer.LATE_KEYS, with_citations=True)
-                try:
-                    sections = writer.collect(ctx, early, late)
-                except base.AgentFailure as failure:
-                    log_event("agent.failure", agentId=writer.AGENT_ID, reason=failure.reason, sessionId=session_id)
-                    sections = None
-            sections_t, verdicts_t, notices_t, match = _translate_run_texts(
-                ctx, sections or [], verdicts, run.get("jurisdictionNotices", []), language)
+            notices_en = run.get("jurisdictionNotices", [])
+            with RunTranslator(ctx, language) as translator:
+                for index, notice in enumerate(notices_en):
+                    translator.submit_text(notice, "notice", f"notice:{index}")
+                with ThreadPoolExecutor(max_workers=len(SECTION_KEYS)) as pool:
+                    early = writer.submit(pool, ctx, writer.analysis_record(mandate, run["scenarios"], run["verdicts"], registry.items),
+                                          run["verdicts"], writer.EARLY_KEYS, with_citations=False)
+                    translator.follow_sections(early)  # chaque section part en traduction dès qu'elle est écrite
+                    verdicts = auditor.audit(ctx, run["verdicts"], registry)
+                    # Motifs reformulés par l'auditeur : traduits pendant les sections tardives (les motifs par défaut sont en table).
+                    for verdict in verdicts:
+                        translator.submit_text(verdict["messageEn"], "message", f"{verdict['rule']}:{verdict['status']}")
+                    late = writer.submit(pool, ctx, writer.analysis_record(mandate, run["scenarios"], verdicts, registry.items),
+                                         verdicts, writer.LATE_KEYS, with_citations=True)
+                    translator.follow_sections(late)
+                    try:
+                        sections = writer.collect(ctx, early, late)
+                    except base.AgentFailure as failure:
+                        log_event("agent.failure", agentId=writer.AGENT_ID, reason=failure.reason, sessionId=session_id)
+                        sections = None
+                translator.finalize()  # attend les traductions en cours, corrige en un appel LLM les textes signalés
+                sections_t, verdicts_t, notices_t, match = _apply_translations(translator, sections or [], verdicts, notices_en)
             status = "done"
             if sections is not None:
                 with telemetry.trace_span(

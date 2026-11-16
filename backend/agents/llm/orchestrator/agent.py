@@ -1,4 +1,4 @@
-"""agent-orchestrator : tour de conversation (cadrage) et traduction de la restitution."""
+"""agent-orchestrator : tour de conversation (cadrage), refus expliqué et correction des traductions signalées."""
 
 from __future__ import annotations
 
@@ -6,14 +6,13 @@ import json
 from typing import Any
 
 from backend.agents import models
-from backend.agents.llm.base import AgentFailure, run_agent
+from backend.agents.llm.base import run_agent
 from backend.agents.llm.orchestrator import prompts
-from backend.agents.llm.orchestrator.schemas import OrchestratorTurn, Refusal, TranslationBatch
+from backend.agents.llm.orchestrator.schemas import OrchestratorTurn, Refusal, TranslationFixes
 from backend.agents.tools.context import RequestContext
 from backend.agents.verifier.verifier import placeholders
 
 AGENT_ID = "agent-orchestrator"
-TRANSLATION_BATCH = 32  # TRANSLATION_SPEC (max_tokens = 8192) couvre l'ensemble des motifs et mentions en un appel
 
 
 def history_messages(items: list[dict[str, Any]], limit: int = 20) -> list[dict[str, Any]]:
@@ -57,25 +56,19 @@ def explain_refusal(ctx: RequestContext, topics: list[str], user_message: str, l
     return output.reply.strip()
 
 
-def translate(ctx: RequestContext, texts: list[str], target_language: str) -> list[str]:
-    """Traduit des textes en conservant les emplacements ; un texte dont les emplacements
-    changent garde sa version anglaise (le vérificateur le signalera par placeholdersMatch)."""
-    if target_language == "en" or not texts:
-        return list(texts)
-    translated: list[str] = []
-    for start in range(0, len(texts), TRANSLATION_BATCH):
-        batch = texts[start:start + TRANSLATION_BATCH]
-        try:
-            output = run_agent(
-                AGENT_ID, prompts.TRANSLATE_PROMPT,
-                prompts.translate_prompt(target_language, json.dumps(batch, ensure_ascii=False)),
-                ctx, TranslationBatch, with_tools=False, spec=models.TRANSLATION_SPEC,
-            )
-            items = list(output.items) if len(output.items) == len(batch) else list(batch)
-        except AgentFailure:
-            items = list(batch)
-        translated.extend(items)
-    return translated
+def fix_translations(ctx: RequestContext, flagged: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Corrections des traductions Amazon Translate signalées par le code : un seul appel pour toutes, sans outil.
+
+    `flagged` : [{item, source, translation, problem}]. Renvoie [{item, find, replace}] ; le code les applique puis
+    contrôle de nouveau. Lève AgentFailure en cas d'échec (l'appelant replie sur l'anglais)."""
+    if not flagged:
+        return []
+    output = run_agent(
+        AGENT_ID, prompts.TRANSLATE_FIX_PROMPT, prompts.translate_fix_prompt(json.dumps(flagged, ensure_ascii=False)),
+        ctx, TranslationFixes, with_tools=False, spec=models.TRANSLATION_SPEC,
+    )
+    assert isinstance(output, TranslationFixes)
+    return [{"item": e.item, "find": e.find, "replace": e.replace} for e in output.fixes]
 
 
 def placeholders_preserved(source: str, target: str) -> bool:

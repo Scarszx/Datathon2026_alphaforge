@@ -6,7 +6,7 @@ import time
 
 from backend.agents import app, pipeline
 from backend.agents.tests.conftest import body_of, event
-from backend.agents.tests.fake_model import EchoTranslator, add_section_writers
+from backend.agents.tests.fake_model import add_section_writers
 from backend.agents.tests.test_routes import RUN, _start_run
 
 KEYS = ("data_used", "why", "limits", "what_would_change")
@@ -36,9 +36,6 @@ def _complete(robert_session, store, scripts, monkeypatch, *, auditor=None, **wr
     monkeypatch.setattr(pipeline.auditor, "audit", auditor)
     response, sent = _start_run(store, robert_session)
     log = add_section_writers(scripts, **writer_options)
-    scripts.add("agent-orchestrator", EchoTranslator())
-    for _ in range(4):
-        scripts.add("agent-orchestrator", EchoTranslator())
     app.handle_internal(sent[0], store=store)
     run = body_of(app.handle_request(event(RUN, path={"sessionId": robert_session, "runId": body_of(response)["runId"]}), store=store))
     return run, log, auditor

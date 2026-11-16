@@ -16,7 +16,7 @@ from moto import mock_aws
 
 from backend.agents.data.store import DataStore, set_default_store
 from backend.agents.llm import base
-from backend.agents.tests.fake_model import ScriptedModel
+from backend.agents.tests.fake_model import FakeTranslate, ScriptedModel
 from backend.common.repositories import _dynamo
 from backend.common.repositories.conversations import UPDATED_AT_INDEX
 
@@ -103,10 +103,21 @@ class ModelScripts:
     def factory(self, agent_id: str) -> ScriptedModel:
         queue = self.scripts.get(agent_id) or []
         script = queue.pop(0) if queue else []
-        # Un script peut être un modèle prêt à l'emploi (ex. EchoTranslator).
+        # Un script peut être un modèle prêt à l'emploi (ex. SectionWriter).
         model = script[0] if len(script) == 1 and isinstance(script[0], ScriptedModel) else ScriptedModel(script)
         self.models.setdefault(agent_id, []).append(model)
         return model
+
+
+@pytest.fixture(autouse=True)
+def translate_fake(monkeypatch) -> FakeTranslate:
+    """Amazon Translate simulé pour tous les tests : aucun appel réseau, même si un test l'oublie."""
+    from backend.agents.translate import service
+
+    fake = FakeTranslate()
+    monkeypatch.setattr(service, "_client", lambda: fake)
+    monkeypatch.delenv("TRANSLATE_TERMINOLOGY", raising=False)
+    return fake
 
 
 @pytest.fixture
