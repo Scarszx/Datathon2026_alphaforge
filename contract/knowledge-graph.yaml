@@ -1,12 +1,20 @@
 application:
   name: "Grow"
-  version: "0.4.16"
+  version: "0.4.17"
   description: "Banc d'essai agentique et auto-explicatif pour l'investisseur autonome : il cadre l'intention, simule son impact sur le portefeuille et l'audite contre les textes réglementaires canadiens (simulation seulement). Datathon 2026."
-  status: "validé par l'équipe (0.4.0 le 2026-11-14, 0.4.1 le 2026-11-15) ; 0.4.2 et 0.4.3 validées par l'utilisateur le 2026-11-15, à relire par l'équipe ; 0.4.4 à 0.4.7 demandées par l'utilisateur le 2026-11-15 (lots A, B, C et E), à relire par l'équipe ; 0.4.8 demandée par l'utilisateur le 2026-11-15 (saisie vocale), à relire par l'équipe ; 0.4.9 demandée par l'utilisateur le 2026-11-15 (jeu de données aligné sur le script du collègue), à relire par l'équipe ; 0.4.10 demandée par l'utilisateur le 2026-11-15 (saisie vocale, détection de la langue), à relire par l'équipe; 0.4.11 demandée par l'utilisateur le 2026-11-15 (statistiques de marché), à relire par l'équipe ; 0.4.12 demandée par l'utilisateur le 2026-11-15 (constructeur de portefeuille), à relire par l'équipe ; 0.4.13 demandée par l'utilisateur le 2026-11-15 (inscription sans code de confirmation), à relire par l'équipe ; 0.4.14 demandée par l'utilisateur le 2026-11-15 (modèles des 3 agents passés à Claude Opus 5.5), à relire par l'équipe ; 0.4.15 demandée par l'utilisateur le 2026-11-15 (fiche d'un actif : route déjà codée sur main, ajoutée au contrat), à relire par l'équipe ; 0.4.16 demandée par l'utilisateur le 2026-11-15 (premier portefeuille fictif proposé à l'onboarding), à relire par l'équipe"
+  status: "validé par l'équipe (0.4.0 le 2026-11-14, 0.4.1 le 2026-11-15) ; 0.4.2 et 0.4.3 validées par l'utilisateur le 2026-11-15, à relire par l'équipe ; 0.4.4 à 0.4.7 demandées par l'utilisateur le 2026-11-15 (lots A, B, C et E), à relire par l'équipe ; 0.4.8 demandée par l'utilisateur le 2026-11-15 (saisie vocale), à relire par l'équipe ; 0.4.9 demandée par l'utilisateur le 2026-11-15 (jeu de données aligné sur le script du collègue), à relire par l'équipe ; 0.4.10 demandée par l'utilisateur le 2026-11-15 (saisie vocale, détection de la langue), à relire par l'équipe; 0.4.11 demandée par l'utilisateur le 2026-11-15 (statistiques de marché), à relire par l'équipe ; 0.4.12 demandée par l'utilisateur le 2026-11-15 (constructeur de portefeuille), à relire par l'équipe ; 0.4.13 demandée par l'utilisateur le 2026-11-15 (inscription sans code de confirmation), à relire par l'équipe ; 0.4.14 demandée par l'utilisateur le 2026-11-15 (modèles des 3 agents passés à Claude Opus 5.5), à relire par l'équipe ; 0.4.15 demandée par l'utilisateur le 2026-11-15 (fiche d'un actif : route déjà codée sur main, ajoutée au contrat), à relire par l'équipe ; 0.4.16 demandée par l'utilisateur le 2026-11-15 (premier portefeuille fictif proposé à l'onboarding), à relire par l'équipe ; 0.4.17 demandée par l'utilisateur le 2026-11-15 (premier portefeuille construit et adopté sans passer par le chat), à relire par l'équipe"
   solution_ref: "SOLUTION.md (racine du dépôt) : décisions de produit et de conception détaillées"
   # Règle d'équipe : ce fichier est la référence. Toute modification passe par un accord de l'équipe.
   # Voir aussi : la page de présentation du contrat (même contenu, avec schémas).
   changelog:
+    - version: "0.4.17"
+      date: "2026-11-15"
+      status: "demandé par l'utilisateur le 2026-11-15 (code fusionné dans main, pas encore déployé) ; à relire par l'équipe"
+      summary:
+        - "Onboarding sans chat : après le questionnaire, le front enchaîne api-conversations-create (conversation « Premier portefeuille »), api-mandates-create (mode build, objectif, horizon, tolérance, capacité et industries du profil en fieldSources persona, buildAmount en user_answer ; industries du profil développées en industries du jeu, sans doublon), api-runs-create, puis api-portfolio-holdings-put avec les quantity et price du scénario 1. Le mandat est confirmé sans étape d'approbation et les verdicts R1-R10 ne bloquent pas l'adoption. L'utilisateur reste sur /portefeuille. Si la construction échoue, main reste vide avec un message."
+        - "module-engine (optimiseur) : les prix des titres candidats sont lus en parallèle (10 lectures à la fois), pour que api-runs-create en mode build tienne sous les 30 s d'API Gateway sur une Lambda froide."
+      impacts_to_handle:
+        - "frontend : pages/Portfolio.tsx. backend : agents/engine/optimizer.py ; reconstruire la Lambda agents. Aucune route, aucune table, aucun changement Terraform ni IAM. complete_run (auditeur, rédacteur) tourne toujours en arrière-plan pour la conversation créée."
     - version: "0.4.16"
       date: "2026-11-15"
       status: "demandé par l'utilisateur le 2026-11-15 (code sur la branche ws/onboarding-portfolio, pas encore déployé) ; à relire par l'équipe"
@@ -283,7 +291,7 @@ services:
       - "Il remplace chaque emplacement {EV-nn} ou {KB-nn} du texte narratif par la valeur formatée du registre (run.evidence), sous forme de badge cliquable. Il n'affiche jamais un chiffre absent du registre."
       - "Affichage progressif : scénarios et verdicts dès la réponse de api-runs-create, puis citations et texte quand api-runs-get passe à status = done."
       - "Les hypothèses d'équipe (seuils) sont affichées comme telles. Mention permanente : simulation pédagogique, pas un conseil financier."
-      - "Onboarding (0.4.16) : après le questionnaire, ouvrir /chat et envoyer la demande de construction d'un premier portefeuille fictif (mode build, montant choisi). « Adopter ce portefeuille » envoie à api-portfolio-holdings-put les quantity et price du scénario construit, sans les recalculer."
+      - "Onboarding (0.4.17) : après le questionnaire, construire le premier portefeuille fictif sans passer par le chat (api-conversations-create, api-mandates-create en mode build depuis les réponses, api-runs-create) et l'adopter directement dans main par api-portfolio-holdings-put avec les quantity et price du scénario 1, sans les recalculer. Dans le chat, « Adopter ce portefeuille » fait la même copie pour un build demandé plus tard."
 
   - id: "srv-cognito"
     name: "Amazon Cognito (user pool)"
