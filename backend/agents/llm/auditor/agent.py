@@ -22,6 +22,7 @@ retenu : pas de citation, motif par défaut.
 
 from __future__ import annotations
 
+import contextvars
 import json
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
@@ -113,7 +114,9 @@ def _candidates_for(ctx: RequestContext, groups: dict[str, dict[str, Any]]) -> d
         return rule, subject, sorted([(ref, ctx.passages[ref]) for ref in refs], key=lambda rp: -rp[1]["score"])
 
     with ThreadPoolExecutor(max_workers=SEARCH_WORKERS) as pool:
-        results = list(pool.map(run, searches))
+        # Contexte OpenTelemetry copié dans chaque thread : sinon les spans kb.retrieve deviennent des traces orphelines.
+        futures = [pool.submit(contextvars.copy_context().run, run, item) for item in searches]
+        results = [future.result() for future in futures]
     by_rule: dict[str, list[list[tuple[str, dict[str, Any]]]]] = {}
     for rule, _subject, found in results:
         by_rule.setdefault(rule, []).append(found)
