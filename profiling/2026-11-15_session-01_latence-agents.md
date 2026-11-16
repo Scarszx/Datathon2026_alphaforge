@@ -242,6 +242,13 @@ Mesures sur 11 analyses avec Sonnet 5.5 (16 au total en comptant Opus).
 4. **Alléger l'`analysis_record`** (preuves inutiles au récit) : gain faible, sur le temps avant le premier jeton seulement.
 5. **Prompt caching** (`CacheConfig` ou `cachePoint` dans Strands 1.65) : peu utile ici, puisqu'il y a un seul appel par analyse avec un enregistrement différent à chaque fois.
 
+Décision du 2026-11-15 : le levier 4 est mis de côté (gain faible).
+
+Note sur `max_tokens` : c'est un **plafond**, pas un réglage de vitesse. Le rédacteur a 8 192 jetons et en utilise environ 2 000.
+Le relever ne le rend ni plus rapide ni plus bavard. Le seul effet connu : Bedrock réserve `max_tokens` sur le quota du compte (commentaire de `models.py`),
+donc un plafond plus haut consomme plus de quota par appel. Couper la réflexion **et** relever `max_tokens` donne le même gain de temps
+que couper la réflexion seule.
+
 ## Questions ouvertes pour la suite
 
 - Comment se répartissent les 8,6 s du moteur (S3 ou calcul numpy/pandas) ? Il faut des spans.
