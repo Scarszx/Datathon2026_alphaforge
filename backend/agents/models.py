@@ -24,7 +24,7 @@ class AgentSpec:
 
 
 MODELS: dict[str, AgentSpec] = {
-    "agent-orchestrator": AgentSpec(config.model_orchestrator, 4096, 25, 8),
+    "agent-orchestrator": AgentSpec(config.model_orchestrator, 4096, 30, 8),
     "agent-auditor": AgentSpec(config.model_auditor, 4096, 60, 18),
     "agent-writer": AgentSpec(config.model_writer, 8192, 60, 6),
 }

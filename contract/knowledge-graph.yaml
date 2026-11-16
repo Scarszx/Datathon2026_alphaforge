@@ -1139,7 +1139,7 @@ agents:
     system_prompt_language: "en"
     system_prompt_must_include: "If the user's message is not in English, translate it into English before doing anything else; all tool calls and all communication with other components are in English. When replying to the user, answer in the user's language (userLanguage), keep every {EV-nn}/{KB-nn} placeholder unchanged, and never translate quoted regulatory excerpts." 
     delegates_to: []
-    limits: { max_agent_cycles: 8, timeout_seconds: 25 }  # 25 s : POST /messages est synchrone derrière l'API Gateway (30 s)
+    limits: { max_agent_cycles: 8, timeout_seconds: 30 }  # 30 s : POST /messages est synchrone derrière l'API Gateway (30 s)
     fail_mode: "closed"
     fail_mode_note: "Mandat incomplet : il pose la question ou propose des valeurs par défaut marquées team_assumption, à confirmer."
     owner_agent: "Agent-Backend-Agents"

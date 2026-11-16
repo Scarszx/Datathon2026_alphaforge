@@ -182,23 +182,28 @@ def get_profile(ctx: RequestContext) -> dict[str, Any]:
     return {"investorProfile": {k: v for k, v in profile.items() if k != "riskLevel"} if profile else profile}
 
 
-def _check_build_preferences(ctx: RequestContext, mandate: dict[str, Any]) -> str | None:
-    """Industries exclues ou préférées du mode build : noms exacts du jeu, minimums atteignables (None si tout va bien)."""
+def _check_build_preferences(ctx: RequestContext, mandate: dict[str, Any]) -> list[str]:
+    """Industries exclues ou préférées du mode build : noms exacts du jeu, minimums atteignables (liste vide si tout va bien).
+
+    Toutes les industries inconnues sont signalées d'un coup : l'agent corrige en un seul aller-retour (délai de 30 s)."""
     preferences = mandate.get("preferences") or {}
     excluded = list(preferences.get("excludedIndustries") or [])
     preferred = [{"industry": p["industry"], "minWeight": (p["minWeight"] / 100.0 if p.get("minWeight") is not None else None)}
                  for p in preferences.get("preferredIndustries") or []]
     universe = ctx.store.universe()
     known = sorted(set(universe["industry"].dropna())) if "industry" in universe.columns else []
-    for name in excluded + [p["industry"] for p in preferred]:
+    problems: list[str] = []
+    for name in dict.fromkeys(excluded + [p["industry"] for p in preferred]):
         if name not in known:
             close = difflib.get_close_matches(name, known, n=5, cutoff=0.4)
-            return f"Unknown industry '{name}'. Use the dataset's English industry names" + (f", for example: {', '.join(close)}." if close else ".")
+            problems.append(f"Unknown industry '{name}'. Use the dataset's English industry names" + (f", for example: {', '.join(close)}." if close else "."))
+    if problems:
+        return problems
     try:
         optimizer.check_preferences(universe, excluded, preferred)
     except optimizer.OptimizerError as error:
-        return str(error)
-    return None
+        return [str(error)]
+    return []
 
 
 def propose_mandate(ctx: RequestContext, draft: dict[str, Any]) -> dict[str, Any]:
@@ -228,9 +233,9 @@ def propose_mandate(ctx: RequestContext, draft: dict[str, Any]) -> dict[str, Any
     if mandate["mode"] == "build":
         if mandate.get("operations") or mandate.get("subjectTicker"):
             return {"valid": False, "errors": ["build describes a portfolio to construct: no operations and no subjectTicker."]}
-        problem = _check_build_preferences(ctx, mandate)
-        if problem:
-            return {"valid": False, "errors": [problem]}
+        problems = _check_build_preferences(ctx, mandate)
+        if problems:
+            return {"valid": False, "errors": problems}
     if mandate["mode"] in ("add_asset", "rebalance") and not mandate.get("operations"):
         return {"valid": False, "errors": ["operations must describe the tested idea for add_asset and rebalance."]}
     if mandate["mode"] == "diagnose" and not mandate.get("subjectTicker"):

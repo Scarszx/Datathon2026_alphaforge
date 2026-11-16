@@ -392,3 +392,9 @@ def test_optimize_portfolio_outil(ctx, relaxed_optimizer):
     assert "error" in catalog.optimize_portfolio(ctx, 9)
     assert "error" in catalog.optimize_portfolio(ctx, 3, ["Atlantis"])
     assert "error" in catalog.optimize_portfolio(ctx, 3, None, [{"industry": 5}])
+
+
+def test_propose_mandate_build_signale_toutes_les_industries_inconnues(ctx):
+    result = catalog.propose_mandate(ctx, _build_draft(excludedIndustries=["Atlantis", "Semiconducters"], preferredIndustries=[{"industry": "Mordor"}]))
+    assert result["valid"] is False
+    assert [e.split("'")[1] for e in result["errors"]] == ["Atlantis", "Semiconducters", "Mordor"]
