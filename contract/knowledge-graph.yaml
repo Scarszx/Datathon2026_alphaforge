@@ -1,12 +1,49 @@
 application:
   name: "Grow"
-  version: "0.4.17"
+  version: "0.4.20"
   description: "Banc d'essai agentique et auto-explicatif pour l'investisseur autonome : il cadre l'intention, simule son impact sur le portefeuille et l'audite contre les textes réglementaires canadiens (simulation seulement). Datathon 2026."
-  status: "validé par l'équipe (0.4.0 le 2026-11-14, 0.4.1 le 2026-11-15) ; 0.4.2 et 0.4.3 validées par l'utilisateur le 2026-11-15, à relire par l'équipe ; 0.4.4 à 0.4.7 demandées par l'utilisateur le 2026-11-15 (lots A, B, C et E), à relire par l'équipe ; 0.4.8 demandée par l'utilisateur le 2026-11-15 (saisie vocale), à relire par l'équipe ; 0.4.9 demandée par l'utilisateur le 2026-11-15 (jeu de données aligné sur le script du collègue), à relire par l'équipe ; 0.4.10 demandée par l'utilisateur le 2026-11-15 (saisie vocale, détection de la langue), à relire par l'équipe; 0.4.11 demandée par l'utilisateur le 2026-11-15 (statistiques de marché), à relire par l'équipe ; 0.4.12 demandée par l'utilisateur le 2026-11-15 (constructeur de portefeuille), à relire par l'équipe ; 0.4.13 demandée par l'utilisateur le 2026-11-15 (inscription sans code de confirmation), à relire par l'équipe ; 0.4.14 demandée par l'utilisateur le 2026-11-15 (modèles des 3 agents passés à Claude Opus 5.5), à relire par l'équipe ; 0.4.15 demandée par l'utilisateur le 2026-11-15 (fiche d'un actif : route déjà codée sur main, ajoutée au contrat), à relire par l'équipe ; 0.4.16 demandée par l'utilisateur le 2026-11-15 (premier portefeuille fictif proposé à l'onboarding), à relire par l'équipe ; 0.4.17 demandée par l'utilisateur le 2026-11-15 (premier portefeuille construit et adopté sans passer par le chat), à relire par l'équipe"
+  status: "validé par l'équipe (0.4.0 le 2026-11-14, 0.4.1 le 2026-11-15) ; 0.4.2 et 0.4.3 validées par l'utilisateur le 2026-11-15, à relire par l'équipe ; 0.4.4 à 0.4.7 demandées par l'utilisateur le 2026-11-15 (lots A, B, C et E), à relire par l'équipe ; 0.4.8 demandée par l'utilisateur le 2026-11-15 (saisie vocale), à relire par l'équipe ; 0.4.9 demandée par l'utilisateur le 2026-11-15 (jeu de données aligné sur le script du collègue), à relire par l'équipe ; 0.4.10 demandée par l'utilisateur le 2026-11-15 (saisie vocale, détection de la langue), à relire par l'équipe; 0.4.11 demandée par l'utilisateur le 2026-11-15 (statistiques de marché), à relire par l'équipe ; 0.4.12 demandée par l'utilisateur le 2026-11-15 (constructeur de portefeuille), à relire par l'équipe ; 0.4.13 demandée par l'utilisateur le 2026-11-15 (inscription sans code de confirmation), à relire par l'équipe ; 0.4.14 demandée par l'utilisateur le 2026-11-15 (modèles des 3 agents passés à Claude Opus 5.5), à relire par l'équipe ; 0.4.15 demandée par l'utilisateur le 2026-11-15 (fiche d'un actif : route déjà codée sur main, ajoutée au contrat), à relire par l'équipe ; 0.4.16 demandée par l'utilisateur le 2026-11-15 (premier portefeuille fictif proposé à l'onboarding), à relire par l'équipe ; 0.4.17 demandée par l'utilisateur le 2026-11-15 (premier portefeuille construit et adopté sans passer par le chat), à relire par l'équipe ; 0.4.18 demandée par l'utilisateur le 2026-11-15 (recherche d'industries du jeu), à relire par l'équipe ; 0.4.19 demandée par l'utilisateur le 2026-11-15 (latence : agents sur Sonnet 5.5, rédacteur en parallèle, lecture groupée des cours), à relire par l'équipe ; 0.4.20 demandée par l'utilisateur le 2026-11-15 (traduction de la restitution par Amazon Translate, code en cours sur ws/translate), à relire par l'équipe"
   solution_ref: "SOLUTION.md (racine du dépôt) : décisions de produit et de conception détaillées"
   # Règle d'équipe : ce fichier est la référence. Toute modification passe par un accord de l'équipe.
   # Voir aussi : la page de présentation du contrat (même contenu, avec schémas).
   changelog:
+    - version: "0.4.20"
+      date: "2026-11-15"
+      status: "demandé par l'utilisateur le 2026-11-15 ; code en cours sur la branche ws/translate (non fusionné, non déployé) ; à relire par l'équipe"
+      summary:
+        - "Traduction de la restitution du run (narrative, motifs de verdict, mentions) : anglais vers fr-CA par Amazon Translate (srv-translate, TranslateText en text/html), et non plus par agent-orchestrator. Une seule langue cible : seulement quand userLanguage = fr. Un run en anglais ne traduit rien. Toute autre langue affiche l'anglais."
+        - "Les textes connus d'avance (motifs par défaut de module-rules, baseNotice et provinceNotices) ont une version française fixe, relue, à la source : aucun appel."
+        - "Les textes variables (chaque section du rédacteur dès qu'elle est écrite, motifs reformulés par l'auditeur dès qu'il a fini) passent par Translate avec la terminologie grow-finance-en-fr (CSV en,fr-CA dans le dépôt, importée par un humain). Les emplacements {EV-nn}/{KB-nn} et les extraits entre guillemets sont protégés par <span translate=\"no\">, puis restitués (balises retirées, entités HTML décodées)."
+        - "Contrôles en code après traduction : emplacements identiques, aucune formulation interdite ou de jugement (module-verifier), aucun chiffre ajouté. Un texte signalé passe par un seul appel de correction d'agent-orchestrator (sans outil, 1 tour, sortie limitée aux corrections), puis par un nouveau contrôle. Les textes fixes ne passent pas par ces contrôles (les mentions nomment des titres protégés)."
+        - "Fail-open : une erreur de Translate, une terminologie absente ou une correction qui échoue donnent le texte anglais pour ce texte (placeholdersMatch = false pour une section). Le run n'échoue jamais pour la traduction. textEn reste la version de référence ; les schémas ne changent pas."
+        - "La traduction en anglais des messages du chat reste faite par agent-orchestrator dans son propre appel (english_request), sans changement."
+      impacts_to_handle:
+        - "infra/terraform/iam.tf : translate:TranslateText (et translate:GetTerminology si la documentation l'exige pour TerminologyNames) sur alphaforge-agents-role ; terraform apply par un humain."
+        - "scripts/import_terminology.py (ImportTerminology, à exécuter par un humain) ; reconstruire la Lambda agents."
+        - "SOLUTION.md (politique de langue) : la traduction de la restitution n'est plus faite par l'orchestrateur."
+    - version: "0.4.19"
+      date: "2026-11-15"
+      status: "demandé par l'utilisateur le 2026-11-15 (code fusionné dans main : 290bccc, 994b521, 10f09ca, f1edb4e, 2670aca ; non déployé sauf mention) ; à relire par l'équipe"
+      summary:
+        - "Latence (profilage Langfuse du 2026-11-15, profiling/2026-11-15_session-01_latence-agents.md) : la durée d'une requête vient surtout des appels LLM, pas des outils."
+        - "Modèle des 3 agents repassé de Claude Opus 5.5 à Claude Sonnet 5.5 (profil d'inférence global.anthropic.claude-sonnet-5-5) : 25 à 40 % plus rapide par jeton généré. Annule le modèle de 0.4.14."
+        - "agent-writer : 4 appels parallèles, un par section. data_used et limits partent en même temps qu'agent-auditor, à partir des verdicts de module-rules et d'une copie figée du registre (aucun KB-nn). why et what_would_change partent dès que l'auditeur a fini (verdicts audités, registre complet). max_tool_calls = 4 se partage entre les sections (1 chacune). La sortie structurée ne compte pas dans ce plafond. Un échec de section donne le fail_mode actuel (pas de récit, status = error). Réflexion, effort et max_tokens inchangés."
+        - "Chaîne du run : module-engine → module-rules → (agent-auditor ‖ agent-writer data_used, limits) → agent-writer why, what_would_change → traduction → module-verifier."
+        - "module-engine (optimiseur) : les cours des candidats sont lus en bloc depuis storage-dataset prices_all (un fichier par année, lectures parallèles), au lieu d'un fichier par titre. Repli par titre si prices_all est absent."
+        - "Traces : le contexte OpenTelemetry est copié dans les threads (recherches KB de l'auditeur, sections du rédacteur) ; chaque section porte l'attribut agent.section."
+        - "agent-orchestrator : délai porté de 25 s à 30 s (157a87e) ; propose_mandate signale toutes les industries inconnues d'un coup."
+      impacts_to_handle:
+        - "backend : agents/llm/writer/, agents/pipeline.py, agents/llm/base.py, agents/llm/auditor/agent.py, agents/data/store.py, agents/engine/optimizer.py, common/config.py ; reconstruire la Lambda agents. infra/terraform/variables.tf : défauts model_* sur Sonnet 5.5 (ARN IAM dérivés). Aucune route ni aucun schéma ne change."
+    - version: "0.4.18"
+      date: "2026-11-15"
+      status: "demandé par l'utilisateur le 2026-11-15 (ws/industry-search fusionnée dans main, non déployée) ; à relire par l'équipe"
+      summary:
+        - "Industries du profil : les 21 catégories larges (covers) sont remplacées par deux champs de recherche avec autocomplétion (questionnaire et Profil) sur les 101 industries des candidats de l'optimiseur (actions en USD avec une industrie), affichées et cherchées en français et en anglais (frontend/src/lib/industries.json, généré par scripts/build_industries.py depuis universe.parquet). Les deux listes sont facultatives et peuvent rester vides."
+        - "schema-investor-profile.preferences : une industrie est stockée sous son nom anglais exact du jeu (« Industrie : Oil & Gas E&P », « Industrie à éviter : Banks - Regional »). La forme du champ ne change pas (liste de textes). Les anciens libellés ne sont plus lus : les profils existants ont été supprimés le 2026-11-15 (scripts/delete_profiles.py)."
+        - "Onboarding sans chat (0.4.17) et agent-orchestrator : les industries du profil sont recopiées telles quelles dans le mandat, sans développement en industries du jeu."
+        - "tool-propose-mandate : un nom d'industrie presque exact (casse, espaces, & ou and, une seule correspondance proche) est corrigé dans le mandat et signalé dans corrections[] du retour de l'outil (hors schema-mandate-warning). Sinon, l'erreur « Unknown industry » est renvoyée comme avant."
+      impacts_to_handle:
+        - "frontend : components/IndustrySearch.tsx, lib/industries.ts, RiskForm, Profile, Portfolio ; backend : tools/catalog.py, prompt de l'orchestrateur ; reconstruire la Lambda agents et le front. Aucune route, aucune table, aucun changement Terraform ni IAM."
     - version: "0.4.17"
       date: "2026-11-15"
       status: "demandé par l'utilisateur le 2026-11-15 (code fusionné dans main, pas encore déployé) ; à relire par l'équipe"
@@ -228,7 +265,7 @@ conventions:
     internal_language: "en"
     rule: "Tout le système interne est en anglais : prompts système, descriptions d'outils et de paramètres lues par le modèle, arguments d'outils, champs du mandat, éléments du registre (label, method, caveats), raisons de verdict, requêtes et corpus de la Knowledge Base, journaux. Seuls les textes affichés à l'utilisateur sont dans userLanguage."
     input: "agent-orchestrator détecte userLanguage (ISO 639-1) et traduit le message de l'utilisateur en anglais avant toute autre action. Le message original est stocké tel quel (content)."
-    output: "agent-orchestrator traduit dans userLanguage tout texte affiché (sa réponse, quickReplies, narrative, motifs de verdict, jurisdictionNotices). Les emplacements {EV-nn}/{KB-nn} restent identiques; les extraits réglementaires (evidence.excerpt) ne sont jamais traduits."
+    output: "agent-orchestrator traduit dans userLanguage sa réponse et ses quickReplies. La restitution du run (narrative, motifs de verdict, jurisdictionNotices) est traduite en fr-CA par srv-translate quand userLanguage = fr, avec des textes fixes pour les motifs par défaut et les mentions (0.4.20) ; toute autre langue affiche l'anglais. Les emplacements {EV-nn}/{KB-nn} restent identiques; les extraits réglementaires (evidence.excerpt) ne sont jamais traduits."
     ui_labels: "les libellés fixes (noms de mesures, règles) sont traduits par le front à partir de clés stables."
   jurisdictions: ["CA", "QC", "ON", "BC", "AB", "SK", "MB", "NB", "NS", "PE", "NL", "YT", "NT", "NU"]  # CA = textes nationaux
   pagination: "limit + cursor opaque; réponse { items, nextCursor }"
@@ -382,6 +419,7 @@ services:
       - "srv-bedrock"
       - "srv-bedrock-kb"
       - "srv-bedrock-guardrails"
+      - "srv-translate"          # 0.4.20 : traduction de la restitution (fr-CA)
       - "srv-cloudwatch"
     contains_agents:
       - "agent-orchestrator"
@@ -423,6 +461,14 @@ services:
     description: "Reconnaissance vocale en direct pour la saisie du chat (0.4.8). Le navigateur s'y connecte par WebSocket avec l'URL signée par api-speech-session ; le texte reconnu ne fait que remplir le champ de saisie."
     notes:
       - "Droit transcribe:StartStreamTranscriptionWebSocket, ressource * (seule valeur acceptée par le service). Langues : fr-CA et en-US. Coût à la seconde, minimum 15 s par session."
+
+  - id: "srv-translate"
+    name: "Amazon Translate"
+    type: "managed_service"
+    description: "Traduction anglais → fr-CA de la restitution d'un run (sections du rédacteur, motifs reformulés par l'auditeur), seulement quand userLanguage = fr (0.4.20). TranslateText en text/html : emplacements {EV-nn}/{KB-nn} et extraits entre guillemets protégés par <span translate=\"no\">. Terminologie personnalisée grow-finance-en-fr. Fail-open : en cas d'erreur, le texte anglais est affiché."
+    notes:
+      - "Droit translate:TranslateText (et translate:GetTerminology si nécessaire) sur le rôle de la Lambda agents. Région us-east-1. La terminologie est importée par un humain (scripts/import_terminology.py), jamais par le code de la Lambda."
+      - "Translate ne suit aucune consigne : les contrôles de module-verifier (emplacements, formulations interdites, chiffres) servent de filet ; un texte signalé passe par un appel de correction d'agent-orchestrator."
 
   - id: "srv-cloudwatch"
     name: "Amazon CloudWatch Logs"
@@ -565,7 +611,7 @@ apis:
       status: 201
     errors: ["CONVERSATION_NOT_FOUND", "MANDATE_NOT_FOUND", "MANDATE_NOT_CONFIRMED", "VALIDATION_ERROR"]
     notes:
-      - "Chaîne : module-engine → module-rules → agent-auditor (KB) → agent-writer → module-verifier."
+      - "Chaîne (0.4.19, 0.4.20) : module-engine → module-rules → (agent-auditor (KB) ‖ agent-writer data_used, limits) → agent-writer why, what_would_change → traduction fr-CA si userLanguage = fr (textes fixes, puis srv-translate section par section) → module-verifier."
       - "Mécanisme de complétion (invocation asynchrone de la Lambda puis relecture, ou réponse diffusée en continu) : voir open_questions. Le schéma ne change pas."
 
   - id: "api-runs-get"
@@ -678,7 +724,7 @@ data_schemas:
       - { name: "horizonMaxYears", type: "integer", required: false }
       - { name: "objective", type: "string", required: true, description: "ex. croissance à long terme, préservation du capital" }
       - { name: "constraints", type: "array", items_type: "string", description: "ex. diversification minimale, pas de levier" }
-      - { name: "preferences", type: "array", items_type: "string", description: "ex. ESG, IA, éviter la spéculation" }
+      - { name: "preferences", type: "array", items_type: "string", description: "ex. ESG, IA, éviter la spéculation. Industries (0.4.18) : « Industrie : <nom anglais exact du jeu> » ou « Industrie à éviter : <nom> », choisies parmi les industries des candidats de l'optimiseur ; facultatives" }
       - { name: "excludedAssetClasses", type: "array", items_type: "string", description: "ex. crypto" }
 
   - id: "schema-user"
@@ -966,12 +1012,12 @@ data_schemas:
       - { name: "citations", type: "array", items_type: "string", description: "KB-nn, rempli par agent-auditor pour les statuts warn et fail seulement (0.4.4) : toujours vide pour pass et not_verified" }
       - { name: "threshold", type: "object", description: "{ value, nature: text | team_assumption }" }
       - { name: "messageEn", type: "string", description: "une phrase, formulée par agent-auditor (anglais)" }
-      - { name: "message", type: "string", description: "messageEn traduit dans userLanguage par agent-orchestrator" }
+      - { name: "message", type: "string", description: "messageEn traduit en fr-CA si userLanguage = fr (texte fixe pour un motif par défaut, srv-translate pour un motif reformulé par agent-auditor, 0.4.20); = messageEn sinon" }
 
   - id: "schema-narrative"
     description: "Texte du rédacteur. Il ne contient aucun chiffre écrit à la main : seulement des emplacements {EV-nn} et {KB-nn}."
     fields:
-      - { name: "sections", type: "array", required: true, description: "4 sections : { key: data_used | why | limits | what_would_change, textEn (version de référence, agent-writer), text (traduction dans userLanguage par agent-orchestrator; = textEn si en) }" }
+      - { name: "sections", type: "array", required: true, description: "4 sections : { key: data_used | why | limits | what_would_change, textEn (version de référence, agent-writer), text (traduction fr-CA par srv-translate si userLanguage = fr, 0.4.20; = textEn sinon, ou si la traduction a perdu un emplacement) }" }
       - { name: "language", type: "string", required: true, description: "userLanguage de text" }
       - { name: "hiddenSentences", type: "array", description: "{ section, reason } : phrases masquées par module-verifier" }
 
@@ -1138,11 +1184,11 @@ agents:
   - id: "agent-orchestrator"
     name: "Orchestrateur"
     status: "retenu"
-    role: "Seule voix face à l'utilisateur. Détecte userLanguage et traduit chaque message de l'utilisateur en anglais avant toute action; tout ce qu'il transmet aux outils et aux autres composants est en anglais; traduit dans userLanguage tout texte affiché (réponse, quickReplies, narrative, motifs de verdict, mentions), en conservant les emplacements {EV-nn}/{KB-nn} et sans traduire les extraits réglementaires. Lit la session (portefeuille, profil, province), détecte ce qui manque, pose au plus une étape de questions (quickReplies), propose le mandat, attend sa confirmation, puis lance l'analyse. Répond aux questions de suivi à partir du registre. Ne calcule jamais de tête et ne nomme jamais un titre comme recommandation."
+    role: "Seule voix face à l'utilisateur. Détecte userLanguage et traduit chaque message de l'utilisateur en anglais avant toute action; tout ce qu'il transmet aux outils et aux autres composants est en anglais; traduit dans userLanguage sa réponse et ses quickReplies, en conservant les emplacements {EV-nn}/{KB-nn} et sans traduire les extraits réglementaires. Lit la session (portefeuille, profil, province), détecte ce qui manque, pose au plus une étape de questions (quickReplies), propose le mandat, attend sa confirmation, puis lance l'analyse. Répond aux questions de suivi à partir du registre. Ne calcule jamais de tête et ne nomme jamais un titre comme recommandation. Depuis 0.4.20, la restitution du run (narrative, motifs, mentions) est traduite par srv-translate ; l'orchestrateur ne fait qu'un appel de correction (sans outil, 1 tour) pour les textes que les contrôles signalent."
     runs_in: "srv-agent-runtime"
-    model: "Claude Opus 5.5 via Bedrock, région us-east-1 (profil d'inférence global.anthropic.claude-opus-5-5, testé par l'équipe; lu dans la config)"
+    model: "Claude Sonnet 5.5 via Bedrock, région us-east-1 (profil d'inférence global.anthropic.claude-sonnet-5-5, 0.4.19; lu dans la config)"
     max_tokens: 4096  # conversation; traduction de la restitution : translation_max_tokens
-    translation_max_tokens: 8192
+    translation_max_tokens: 8192  # 0.4.20 : appel de correction des traductions signalées
     allowed_tools: ["tool-get-portfolio", "tool-get-profile", "tool-search-assets", "tool-propose-mandate", "tool-read-evidence"]
     system_prompt_language: "en"
     system_prompt_must_include: "If the user's message is not in English, translate it into English before doing anything else; all tool calls and all communication with other components are in English. When replying to the user, answer in the user's language (userLanguage), keep every {EV-nn}/{KB-nn} placeholder unchanged, and never translate quoted regulatory excerpts." 
@@ -1159,7 +1205,7 @@ agents:
     system_prompt_language: "en"
     role: "Travaille en anglais (requêtes KB et motifs en anglais). Ne décide pas des verdicts (module-rules le fait). Ne lance pas lui-même les recherches : le code cherche dans la Knowledge Base, une recherche par sujet de chaque règle (filtre juridiction ∈ {CA, province}), et lui donne les passages. Seules les règles déclenchées (warn, fail) sont auditées (0.4.4) : un pass ou un not_verified n'a ni recherche ni citation. Pour chaque verdict déclenché, il désigne les passages qui énoncent le principe dont la règle s'inspire (ou aucun), le code les inscrit au registre (KB-nn), et il formule le motif en une phrase. Les verdicts sans objet (R7 sans cryptoactif, R8 sans préférence ESG) et R10 (aucun sujet) ne déclenchent aucune recherche : motif par défaut, sans citation."
     runs_in: "srv-agent-runtime"
-    model: "Claude Opus 5.5 via Bedrock, région us-east-1 (profil d'inférence global.anthropic.claude-opus-5-5, testé par l'équipe; lu dans la config)"
+    model: "Claude Sonnet 5.5 via Bedrock, région us-east-1 (profil d'inférence global.anthropic.claude-sonnet-5-5, 0.4.19; lu dans la config)"
     max_tokens: 4096
     allowed_tools: []  # 0.4.3 : les recherches (tool-search-regulation) sont lancées par le code de l'auditeur, pas par le modèle
     code_tools: ["tool-search-regulation"]  # appelés par le code de l'auditeur, une recherche par sujet de règle, 16 au plus, en parallèle
@@ -1172,12 +1218,12 @@ agents:
     name: "Rédacteur"
     status: "retenu"
     system_prompt_language: "en"
-    role: "Rédige en anglais (textEn) 4 sections (données utilisées, pourquoi ce verdict, limites, ce qui changerait la réponse) à partir du registre seulement; agent-orchestrator les traduit. N'écrit aucun chiffre : seulement des emplacements {EV-nn} et {KB-nn}."
+    role: "Rédige en anglais (textEn) 4 sections (données utilisées, pourquoi ce verdict, limites, ce qui changerait la réponse) à partir du registre seulement, en 4 appels parallèles (0.4.19) : data_used et limits pendant agent-auditor (sans KB-nn), why et what_would_change après lui ; srv-translate les traduit (0.4.20). N'écrit aucun chiffre : seulement des emplacements {EV-nn} et {KB-nn}."
     runs_in: "srv-agent-runtime"
-    model: "Claude Opus 5.5 via Bedrock, région us-east-1 (profil d'inférence global.anthropic.claude-opus-5-5, testé par l'équipe; lu dans la config)"
+    model: "Claude Sonnet 5.5 via Bedrock, région us-east-1 (profil d'inférence global.anthropic.claude-sonnet-5-5, 0.4.19; lu dans la config)"
     max_tokens: 8192
     allowed_tools: ["tool-read-evidence"]
-    limits: { max_tool_calls: 4, timeout_seconds: 60 }  # partie asynchrone du run (Lambda 180 s)
+    limits: { max_tool_calls: 4, timeout_seconds: 60 }  # partie asynchrone du run (Lambda 180 s); 0.4.19 : 4 appels partagés entre les 4 sections (1 chacune), sortie structurée non comptée
     fail_mode: "open"
     fail_mode_note: "En cas d'échec, le run reste utilisable (scénarios, verdicts, citations) avec status = error sur narrative."
     owner_agent: "Agent-Backend-Agents"
@@ -1329,7 +1375,7 @@ tools:
     used_by: ["agent-orchestrator"]
     params:
       - { name: "draft", type: "object", required: true, validation: "schema-mandate-create-request; tickers dans l'univers" }
-    returns: "{ valid, errors[], riskProfile, effectiveMaxLossPct, warnings[] (schema-mandate-warning) }"
+    returns: "{ valid, errors[], riskProfile, effectiveMaxLossPct, warnings[] (schema-mandate-warning), corrections[] (0.4.18 : noms d'industrie presque exacts corrigés, textes) }"
     reads: ["storage-dataset: universe.parquet"]
 
   - id: "tool-read-evidence"
