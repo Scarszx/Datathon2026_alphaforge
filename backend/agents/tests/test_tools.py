@@ -422,9 +422,11 @@ def test_propose_mandate_build_corrige_un_nom_presque_exact(ctx_industries):
     preferences = ctx_industries.captured["mandateDraft"]["preferences"]
     assert preferences["excludedIndustries"] == ["Healthcare Plans", "Oil & Gas E&P"]
     assert preferences["preferredIndustries"] == [{"industry": "Semiconductors", "minWeight": 10}]
-    corrected = [w for w in result["warnings"] if w["code"] == "INDUSTRY_NAME_CORRECTED"]
-    assert [(w["params"]["given"], w["params"]["corrected"]) for w in corrected] == [
-        ("Health Care Plans", "Healthcare Plans"), ("oil and gas e&p", "Oil & Gas E&P"), ("Semiconducters", "Semiconductors")]
+    assert result["corrections"] == [
+        "Industry 'Health Care Plans' was corrected to the dataset name 'Healthcare Plans'.",
+        "Industry 'oil and gas e&p' was corrected to the dataset name 'Oil & Gas E&P'.",
+        "Industry 'Semiconducters' was corrected to the dataset name 'Semiconductors'."]
+    assert not any("corrected" in str(w) for w in result["warnings"])
 
 
 def test_propose_mandate_build_ne_devine_pas_une_industrie_differente(ctx_industries):
@@ -436,4 +438,4 @@ def test_propose_mandate_build_ne_devine_pas_une_industrie_differente(ctx_indust
 
 def test_propose_mandate_build_sans_correction_pas_d_avertissement(ctx_industries):
     result = catalog.propose_mandate(ctx_industries, _build_draft(excludedIndustries=["Healthcare Plans"]))
-    assert result["valid"] is True and not any(w["code"] == "INDUSTRY_NAME_CORRECTED" for w in result["warnings"])
+    assert result["valid"] is True and "corrections" not in result
