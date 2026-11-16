@@ -6,7 +6,7 @@ import pytest
 
 from backend.agents import app, guardrails
 from backend.agents.tests.conftest import USER, body_of, event
-from backend.agents.tests.fake_model import EchoTranslator, call, output
+from backend.agents.tests.fake_model import EchoTranslator, add_section_writers, call, output
 from backend.agents.tests.test_tools import FakeKb, _kb_result
 from backend.agents.tools import kb
 from backend.common.repositories import analyses, conversations, messages
@@ -64,15 +64,12 @@ def _script_completion(scripts, *, writer_ok=True):
                 call("search_regulation", query="risk profile is the lower of risk tolerance and risk capacity", subjects=["profil_risque"]),
                 output("AuditReport", items=[{"key": "R1:fail", "passage_refs": [f"P{i}" for i in range(1, 10)],  # seules les références des candidats de R1 comptent
                                               "message_en": "The idea implies a higher risk profile than the retained one."}]))
-    if writer_ok:
-        scripts.add("agent-writer", output(
-            "WriterSections",
-            data_used="Daily adjusted prices over {EV-01} were used, converted to CAD.",
-            why="The idea fails because its volatility reaches {EV-01}, above the retained profile {KB-01}. It is up 12% too.",
-            limits="The past does not predict the future.",
-            what_would_change="A longer horizon, such as the 3 years you gave, would change the loss limit."))
-    else:
-        scripts.add("agent-writer", "no output", "no output", "no output")
+    # Quatre appels, un par section : le texte dépend de la section demandée, jamais de l'ordre d'arrivée.
+    add_section_writers(scripts, None if not writer_ok else {
+        "data_used": "Daily adjusted prices over {EV-01} were used, converted to CAD.",
+        "why": "The idea fails because its volatility reaches {EV-01}, above the retained profile {KB-01}. It is up 12% too.",
+        "limits": "The past does not predict the future.",
+        "what_would_change": "A longer horizon, such as the 3 years you gave, would change the loss limit."}, fail=set() if writer_ok else {"limits"})
     # Traduction (agent-orchestrator) : sections, puis motifs et mentions.
     scripts.add("agent-orchestrator", output("TranslationBatch", items=[
         "Des prix ajustés quotidiens sur {EV-01} ont été utilisés, convertis en CAD.",

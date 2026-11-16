@@ -13,7 +13,8 @@ from backend.agents.llm.base import AgentFailure
 from backend.agents.llm.orchestrator import agent as orchestrator
 from backend.agents.llm.writer import agent as writer
 from backend.agents.tests.conftest import USER
-from backend.agents.tests.fake_model import call, output
+from backend.agents.tests.fake_model import add_section_writers, call, output
+from backend.agents.toolbox import MAX_TOOL_CALLS
 from backend.agents.tools.context import RequestContext
 from backend.agents.tests.test_tools import FakeKb, _kb_result
 
@@ -232,12 +233,42 @@ def test_auditeur_en_echec_garde_les_verdicts(ctx, scripts):
 
 
 def test_redacteur_quatre_sections(ctx, scripts):
-    scripts.add("agent-writer", output("WriterSections", data_used="Prices over {EV-01}.", why="Scenario one fails {KB-01}.",
-                                       limits="The past does not predict the future.", what_would_change="A longer horizon."))
+    texts = {"data_used": "Prices over {EV-01}.", "why": "Scenario one fails {KB-01}.",
+             "limits": "The past does not predict the future.", "what_would_change": "A longer horizon."}
+    log = add_section_writers(scripts, texts)
     sections = writer.write(ctx, {"evidence": []})
-    assert [s["key"] for s in sections] == ["data_used", "why", "limits", "what_would_change"]
-    prompt = scripts.models["agent-writer"][0].calls[0]["messages"][-1]["content"][0]["text"]
-    assert json.loads(prompt.split("<analysis_record>\n", 1)[1].split("\n</analysis_record>", 1)[0]) == {"evidence": []}
+    assert sections == [{"key": k, "textEn": texts[k]} for k in ("data_used", "why", "limits", "what_would_change")]
+    assert set(log["calls"]) == set(texts)
+    for key, call_ in log["calls"].items():
+        assert call_["record"] == {"evidence": []}
+        # Aucune perte : tout le prompt d'origine, plus la section demandée et ce que couvrent les trois autres.
+        assert writer.prompts.SYSTEM_PROMPT.rstrip() in call_["system"]
+        assert f"Section to write: {key}," in call_["system"]
+        assert sum(f"{other}: " in call_["system"] for other in texts if other != key) == 3
+    assert sorted(c["params"]["section"] for c in ctx.tool_calls if c["tool"] == "agent_invocation") == sorted(texts)
+
+
+def test_un_appel_par_section_nomme_dans_la_trace(ctx, scripts):
+    from backend.agents.llm.base import build_agent
+
+    agent = build_agent("agent-writer", "p", ctx, label="why", tool_call_limit=1)
+    assert agent.name == "agent-writer" and agent.trace_attributes["agent.section"] == "why"
+    assert build_agent("agent-writer", "p", ctx).trace_attributes.get("agent.section") is None
+
+
+def test_redacteur_une_section_en_echec_fait_echouer_l_ensemble(ctx, scripts):
+    add_section_writers(scripts, fail={"limits"})
+    with pytest.raises(AgentFailure):
+        writer.write(ctx, {"evidence": []})
+    assert len([c for c in ctx.tool_calls if c["tool"] == "agent_invocation"]) == 4  # les trois autres ont fini et sont journalisées
+
+
+def test_plafond_total_de_quatre_lectures_du_registre(ctx, scripts):
+    ctx.evidence = [{"id": "EV-01", "kind": "metric", "label": "x"}]
+    add_section_writers(scripts, evidence_reads=3)  # chaque section tente 3 lectures en un tour
+    writer.write(ctx, {"evidence": []})
+    reads = [c for c in ctx.tool_calls if c["tool"] == "read_evidence"]
+    assert len(reads) == 4 <= MAX_TOOL_CALLS["agent-writer"]
 
 
 def test_auditeur_ne_cherche_pas_les_verdicts_sans_objet(ctx, scripts):

@@ -79,3 +79,44 @@ class EchoTranslator(ScriptedModel):
         self.script = [output("TranslationBatch", items=[self.prefix + item for item in items])]
         async for chunk in super().stream(messages, tool_specs, system_prompt, **kwargs):
             yield chunk
+
+
+class SectionWriter(ScriptedModel):
+    """Rédacteur simulé, une section par appel. Indifférent à l'ordre d'arrivée : la section demandée est lue dans
+    le prompt (`<section>clé</section>`), et le texte renvoyé dépend d'elle seulement.
+
+    `log` est partagé entre les instances d'un même run : {"calls": {clé: {"start", "end", "system", "record"}}}.
+    """
+
+    def __init__(self, log: dict[str, Any], texts: dict[str, str] | None = None, *, delay: float = 0.0,
+                 fail: set[str] = frozenset(), evidence_reads: int = 0):  # type: ignore[assignment]
+        super().__init__([])
+        self.log, self.texts, self.delay, self.fail, self.evidence_reads = log, texts or {}, delay, fail, evidence_reads
+
+    async def stream(self, messages, tool_specs=None, system_prompt=None, **kwargs):
+        import asyncio
+        import time
+
+        text = messages[0]["content"][0]["text"]
+        key = text.split("<section>", 1)[1].split("</section>", 1)[0]
+        entry = self.log["calls"].setdefault(key, {"start": time.perf_counter(), "system": system_prompt,
+                                                   "record": json.loads(text.split("<analysis_record>\n", 1)[1].split("\n</analysis_record>", 1)[0])})
+        await asyncio.sleep(self.delay)
+        if key in self.fail:
+            self.script = ["no output"] * 3
+        else:
+            final = output("SectionText", text=self.texts.get(key, f"Text of {key}."))
+            # Premier tour : `evidence_reads` lectures du registre en un seul tour, puis la section.
+            first = len(messages) == 1 and self.evidence_reads
+            self.script = [[{"name": "read_evidence", "input": {}}] * self.evidence_reads, final] if first else [final]
+        async for chunk in super().stream(messages, tool_specs, system_prompt, **kwargs):
+            yield chunk
+        entry["end"] = time.perf_counter()
+
+
+def add_section_writers(scripts, texts: dict[str, str] | None = None, **options: Any) -> dict[str, Any]:
+    """Enregistre 4 rédacteurs simulés identiques (un par section) ; renvoie le journal partagé de leurs appels."""
+    log: dict[str, Any] = {"calls": {}}
+    for _ in range(4):
+        scripts.add("agent-writer", SectionWriter(log, texts, **options))
+    return log
