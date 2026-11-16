@@ -12,7 +12,7 @@ import AssetClassPicker from "../components/AssetClassPicker";
 import InfoTip from "../components/InfoTip";
 import { assetClassName } from "../lib/assetClasses";
 import { t, useT } from "../lib/i18n";
-import IndustryPicker from "../components/IndustryPicker";
+import IndustrySearch from "../components/IndustrySearch";
 import { industryName, industryPrefs, splitPreferences, type IndustryChoice } from "../lib/industries";
 import { ESG_ANSWERS, MARKETS, esgMarketPrefs, marketName, splitEsgMarket, toggleMarket, type Market } from "../lib/esgMarket";
 import { useApp } from "../lib/store";
@@ -358,7 +358,7 @@ export default function Profile() {
                     ))}
                   </div></div>
               </div>
-              <div className="field"><label>{L("Industries", "Industries")}</label><IndustryPicker value={industries} onChange={setIndustries} /></div>
+              <div className="field"><label>{L("Industries", "Industries")}</label><IndustrySearch value={industries} onChange={setIndustries} /></div>
               <div className="field"><label>{L("Classes d'actifs exclues (plusieurs choix possibles)", "Excluded asset classes (several choices possible)")}</label><AssetClassPicker value={excluded} onChange={setExcluded} /></div>
               <div className="field"><label htmlFor="con">{L("Contraintes (une par ligne)", "Constraints (one per line)")}</label><textarea id="con" rows={3} placeholder={L("ex. diversification minimale", "e.g. minimum diversification")} value={constraints} onChange={(e) => setConstraints(e.target.value)} /></div>
               <div className="field"><label htmlFor="pre">{L("Autres préférences (une par ligne)", "Other preferences (one per line)")}</label><textarea id="pre" rows={2} placeholder={L("ex. éviter la spéculation", "e.g. avoid speculation")} value={preferences} onChange={(e) => setPreferences(e.target.value)} /></div>
