@@ -14,7 +14,7 @@ Lis ensuite `SOLUTION.md`. Il explique la solution retenue et les raisons de cha
 
 - Pour les noms (routes, schémas, champs), le contrat fait foi.
 - Les décisions de la section « Ce qu'on a écarté » sont prises : ne les rouvre pas sans demande explicite.
-- Le découpage du travail en chantiers est dans `docs/workstreams.md`.
+- Le découpage du travail en chantiers est dans `docs/for_building/workstreams.md`.
 
 ## Commandes AWS et Terraform
 
