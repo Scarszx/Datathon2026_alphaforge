@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { fullDate, fullDateTime } from "../lib/format";
 
 export default function Chart({
@@ -9,6 +9,7 @@ export default function Chart({
   dim = false,
   intraday = false,
   baseline,
+  trend,
 }: {
   values: number[];
   timestamps: number[];
@@ -18,6 +19,9 @@ export default function Chart({
   intraday?: boolean;
   /** Ligne pointillée de référence (ex. clôture précédente) */
   baseline?: number | null;
+  /** Sens imposé de la couleur (ex. gain ou perte par rapport au montant investi). Absent : fin de la courbe
+   *  comparée à la référence (baseline, sinon premier point). */
+  trend?: "up" | "down";
 }) {
   const [hover, setHover] = useState<number | null>(null);
   const all = baseline != null ? [...values, baseline] : values;
@@ -31,8 +35,9 @@ export default function Chart({
   const yp = (v: number) => 100 - ((v - lo) / (hi - lo)) * 100;
   const line = values.map((v, i) => `${i ? "L" : "M"}${(xp(i) * 10).toFixed(1)} ${(yp(v) * 3).toFixed(1)}`).join(" ");
   const ref = baseline ?? values[0];
-  const up = values[n - 1] >= ref;
-  const color = up ? "#143D30" : "#111318";
+  const up = trend ? trend === "up" : values[n - 1] >= ref;
+  const color = up ? "#1F7A4D" : "#B4433A"; // vert = gain, rouge = perte
+  const gradientId = `area-${useId().replace(/:/g, "")}`; // un dégradé par graphique (plusieurs sur une page)
   const labels = [0, 0.33, 0.66, 1].map((f) => timestamps[Math.round(f * (n - 1))]);
 
   return (
@@ -48,12 +53,12 @@ export default function Chart({
       >
         <svg viewBox="0 0 1000 300" preserveAspectRatio="none" aria-hidden="true">
           <defs>
-            <linearGradient id="area" x1="0" y1="0" x2="0" y2="1">
+            <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
               <stop offset="0" stopColor={color} stopOpacity=".12" />
               <stop offset="1" stopColor={color} stopOpacity="0" />
             </linearGradient>
           </defs>
-          <path d={`${line} L1000 300 L0 300 Z`} fill="url(#area)" />
+          <path d={`${line} L1000 300 L0 300 Z`} fill={`url(#${gradientId})`} />
           {baseline != null && (
             <line x1="0" x2="1000" y1={yp(baseline) * 3} y2={yp(baseline) * 3} stroke="#c4c8cf" strokeDasharray="4 6" vectorEffect="non-scaling-stroke" />
           )}

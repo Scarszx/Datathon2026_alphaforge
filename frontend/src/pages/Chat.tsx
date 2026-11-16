@@ -6,7 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { ApiError, errorText } from "../api/errors";
 import {
-  createConversation, createMandate, createRun, getRun, listConversations, listMandates,
+  createConversation, createMandate, createRun, deleteConversation, getRun, listConversations, listMandates, renameConversation,
   listMessages, listPortfolios, putHoldings, sendMessage,
 } from "../api/endpoints";
 import type { Conversation, Evidence, Mandate, MandateCreateRequest, Message, Run, Scenario } from "../api/types";
@@ -222,6 +222,39 @@ export default function Chat() {
     } catch (e) { setError(errorText(e)); } finally { setBusy(false); }
   }, [busy]);
 
+  /* --- historique : renommer et supprimer une session (PATCH / DELETE /v1/conversations/{sessionId}) --- */
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draftTitle, setDraftTitle] = useState("");
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [railError, setRailError] = useState("");
+  const startRename = (c: Conversation) => { setConfirmId(null); setRailError(""); setEditingId(c.sessionId); setDraftTitle(c.title ?? ""); };
+  const saveRename = useCallback(async (sessionId: string) => {
+    const title = draftTitle.trim().slice(0, 120);
+    setEditingId(null);
+    const before = sessions.find((x) => x.sessionId === sessionId);
+    if (!title || title === (before?.title ?? "")) return;
+    setSessions((list) => list.map((x) => (x.sessionId === sessionId ? { ...x, title } : x))); // affichage immédiat
+    try {
+      const updated = await renameConversation(sessionId, title);
+      setSessions((list) => list.map((x) => (x.sessionId === sessionId ? { ...x, ...updated } : x)));
+    } catch (e) {
+      setSessions((list) => list.map((x) => (x.sessionId === sessionId && before ? before : x))); // retour au titre précédent
+      setRailError(errorText(e));
+    }
+  }, [draftTitle, sessions]);
+  const removeSession = useCallback(async (sessionId: string) => {
+    setConfirmId(null); setRailError("");
+    try {
+      await deleteConversation(sessionId);
+      setSessions((list) => list.filter((x) => x.sessionId !== sessionId));
+      if (activeRef.current === sessionId) void openSession(null);
+    } catch (e) {
+      if (e instanceof ApiError && e.code === "CONVERSATION_NOT_FOUND") {
+        setSessions((list) => list.filter((x) => x.sessionId !== sessionId)); // déjà supprimée ailleurs
+        if (activeRef.current === sessionId) void openSession(null);
+      } else setRailError(errorText(e));
+    }
+  }, [openSession]);
   const evidence: Evidence[] = run?.evidence ?? [];
   const filtered = sessions.filter((c) => (c.title ?? "").toLowerCase().includes(q.trim().toLowerCase()));
 
@@ -252,14 +285,35 @@ export default function Chat() {
           <div className="af-lists">
             <h3 className="af-label">{t("chat.history", lang)}</h3>
             <ul className="af-list">
-              {filtered.map((c) => (
+              {filtered.map((c) => c.sessionId === editingId ? (
+                <li key={c.sessionId} className="af-row editing">
+                  <input
+                    className="af-rename" autoFocus maxLength={120} value={draftTitle}
+                    aria-label={t("chat.renameLabel", lang)}
+                    onChange={(e) => setDraftTitle(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") void saveRename(c.sessionId); if (e.key === "Escape") setEditingId(null); }}
+                    onBlur={() => void saveRename(c.sessionId)}
+                  />
+                </li>
+              ) : c.sessionId === confirmId ? (
+                <li key={c.sessionId} className="af-row confirm" role="alertdialog" aria-label={t("chat.deleteConfirm", lang)}>
+                  <span style={{ flexBasis: "100%" }}>{t("chat.deleteConfirm", lang)} <strong>{c.title || t("chat.untitled", lang)}</strong></span>
+                  <button type="button" className="btn" style={{ padding: "6px 12px" }} onClick={() => void removeSession(c.sessionId)}>{t("chat.delete", lang)}</button>
+                  <button type="button" className="link" onClick={() => setConfirmId(null)}>{t("chat.cancel", lang)}</button>
+                </li>
+              ) : (
                 <li key={c.sessionId} className={`af-row${c.sessionId === activeId ? " sel" : ""}`}>
                   <button type="button" className="af-conv" onClick={() => { void openSession(c.sessionId); setMobilePanel("conversation"); }}>
                     <strong>{c.title || t("chat.untitled", lang)}</strong>
                     <span>{new Date(c.updatedAt).toLocaleDateString()}</span>
                   </button>
+                  <span className="af-acts">
+                    <button type="button" className="af-act" title={t("chat.rename", lang)} aria-label={`${t("chat.rename", lang)} : ${c.title || t("chat.untitled", lang)}`} onClick={() => startRename(c)}>✎</button>
+                    <button type="button" className="af-act" title={t("chat.delete", lang)} aria-label={`${t("chat.delete", lang)} : ${c.title || t("chat.untitled", lang)}`} onClick={() => { setEditingId(null); setRailError(""); setConfirmId(c.sessionId); }}>🗑</button>
+                  </span>
                 </li>
               ))}
+              {railError && <li className="af-empty error" role="alert">{railError}</li>}
               {!filtered.length && <li className="af-empty">{q ? "—" : t("chat.history", lang)}</li>}
             </ul>
           </div>
