@@ -37,6 +37,7 @@ locals {
     LANGFUSE_PUBLIC_KEY   = var.langfuse_public_key
     LANGFUSE_BASE_URL     = var.langfuse_base_url
     LANGFUSE_SECRET_PARAM = var.langfuse_secret_param
+    TRANSLATE_TERMINOLOGY = var.translate_terminology
   })
 }
 
