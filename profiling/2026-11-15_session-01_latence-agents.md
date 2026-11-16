@@ -345,18 +345,38 @@ Points d'attention :
 - Piège relevé en préparant la tâche : les mentions de province contiennent « planificateur financier », qui figure dans `FORBIDDEN_PATTERNS`.
   Elles viennent donc de la table fixe relue et ne passent pas par ce contrôle.
 
-## État des chantiers à la fin de la session (2026-11-15, `main` = `0a913cc`)
+## Constat 8 : « Créer mon premier portefeuille » après le déploiement de 04:09 UTC (1 seul essai, 04:14 UTC)
+
+Les Lambdas ont été redéployées le 2026-11-16 à 04:09 UTC, `main` comprenant `prices_many` et le rédacteur parallèle.
+Le front attend `POST /runs` (partie synchrone seulement), puis `PUT holdings`.
+
+| Étape | Durée | Source |
+|---|---|---|
+| Démarrage à froid de la Lambda agents (`Init Duration`) | **5,0 s** | CloudWatch REPORT 04:14:17 |
+| Moteur (optimiseur, avant `check_rules`) | **4,2 s** (contre 8,6 s à chaud et 34-38 s à froid avant) | Langfuse `analysis-run` |
+| `POST /runs` au total | environ 10,6 s | 5,0 + 5,6 s |
+| Appels de l'API Lambda (profil, conversation, mandat, holdings) | moins de 0,2 s chacun (1,1 s pour le premier, à froid) | CloudWatch |
+
+- Le correctif des cours (`prices_many`, proposé par Kiro) **fonctionne** : le moteur est 2 à 8 fois plus rapide.
+- Ce qui reste : le **démarrage à froid** (environ 5 s, chargement de pandas, numpy et Strands), inévitable au premier appel après un déploiement
+  ou après une période sans trafic. À chaud, on peut s'attendre à environ 5 s pour `POST /runs` (non mesuré).
+- La complétion asynchrone (auditeur, rédacteur) a pris 12,5 s, dans un **second** conteneur froid (init 4,4 s). L'onboarding ne l'attend pas.
+- Rédacteur parallèle vérifié en production : `data_used` et `limits` démarrent 0,4 s **avant** l'auditeur. Les sections tardives
+  finissent 8,5 s après lui (`why` : 1 308 jetons, la plus longue).
+- Levier restant : la **provisioned concurrency** sur la Lambda agents (alias, Terraform, `apply` par un humain), ou un ping de préchauffage.
+
+## État des chantiers à la fin de la session (2026-11-15, `main` = `9b9bea9`, Lambdas et front déployés le 2026-11-16 vers 04:09-04:10 UTC)
 
 | Chantier | Branche | État | Contrat |
 |---|---|---|---|
-| Industries recherchées dans le jeu (constats 3 et 5) | `ws/industry-search` | fusionné, **non déployé**. Profils supprimés (`scripts/delete_profiles.py`) | 0.4.18 |
+| Industries recherchées dans le jeu (constats 3 et 5) | `ws/industry-search` | fusionné et déployé (front et Lambda agents, 04:09-04:10 UTC). Profils supprimés (`scripts/delete_profiles.py`) | 0.4.18 |
 | Agents repassés sur Sonnet 5.5 | `main` (`290bccc`) | fusionné | 0.4.19 |
 | Délai de l'orchestrateur à 30 s, toutes les industries inconnues d'un coup | `ws/mandate-errors` (`157a87e`) | fusionné | déjà dans le contrat, rappel en 0.4.19 |
-| Cours de l'optimiseur lus en bloc (`prices_all`) | `ws/prices-many` (`994b521`) | fusionné, **non déployé** | 0.4.19 |
-| Rédacteur en 4 appels parallèles, dont 2 pendant l'auditeur (constat 6) | `ws/writer-parallel` (`2670aca`) | fusionné, **non déployé** | 0.4.19 |
+| Cours de l'optimiseur lus en bloc (`prices_all`) | `ws/prices-many` (`994b521`) | fusionné et déployé, moteur à 4,2 s mesuré (constat 8) | 0.4.19 |
+| Rédacteur en 4 appels parallèles, dont 2 pendant l'auditeur (constat 6) | `ws/writer-parallel` (`2670aca`) | fusionné et déployé, chevauchement vérifié en production (constat 8) | 0.4.19 |
 | Contexte OpenTelemetry dans les threads (traces `kb.retrieve` orphelines, constat 4) | `f1edb4e` | fusionné | 0.4.19 |
-| Restitution traduite par Amazon Translate (constat 7) | `ws/translate` | **en cours** (agent délégué), sans banc réel | 0.4.20 |
-| Moteur à chaud (8,6 s), démarrages à froid, provisioned concurrency | — | **mis de côté** par l'utilisateur | — |
+| Restitution traduite par Amazon Translate (constat 7) | `ws/translate` | branche terminée par l'agent (`12debe6`), **non fusionnée** ; IAM et terminologie à appliquer par un humain | 0.4.20 |
+| Démarrage à froid (environ 5 s, constat 8), provisioned concurrency | — | **mis de côté** par l'utilisateur (date de soumission) | — |
 
 Gains attendus, non mesurés après déploiement :
 - tours de chat sans aller-retour perdu sur `propose_mandate` (environ −4 à −5 s par échec évité, plus de timeouts) ;
