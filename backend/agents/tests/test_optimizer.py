@@ -39,6 +39,9 @@ class FakeStore:
     def universe(self):
         return self._universe
 
+    def prices_many(self, tickers):
+        return {t: self.prices[t] for t in tickers}
+
     def last_date(self):
         return self.index[-1]
 
