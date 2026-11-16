@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { ApiError, errorText } from "../api/errors";
-import { getSummary, listPortfolios, putHoldings, searchAssets } from "../api/endpoints";
-import type { Asset, Holding, Jurisdiction, Portfolio, PortfolioSummary, Slice, SummaryRange } from "../api/types";
+import { createConversation, createMandate, createRun, getSummary, listPortfolios, putHoldings, searchAssets } from "../api/endpoints";
+import type { Asset, Holding, Jurisdiction, MandateCreateRequest, MandateObjective, Portfolio, PortfolioSummary, Run, Slice, SummaryRange } from "../api/types";
 import AppHeader from "../components/AppHeader";
 import Chart from "../components/Chart";
 import Explanation from "../components/Explanation";
 import InfoTip from "../components/InfoTip";
 import { assetClassName } from "../lib/assetClasses";
+import { INDUSTRIES } from "../lib/industries";
 import { t as tr, useT } from "../lib/i18n";
 import RiskForm from "../components/RiskForm";
 import { amount, colon, localeDateTime, money, pct, plainPct, shortDate, signedAmount, toSeconds } from "../lib/format";
@@ -42,6 +42,31 @@ function parseRows(rows: Row[], L: (fr: string, en: string) => string): { holdin
   return { holdings };
 }
 
+/* Onboarding (0.4.17) : mandat build construit sans LLM à partir des réponses du questionnaire,
+ * avec les mêmes règles que l'orchestrateur (objectif, horizon, tolérance, capacité, industries du profil). */
+const OBJECTIVES: MandateObjective[] = ["preservation", "income", "growth", "growth", "growth"]; // ordre des réponses « goal »
+const datasetIndustries = (labels: string[]) =>
+  [...new Set(labels.flatMap((l) => INDUSTRIES.find((i) => i.label === l)?.covers.split(", ") ?? []))];
+
+function onboardingMandate(answers: Record<string, number>, province: Jurisdiction, choices: ProfileChoices,
+  lang: string, buildAmount?: number): MandateCreateRequest {
+  const profile = profileFromAnswers(answers, province, choices);
+  const excluded = datasetIndustries(choices.industries.avoided);
+  const preferred = datasetIndustries(choices.industries.liked).filter((i) => !excluded.includes(i));
+  return {
+    portfolioId: "main", mode: "build", province, userLanguage: lang === "en" ? "en" : "fr",
+    objective: OBJECTIVES[answers.goal] ?? "growth",
+    horizonYears: profile.horizonMinYears || 1, // l'API exige > 0 ; borne basse de la tranche choisie
+    riskTolerance: profile.riskTolerance!, riskCapacity: profile.riskCapacity!,
+    preferences: { excludedIndustries: excluded, preferredIndustries: preferred.map((industry) => ({ industry, minWeight: null })) },
+    ...(buildAmount ? { buildAmount } : {}),
+    fieldSources: {
+      objective: "persona", horizonYears: "persona", riskTolerance: "persona", riskCapacity: "persona", preferences: "persona",
+      ...(buildAmount ? { buildAmount: "user_answer" as const } : {}),
+    },
+  };
+}
+
 function Alloc({ title, items, classes = false }: { title: string; items: Slice[]; classes?: boolean }) {
   const { lang, L } = useT();
   const name = (label: string) => (classes ? assetClassName(label, lang) : label);
@@ -61,8 +86,7 @@ function Alloc({ title, items, classes = false }: { title: string; items: Slice[
 export default function PortfolioPage() {
   const { lang, L } = useT();
   const { user, saveProfile } = useApp();
-  const nav = useNavigate();
-  const [profileReady] = useState(() => Boolean(user?.investorProfile));
+  const [profileReady, setProfileReady] = useState(() => Boolean(user?.investorProfile));
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
   const [rows, setRows] = useState<Row[]>([]);
   const [range, setRange] = useState<SummaryRange>("1y");
@@ -70,6 +94,8 @@ export default function PortfolioPage() {
   const [loading, setLoading] = useState(() => Boolean(user?.investorProfile));
   const [onboardingBusy, setOnboardingBusy] = useState(false);
   const [onboardingError, setOnboardingError] = useState("");
+  const [buildNote, setBuildNote] = useState("");
+  const [building, setBuilding] = useState(false);
   const [sumLoading, setSumLoading] = useState(false);
   const [error, setError] = useState("");
   const [sumError, setSumError] = useState("");
@@ -82,7 +108,7 @@ export default function PortfolioPage() {
   const sumSeq = useRef(0);
 
   useEffect(() => {
-    if (!profileReady) return;
+    if (!profileReady || portfolio) return; // onboarding : portefeuille déjà chargé par createPortfolio
     setLoading(true);
     listPortfolios()
       .then(({ items }) => {
@@ -104,14 +130,46 @@ export default function PortfolioPage() {
     setOnboardingBusy(true); setOnboardingError("");
     try {
       await saveProfile(profileFromAnswers(answers, province, choices));
-      // Le contrat crée le portefeuille principal au prochain GET /portfolios.
       saveRisk(user.userId, ["main"], answers, province);
-      // Premier portefeuille fictif (0.4.16) : le chat construit et explique une proposition à partir du profil.
-      await listPortfolios(); // crée le portefeuille « main » vide que le chat lira
-      nav("/chat", { replace: true, state: { onboarding: { amount: buildAmount } } });
     } catch (e) {
       setOnboardingError(errorText(e));
+      setOnboardingBusy(false);
+      return;
+    }
+    // Profil enregistré : la page passe en vue portefeuille à la fin, même si la construction échoue.
+    setBuilding(true);
+    try {
+      const { items } = await listPortfolios(); // crée le portefeuille « main » vide
+      let main = items.find((x) => x.portfolioId === "main") ?? items[0];
+      try {
+        // Premier portefeuille fictif (0.4.17) : même calcul que le mode build du chat, confirmé sans approbation.
+        const conv = await createConversation(L("Premier portefeuille", "First portfolio"));
+        const mandate = await createMandate(conv.sessionId, onboardingMandate(answers, province, choices, lang, buildAmount));
+        let run: Run;
+        try {
+          run = await createRun(conv.sessionId, mandate.version);
+        } catch {
+          run = await createRun(conv.sessionId, mandate.version); // filet de sécurité (délai d'API Gateway)
+        }
+        const built = run.scenarios.find((x) => x.index === 1 && x.holdings?.length);
+        const holdings = (built?.holdings ?? []).filter((h) => h.quantity && h.price)
+          .map((h) => ({ ticker: h.symbol, quantity: h.quantity!, avgCost: h.price! }));
+        if (!holdings.length) throw new Error(run.scenarios.length ? "no build scenario" : "empty run");
+        main = await putHoldings("main", holdings);
+      } catch {
+        setBuildNote(L(
+          "Le premier portefeuille n'a pas pu être construit. Saisissez vos positions ci-dessous ou construisez-le dans le chat.",
+          "The first portfolio could not be built. Enter your positions below or build it in the chat.",
+        ));
+      }
+      if (main) { setPortfolio(main); setRows(toRows(main.holdings)); }
+      else setError(L("Aucun portefeuille.", "No portfolio."));
+    } catch (e) {
+      setError(errorText(e));
     } finally {
+      setLoading(false);
+      setProfileReady(true);
+      setBuilding(false);
       setOnboardingBusy(false);
     }
   }
@@ -181,6 +239,9 @@ export default function PortfolioPage() {
     return pts.length > 1 ? { values: pts.map((p) => p.value), timestamps: pts.map((p) => toSeconds(p.date)) } : null;
   }, [summary]);
 
+  if (!profileReady && building) {
+    return <><AppHeader /><main className="wrap"><p className="muted" style={{ padding: "48px 0" }}>{L("Construction de votre premier portefeuille fictif…", "Building your first fictitious portfolio…")}</p></main></>;
+  }
   if (!profileReady) {
     return (
       <>
@@ -194,7 +255,7 @@ export default function PortfolioPage() {
               </div>
               <h1 id="onboarding-title" className="auth-h">{L("Quel investisseur êtes-vous\u00a0?", "What kind of investor are you?")}</h1>
               <p className="muted onboarding-intro">
-                {L("Répondez à ces questions pour établir le profil utilisé par vos simulations. Votre portefeuille principal sera créé ensuite.", "Answer these questions to set the profile used by your simulations. Your main portfolio will be created afterwards.")}
+                {L("Répondez à ces questions pour établir le profil utilisé par vos simulations. Votre premier portefeuille fictif sera ensuite construit à partir de ces réponses.", "Answer these questions to set the profile used by your simulations. Your first fictitious portfolio will then be built from these answers.")}
               </p>
             </header>
             <RiskForm
@@ -234,6 +295,7 @@ export default function PortfolioPage() {
           </div>
         </section>
 
+        {buildNote && <div className="banner warn" role="status"><p>{buildNote}</p></div>}
         {sumError && <p className="error" role="alert" style={{ marginBottom: 16 }}>{sumError}</p>}
         {sumLoading && <p className="muted small">{L("Calcul en cours…", "Calculating…")}</p>}
         {!!summary?.warnings?.length && <div className="banner warn" role="status">{summary.warnings.map((w, i) => <p key={i}>{w}</p>)}</div>}
