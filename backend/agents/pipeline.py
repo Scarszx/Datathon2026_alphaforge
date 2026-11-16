@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from typing import Any, Callable
 
@@ -27,7 +28,7 @@ from backend.agents.rules.settings import settings
 from backend.agents.toolbox import TOOLBOX
 from backend.agents.tools import notices
 from backend.agents.tools.context import RequestContext
-from backend.agents.verifier.verifier import forbidden_phrases, verify_narrative
+from backend.agents.verifier.verifier import SECTION_KEYS, forbidden_phrases, verify_narrative
 from backend.common.http import ApiError
 from backend.common.ids import new_run_id
 from backend.common.repositories import analyses as analyses_repo
@@ -207,15 +208,21 @@ def complete_run(
         input_data={"runId": run_id, "mandateVersion": run["mandateVersion"], "mode": mandate["mode"], "province": mandate["province"]},
     ) as span:
         try:
-            verdicts = auditor.audit(ctx, run["verdicts"], registry)
             narrative: dict[str, Any] | None = None
             verifier_report = None
-            try:
-                record = writer.analysis_record(mandate, run["scenarios"], verdicts, registry.items)
-                sections = writer.write(ctx, record)
-            except base.AgentFailure as failure:
-                log_event("agent.failure", agentId=writer.AGENT_ID, reason=failure.reason, sessionId=session_id)
-                sections = None
+            # data_used et limits ne citent aucune KB : elles partent en même temps que l'auditeur, avec les verdicts
+            # du module de règles et une copie figée du registre. why et what_would_change attendent les verdicts audités.
+            with ThreadPoolExecutor(max_workers=len(SECTION_KEYS)) as pool:
+                early = writer.submit(pool, ctx, writer.analysis_record(mandate, run["scenarios"], run["verdicts"], registry.items),
+                                      run["verdicts"], writer.EARLY_KEYS, with_citations=False)
+                verdicts = auditor.audit(ctx, run["verdicts"], registry)
+                late = writer.submit(pool, ctx, writer.analysis_record(mandate, run["scenarios"], verdicts, registry.items),
+                                     verdicts, writer.LATE_KEYS, with_citations=True)
+                try:
+                    sections = writer.collect(ctx, early, late)
+                except base.AgentFailure as failure:
+                    log_event("agent.failure", agentId=writer.AGENT_ID, reason=failure.reason, sessionId=session_id)
+                    sections = None
             sections_t, verdicts_t, notices_t, match = _translate_run_texts(
                 ctx, sections or [], verdicts, run.get("jurisdictionNotices", []), language)
             status = "done"

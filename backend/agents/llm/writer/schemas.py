@@ -5,8 +5,7 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 
-class WriterSections(BaseModel):
-    data_used: str = Field(description="Which data and methods produced the figures, with placeholders only.")
-    why: str = Field(description="Why each scenario got its verdict, with placeholders only.")
-    limits: str = Field(description="Limits and uncertainties, with placeholders only.")
-    what_would_change: str = Field(description="Which mandate inputs would change the answer, with placeholders only.")
+class SectionText(BaseModel):
+    """Sortie d'un appel du rédacteur : une seule section (celle demandée dans le prompt)."""
+
+    text: str = Field(description="The requested section, with placeholders only and no figure.")
