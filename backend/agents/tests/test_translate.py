@@ -49,6 +49,11 @@ def test_au_retour_les_balises_sont_retirees_et_les_entites_decodees():
     assert service.unprotect(returned) == 'Rendement de {EV-07} & l\'indice "large" <b>'
 
 
+def test_une_espace_supprimee_autour_d_un_emplacement_est_restituee():
+    returned = '<p>est<span translate="no">{EV-08}</span>, voir<span translate="no">{KB-01}</span>et({EV-02}) {EV-03}%.</p>'
+    assert service.unprotect(returned) == "est {EV-08}, voir {KB-01} et({EV-02}) {EV-03}%."
+
+
 def test_un_passage_cite_contenant_un_emplacement_est_protege_d_un_bloc():
     assert service.protect('The text says "see {KB-01} here".').count("translate=\"no\"") == 1
 

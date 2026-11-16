@@ -25,6 +25,9 @@ REGION = "us-east-1"
 # Un passage cité qui contient un emplacement est protégé d'un seul bloc (l'alternative la plus à gauche l'emporte).
 _PROTECTED = re.compile(r"\{(?:EV|KB)-\d{2,}\}|\"[^\"]*\"|“[^”]*”|«[^»]*»")
 _TAG = re.compile(r"<[^>]*>")
+# Translate supprime parfois l'espace qui précède ou suit un segment protégé (constaté : « voir{KB-01} »).
+_GLUED_BEFORE = re.compile(r"(?<=[A-Za-zÀ-ÿ0-9,;:])(\{(?:EV|KB)-\d{2,}\})")
+_GLUED_AFTER = re.compile(r"(\{(?:EV|KB)-\d{2,}\})(?=[A-Za-zÀ-ÿ])")
 
 _CLIENT = None
 
@@ -51,7 +54,8 @@ def protect(text: str) -> str:
 
 def unprotect(translated_html: str) -> str:
     """Retire les balises (les nôtres et celles que Translate a pu ajouter) puis décode les entités HTML."""
-    return html.unescape(_TAG.sub("", translated_html)).strip()
+    text = html.unescape(_TAG.sub("", translated_html))
+    return _GLUED_AFTER.sub(r"\1 ", _GLUED_BEFORE.sub(r" \1", text)).strip()
 
 
 def _content(blob: Any) -> str:
