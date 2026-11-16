@@ -17,6 +17,7 @@ from typing import Any, Callable
 
 from pydantic import BaseModel
 from strands import Agent
+from strands.tools.structured_output.structured_output_tool import StructuredOutputTool
 from strands.hooks import BeforeInvocationEvent, BeforeToolCallEvent, HookProvider, HookRegistry
 
 from backend.agents import models, telemetry
@@ -54,6 +55,8 @@ class ToolCallLimit(HookProvider):
             self.count = 0
 
     def _check(self, event: BeforeToolCallEvent) -> None:
+        if isinstance(event.selected_tool, StructuredOutputTool):
+            return  # la sortie structurée n'est pas un outil de l'agent : la compter l'annulerait quand le plafond est atteint
         with self._lock:
             self.count += 1
             if self.count > self.limit:
@@ -63,7 +66,10 @@ class ToolCallLimit(HookProvider):
 
 
 def build_agent(agent_id: str, system_prompt: str, ctx: RequestContext, *, with_tools: bool = True,
-                messages: list[dict[str, Any]] | None = None, spec: models.AgentSpec | None = None) -> Agent:
+                messages: list[dict[str, Any]] | None = None, spec: models.AgentSpec | None = None,
+                label: str | None = None, tool_call_limit: int | None = None) -> Agent:
+    """label : sous-invocation de l'agent (ex. la section du rédacteur), nommée dans la trace ; tool_call_limit
+    remplace le plafond de l'agent quand l'agent est lancé plusieurs fois et que le plafond se partage."""
     telemetry.start_telemetry()
     tools = tools_for(agent_id) if with_tools else []
     model = models.create_model(agent_id, spec=spec) if MODEL_FACTORY is models.create_model else MODEL_FACTORY(agent_id)
@@ -73,29 +79,34 @@ def build_agent(agent_id: str, system_prompt: str, ctx: RequestContext, *, with_
         "agent.id": agent_id,
         "langfuse.observation.type": "agent",
     }
+    if label:
+        trace_attrs["agent.section"] = label
+        trace_attrs["langfuse.observation.metadata.section"] = label
     if ctx.user_id:
         trace_attrs["user.id"] = ctx.user_id
         trace_attrs["langfuse.user.id"] = ctx.user_id
     return Agent(
         model=model,
-        name=agent_id,
+        name=agent_id,  # contrat : name = id de l'agent ; la section va dans les attributs de trace
         system_prompt=system_prompt,
         tools=tools,
         messages=messages or [],
         callback_handler=None,
-        hooks=[ToolCallLimit(MAX_TOOL_CALLS.get(agent_id, 0))],
+        hooks=[ToolCallLimit(MAX_TOOL_CALLS.get(agent_id, 0) if tool_call_limit is None else tool_call_limit)],
         trace_attributes=trace_attrs,
     )
 
 
 def run_agent(agent_id: str, system_prompt: str, prompt: str, ctx: RequestContext, output_model: type[BaseModel], *,
               with_tools: bool = True, messages: list[dict[str, Any]] | None = None,
-              spec: models.AgentSpec | None = None) -> BaseModel:
+              spec: models.AgentSpec | None = None, label: str | None = None,
+              tool_call_limit: int | None = None) -> BaseModel:
     """Exécute l'agent et renvoie sa sortie structurée, ou lève AgentFailure."""
     from strands.types.exceptions import MaxTokensReachedException, StructuredOutputException
 
     active_spec = spec or models.MODELS[agent_id]
-    agent = build_agent(agent_id, system_prompt, ctx, with_tools=with_tools, messages=messages, spec=active_spec)
+    agent = build_agent(agent_id, system_prompt, ctx, with_tools=with_tools, messages=messages, spec=active_spec,
+                        label=label, tool_call_limit=tool_call_limit)
     cancel = threading.Event()
     timer = threading.Timer(active_spec.timeout_seconds, cancel.set)
     timer.daemon = True
@@ -121,7 +132,7 @@ def run_agent(agent_id: str, system_prompt: str, prompt: str, ctx: RequestContex
         # Étape observée pour explanation (rule-explanation-from-trace) : l'invocation elle-même,
         # même si l'agent n'a appelé aucun outil. Ce n'est pas une ligne tool.call.
         ctx.tool_calls.append({
-            "agentId": agent_id, "tool": "agent_invocation", "params": {"output": output_model.__name__},
+            "agentId": agent_id, "tool": "agent_invocation", "params": {"output": output_model.__name__, **({"section": label} if label else {})},
             "status": status, "durationMs": int((time.perf_counter() - started) * 1000),
         })
         try:
