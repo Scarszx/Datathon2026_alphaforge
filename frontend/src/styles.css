@@ -705,8 +705,12 @@ fieldset.q.missing legend { color: var(--loss-ink); }
 .industry-side { border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
 .industry-side.liked { border-left: 4px solid var(--red); }
 .industry-side.avoided { border-left: 4px solid var(--loss); }
-.industry-side.avoided .opt.on { background: var(--loss-soft); border-color: var(--loss); color: var(--loss-ink); }
 .industry-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; gap: 8px; }
+.industry-search { position: relative; }
+.industry-search .results { position: absolute; z-index: 20; left: 0; right: 0; top: calc(100% + 4px); background: #fff; box-shadow: 0 8px 24px rgba(0,0,0,.08); }
+.industry-search .results button.active { background: #F7F8F6; }
+.chip-remove { margin-left: 6px; padding: 0 2px; font-size: 15px; line-height: 1; color: inherit; opacity: .7; }
+.chip-remove:hover { opacity: 1; }
 @media (max-width: 900px) {
   .dash-grid { grid-template-columns: 1fr; }
   .dcard.span2 { grid-column: auto; }

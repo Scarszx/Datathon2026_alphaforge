@@ -7,7 +7,6 @@ import Chart from "../components/Chart";
 import Explanation from "../components/Explanation";
 import InfoTip from "../components/InfoTip";
 import { assetClassName } from "../lib/assetClasses";
-import { INDUSTRIES } from "../lib/industries";
 import { t as tr, useT } from "../lib/i18n";
 import RiskForm from "../components/RiskForm";
 import { amount, colon, localeDateTime, money, pct, plainPct, shortDate, signedAmount, toSeconds } from "../lib/format";
@@ -46,14 +45,13 @@ function parseRows(rows: Row[], L: (fr: string, en: string) => string): { holdin
 /* Onboarding (0.4.17) : mandat build construit sans LLM à partir des réponses du questionnaire,
  * avec les mêmes règles que l'orchestrateur (objectif, horizon, tolérance, capacité, industries du profil). */
 const OBJECTIVES: MandateObjective[] = ["preservation", "income", "growth", "growth", "growth"]; // ordre des réponses « goal »
-const datasetIndustries = (labels: string[]) =>
-  [...new Set(labels.flatMap((l) => INDUSTRIES.find((i) => i.label === l)?.covers.split(", ") ?? []))];
+// Les industries du profil sont déjà des noms exacts du jeu (recherche du questionnaire) : pas de développement.
 
 function onboardingMandate(answers: Record<string, number>, province: Jurisdiction, choices: ProfileChoices,
   lang: string, buildAmount?: number): MandateCreateRequest {
   const profile = profileFromAnswers(answers, province, choices);
-  const excluded = datasetIndustries(choices.industries.avoided);
-  const preferred = datasetIndustries(choices.industries.liked).filter((i) => !excluded.includes(i));
+  const excluded = [...new Set(choices.industries.avoided)];
+  const preferred = [...new Set(choices.industries.liked)].filter((i) => !excluded.includes(i));
   return {
     portfolioId: "main", mode: "build", province, userLanguage: lang === "en" ? "en" : "fr",
     objective: OBJECTIVES[answers.goal] ?? "growth",
